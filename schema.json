@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "format": "csv",
+  "file": "asset_index.csv",
+  "encoding": "utf-8",
+  "dialect": {
+    "header": true,
+    "delimiter": ",",
+    "quotechar": "\"",
+    "lineterminator": "\n"
+  },
+  "primary_key": [
+    "game_asset_id"
+  ],
+  "null_values": [
+    ""
+  ],
+  "columns": [
+    {
+      "name": "game_asset_id",
+      "type": "integer",
+      "required": true,
+      "unique": true,
+      "description": "Primary game asset identifier from the API."
+    },
+    {
+      "name": "game_asset_name",
+      "type": "string",
+      "required": false,
+      "description": "Internal asset name when known."
+    },
+    {
+      "name": "display_name",
+      "type": "string",
+      "required": false,
+      "description": "Player-facing asset name when known."
+    },
+    {
+      "name": "hint",
+      "type": "string",
+      "required": false,
+      "description": "Freeform note or inferred classification."
+    }
+  ]
+}
