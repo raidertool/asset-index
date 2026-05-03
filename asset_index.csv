@@ -3916,34 +3916,34 @@ asset_id,asset_name,display_name_en,description_en
 352204774,DA_Redirector_SniperRifle_BoltAction_Medium_01_T3,Osprey,Has reliable damage output and accuracy.
 -1441495265,DA_Redirector_Special_BeamRifle_01_T0,Equalizer,A high capacity experimental beam rifle.
 -537173438,DA_Redirector_Special_Railgun_01_T0,Jupiter,"Fires projectiles at an incredible velocity, capable of damaging multiple targets with one shot."
--144893881,DA_SessionMod_BleedOutRate,,Faster DBNO Bleed-out
-1133767821,DA_SessionMod_BleedOutRate_Less,,Slower DBNO Bleed-out
-624307541,DA_SessionMod_BleedOutRate_More,,Faster DBNO Bleed-out
-350904612,DA_SessionMod_DamageDealt_Enemies_Less,,Enemies deal 60% less damage.
-344757279,DA_SessionMod_DamageDealt_Enemies_More,,Enemies deal 100% more damage.
--1029797162,DA_SessionMod_DamageDealt_Player,,Player deal more damage.
--762720056,DA_SessionMod_DamageTaken_Enemies,,Enemies take 50% less damage.
-97330743,DA_SessionMod_DamageTaken_Player,,Players take 50% more damage.
-2000053193,DA_SessionMod_HealthRegen_Player,,Health regen over time
-289911296,DA_SessionMod_Health_Player,,Players have 50% more health.
--3369041,DA_SessionMod_LootDropAmount,,1000% Increased amount of loot.
--1780836047,DA_SessionMod_LootDropAmount_box,,1000% Increased amount of loot.
-264088327,DA_SessionMod_LootDropAmount_Box_Less,,25% less loot in boxes
+-144893881,DA_SessionMod_BleedOutRate,,
+1133767821,DA_SessionMod_BleedOutRate_Less,,
+624307541,DA_SessionMod_BleedOutRate_More,,
+350904612,DA_SessionMod_DamageDealt_Enemies_Less,,
+344757279,DA_SessionMod_DamageDealt_Enemies_More,,
+-1029797162,DA_SessionMod_DamageDealt_Player,,
+-762720056,DA_SessionMod_DamageTaken_Enemies,,
+97330743,DA_SessionMod_DamageTaken_Player,,
+2000053193,DA_SessionMod_HealthRegen_Player,,
+289911296,DA_SessionMod_Health_Player,,
+-3369041,DA_SessionMod_LootDropAmount,,
+-1780836047,DA_SessionMod_LootDropAmount_box,,
+264088327,DA_SessionMod_LootDropAmount_Box_Less,,
 -218730300,DA_SessionMod_LootDropAmount_Enemy,,More loot from enemies
--378402281,DA_SessionMod_LootDropAmount_Enemy_Less,,Less loot from enemies
-1947563061,DA_SessionMod_LootDropAmount_Enemy_More,,More loot from enemies
-830585599,DA_SessionMod_Loot_Boost020,,Loot Drop Rate Boost 20%
-5430581,DA_SessionMod_Loot_Boost050,,Loot Drop Rate Boost 50%
-1566300018,DA_SessionMod_Loot_Boost100,,Loot Drop Rate Boost 100%
-780990464,DA_SessionMod_Loot_Boost200,,Loot Drop Rate Boost 200%
--2031249980,DA_SessionMod_Loot_RarityCommon,,Loot Drop Rarity Common
--808704936,DA_SessionMod_Loot_RarityEpic,,Loot Drop Rarity Epic
--1068363778,DA_SessionMod_Loot_RarityLegendary,,Loot Drop Rarity Legendary
--1137655172,DA_SessionMod_Loot_RarityRare,,Loot Drop Rarity Rare
-1705258222,DA_SessionMod_Score_Boost010,,Score Boost 10%
-2133964482,DA_SessionMod_Score_Boost020,,Score Boost 20%
-815974844,DA_SessionMod_Score_Boost040,,Score Boost 40%
-2138831842,DA_SessionMod_Score_Boost075,,Score Boost 75%
+-378402281,DA_SessionMod_LootDropAmount_Enemy_Less,,
+1947563061,DA_SessionMod_LootDropAmount_Enemy_More,,
+830585599,DA_SessionMod_Loot_Boost020,,
+5430581,DA_SessionMod_Loot_Boost050,,
+1566300018,DA_SessionMod_Loot_Boost100,,
+780990464,DA_SessionMod_Loot_Boost200,,
+-2031249980,DA_SessionMod_Loot_RarityCommon,,
+-808704936,DA_SessionMod_Loot_RarityEpic,,
+-1068363778,DA_SessionMod_Loot_RarityLegendary,,
+-1137655172,DA_SessionMod_Loot_RarityRare,,
+1705258222,DA_SessionMod_Score_Boost010,,
+2133964482,DA_SessionMod_Score_Boost020,,
+815974844,DA_SessionMod_Score_Boost040,,
+2138831842,DA_SessionMod_Score_Boost075,,
 -726003101,DA_SessionMod_Weather_BuriedCity_BuriedDay,,
 -965589385,DA_SessionMod_Weather_BuriedCity_GoldenOvercast,,
 1190602320,DA_SessionMod_Weather_BuriedCity_MistyMorning,,
@@ -3990,9 +3990,9 @@ asset_id,asset_name,display_name_en,description_en
 -1727430127,DA_SessionMod_Weather_TheDam_Thunderstorm,,
 -610484577,DA_SessionMod_Weather_TheDam_WindyStorm,,
 789585082,DA_SessionMod_Weather_TheDam_WinterSnowDam_01,,
--1955413410,DA_SessionMod_XP_Boost020,,XP Boost 20%
--528666297,DA_SessionMod_XP_Boost040,,XP Boost 40%
-619647460,DA_SessionMod_XP_Boost075,,XP Boost 75%
-1017388981,DA_SessionMod_XP_Boost100,,XP Boost 100%
+-1955413410,DA_SessionMod_XP_Boost020,,
+-528666297,DA_SessionMod_XP_Boost040,,
+619647460,DA_SessionMod_XP_Boost075,,
+1017388981,DA_SessionMod_XP_Boost100,,
 1105015384,DA_SpraytagDefault,,
 -1190681554,UIMapAreaInfoMetaDataItem_0,,

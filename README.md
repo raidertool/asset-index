@@ -22,11 +22,20 @@ Current snapshot:
 - 3,997 unique integer asset IDs.
 - 3,997 internal asset names.
 - 2,475 English display names.
-- 729 English descriptions.
+- 698 English descriptions.
 
 This is intended to cover the integer game asset IDs currently extractable from the game files. It is not a complete index of every Unreal asset, and some display names and descriptions are still blank. More work is being done to extract additional strings.
 
 Every `asset_name` value is an actual string found in the game files. Some currently use `DA_Persistence_*` names because a more specific item or structure name could not be fully resolved yet; those names may become more specific in future revisions.
+
+## Images
+
+The `images/` directory contains exported PNG icons named from `asset_name` when an icon could be resolved from the game files. Weapons may also include a wide equipped icon named `<asset_name>_wide.png`.
+
+Current snapshot:
+
+- 1,117 PNG icons.
+- 101 wide icon variants.
 
 ## Using The Index
 
