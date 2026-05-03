@@ -26,6 +26,8 @@ Current snapshot:
 
 This is intended to cover the integer game asset IDs currently extractable from the game files. It is not a complete index of every Unreal asset, and some display names and descriptions are still blank. More work is being done to extract additional strings.
 
+Every `asset_name` value is an actual string found in the game files. Some currently use `DA_Persistence_*` names because a more specific item or structure name could not be fully resolved yet; those names may become more specific in future revisions.
+
 ## Using The Index
 
 The ARC Raiders API usually uses integer asset IDs, not readable names. Join those IDs against `asset_index.csv` to recover names like `DA_Item_*`, `DA_OI_*`, `DA_Inventory_*`, and `DA_ModSlot_*`.
