@@ -27,7 +27,7 @@
       "name": "asset_name",
       "type": "string",
       "required": true,
-      "description": "Internal game asset name generated from the cooked game files."
+      "description": "Internal game asset name generated from the game files."
     },
     {
       "name": "display_name_en",
