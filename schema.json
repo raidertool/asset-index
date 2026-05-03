@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "format": "csv",
   "file": "asset_index.csv",
   "encoding": "utf-8",
@@ -10,36 +10,36 @@
     "lineterminator": "\n"
   },
   "primary_key": [
-    "game_asset_id"
+    "asset_id"
   ],
   "null_values": [
     ""
   ],
   "columns": [
     {
-      "name": "game_asset_id",
+      "name": "asset_id",
       "type": "integer",
       "required": true,
       "unique": true,
-      "description": "Primary game asset identifier from the API."
+      "description": "Integer game asset identifier."
     },
     {
-      "name": "game_asset_name",
+      "name": "asset_name",
       "type": "string",
-      "required": false,
-      "description": "Internal asset name when known."
+      "required": true,
+      "description": "Internal game asset name generated from the cooked game files."
     },
     {
-      "name": "display_name",
+      "name": "display_name_en",
       "type": "string",
       "required": false,
-      "description": "Player-facing asset name when known."
+      "description": "English player-facing display name, when found in the game files."
     },
     {
-      "name": "hint",
+      "name": "description_en",
       "type": "string",
       "required": false,
-      "description": "Freeform note or inferred classification."
+      "description": "English player-facing description text, when found in the game files."
     }
   ]
 }
