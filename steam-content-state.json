@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 2,
+  "appId": "1808500",
+  "branch": "public",
+  "depots": [
+    "1808501"
+  ],
+  "source": "SteamDepotFS",
+  "steamManifestVersion": "8059892693168620238",
+  "steamManifests": [
+    {
+      "depot": "1808501",
+      "manifest": "8059892693168620238"
+    }
+  ],
+  "manifestFingerprint": "3b936430b96165cd5e5a27e42ace3174b4615ec180c973ff854c719e2d3e0acc",
+  "generatorFingerprint": "7cba9b07f26c0320476d7dccf24e825664dc8b5b72cb8b5ffdb0f3ec3c1d4303",
+  "exportImages": true,
+  "updatedAtUtc": "2026-05-04T20:27:44Z",
+  "repo": {
+    "version": "v0.1.0",
+    "revision": "d2cf54065a54ad3820b8cd2b8e99b2d4bf3cee63"
+  },
+  "dependencies": {
+    "cue4Parse": {
+      "version": "raidertool-v1.2.2-raidertool.0.1.0-1-gb2864edb",
+      "revision": "b2864edbd50a0ef35a9ec72a40c335f66de8c00a"
+    },
+    "steamDepotFS": {
+      "requestedVersion": "latest",
+      "downloadUrl": "",
+      "binaryPath": "tools/SteamDepotFS/SteamDepotFs",
+      "binaryVersion": "",
+      "binarySha256": "547ec5f98d47332300b87192cdd9a124dc7fa3befed153a4386a8817f9905577"
+    }
+  },
+  "inputs": {
+    "usmapPath": "mappings/PioneerGame-5.3.2-1169740+pioneer_1.26.x.usmap",
+    "usmapSha256": "505f17dd43890be225d8e10c2533c66cdfde31291da1447c71562f831ff44e87",
+    "exfilProjectSha256": "8622d89746dab07af4716321f24ae64d2a5b4fa435d964430911655feeb71b73",
+    "exfilPackageReferences": [
+      {
+        "include": "SkiaSharp.NativeAssets.Linux.NoDependencies",
+        "version": "2.88.9"
+      }
+    ],
+    "exfilProgramSha256": "e4b6aaa42fd2dbc56a368dd9e9e02717982266449bd44e1b601146ed0753b49b",
+    "updateScriptSha256": "d3a10badbf62eaf0f197984903da4d221d855b966bde7812280afde1e34d60ea",
+    "installSteamDepotFsScriptSha256": "e0faebf91edb4f3de2031fab66f12a87d7a952f2c9e3600d4bf7e0dd98c8b803"
+  }
+}
