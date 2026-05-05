@@ -1,5 +1,7 @@
 # ARC Raiders Game Asset Index
 
+**Arc Raiders Steam Build: 23029453 (2026-05-05)**
+
 Standalone CSV index of ARC Raiders game asset IDs and internal asset names.
 
 ## Dataset
@@ -19,10 +21,14 @@ asset_id,asset_name,display_name_en,description_en
 
 Current snapshot:
 
-- 3,997 unique integer asset IDs.
-- 3,997 internal asset names.
-- 2,475 English display names.
-- 698 English descriptions.
+| Metric | Count |
+| --- | ---: |
+| Unique asset IDs | 3,997 |
+| Internal asset names | 3,997 |
+| English display names | 2,475 |
+| English descriptions | 729 |
+| PNG icons | 1,125 |
+| Wide icon variants | 101 |
 
 This is intended to cover the integer game asset IDs currently extractable from the game files. It is not a complete index of every Unreal asset, and some display names and descriptions are still blank. More work is being done to extract additional strings.
 
@@ -32,10 +38,7 @@ Every `asset_name` value is an actual string found in the game files. Some curre
 
 The `images/` directory contains exported PNG icons named from `asset_name` when an icon could be resolved from the game files. Weapons may also include a wide equipped icon named `<asset_name>_wide.png`.
 
-Current snapshot:
-
-- 1,117 PNG icons.
-- 101 wide icon variants.
+Current icon counts are included in the dataset table above.
 
 ## Using The Index
 
@@ -118,6 +121,12 @@ Common shorthand:
 - `XP` - experience points.
 - `XL` - extra large, such as an XL safe pocket.
 - `DBNO` - down but not out.
+
+## Automation
+
+This repository is regenerated when Steam publishes a new ARC Raiders build. Generated CSV and image files are committed only when their contents change; version-only game updates update the public metadata and tag without rewriting unchanged assets.
+
+The current snapshot tag is `arc-23029453-exfil-e04546f61a59`.
 
 ## Schema
 
