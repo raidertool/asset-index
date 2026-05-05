@@ -4,6 +4,10 @@
 
 Standalone CSV index of ARC Raiders game asset IDs and internal asset names.
 
+## Automation
+
+This repository is re-generated when Steam publishes a new ARC Raiders build or when the extraction code changes. **`HEAD` should always reflect the latest update.** New Steam builds are tagged as `arc-<steam-build-id>-exfil-<code-fingerprint>`, even if the assets are unchanged. Code updates create a new tag only when the generated output changes.
+
 ## Dataset
 
 The canonical dataset is [asset_index.csv](./asset_index.csv). It is generated entirely from the game's files.
@@ -34,11 +38,7 @@ This is intended to cover the integer game asset IDs currently extractable from 
 
 Every `asset_name` value is an actual string found in the game files. Some currently use `DA_Persistence_*` names because a more specific item or structure name could not be fully resolved yet; those names may become more specific in future revisions.
 
-## Images
-
 The `images/` directory contains exported PNG icons named from `asset_name` when an icon could be resolved from the game files. Weapons may also include a wide equipped icon named `<asset_name>_wide.png`.
-
-Current icon counts are included in the dataset table above.
 
 ## Using The Index
 
@@ -122,11 +122,6 @@ Common shorthand:
 - `XL` - extra large, such as an XL safe pocket.
 - `DBNO` - down but not out.
 
-## Automation
-
-This repository is regenerated when Steam publishes a new ARC Raiders build. Generated CSV and image files are committed only when their contents change; version-only game updates update the public metadata and tag without rewriting unchanged assets.
-
-The current snapshot tag is `arc-23029453-exfil-e04546f61a59`.
 
 ## Schema
 
