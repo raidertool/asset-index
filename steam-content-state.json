@@ -6,24 +6,28 @@
     "1808501"
   ],
   "source": "SteamDepotFS",
-  "steamManifestVersion": "8059892693168620238",
+  "steamBuildId": "23029453",
+  "steamBuildTimeUpdated": "1777971618",
+  "steamBuildTimeBuiltUpdated": "1777551876",
+  "steamAppInfoChangeNumber": "35660364",
+  "steamManifestVersion": "5886965454954510226",
   "steamManifests": [
     {
       "depot": "1808501",
-      "manifest": "8059892693168620238"
+      "manifest": "5886965454954510226"
     }
   ],
-  "manifestFingerprint": "3b936430b96165cd5e5a27e42ace3174b4615ec180c973ff854c719e2d3e0acc",
-  "generatorFingerprint": "7cba9b07f26c0320476d7dccf24e825664dc8b5b72cb8b5ffdb0f3ec3c1d4303",
+  "manifestFingerprint": "472fad48975edf780539708bcd7d75d6d718855aef7fe4a148756f360c31db96",
+  "generatorFingerprint": "e04546f61a59f6ea4f8225367795913f6d5fd32e92379925714eabb530731110",
   "exportImages": true,
-  "updatedAtUtc": "2026-05-04T20:27:44Z",
+  "updatedAtUtc": "2026-05-05T22:21:41Z",
   "repo": {
-    "version": "v0.1.0",
-    "revision": "d2cf54065a54ad3820b8cd2b8e99b2d4bf3cee63"
+    "version": "v0.1.2",
+    "revision": "86ff7be7dc8a3baa6008e8c22628d400312aed44"
   },
   "dependencies": {
     "cue4Parse": {
-      "version": "raidertool-v1.2.2-raidertool.0.1.0-1-gb2864edb",
+      "version": "v1.2.2-raidertool.0.1.0-1-gb2864edb",
       "revision": "b2864edbd50a0ef35a9ec72a40c335f66de8c00a"
     },
     "steamDepotFS": {
@@ -44,8 +48,8 @@
         "version": "2.88.9"
       }
     ],
-    "exfilProgramSha256": "e4b6aaa42fd2dbc56a368dd9e9e02717982266449bd44e1b601146ed0753b49b",
-    "updateScriptSha256": "d3a10badbf62eaf0f197984903da4d221d855b966bde7812280afde1e34d60ea",
+    "exfilProgramSha256": "440de55b1d1a0bd3ed46a75138bd936a6853e2c2e9d0729b6c5dc32e482933d1",
+    "updateScriptSha256": "ac40320c9efe96763597e6b8315c1efc1198d429f73b12370bc2e296139f20d9",
     "installSteamDepotFsScriptSha256": "e0faebf91edb4f3de2031fab66f12a87d7a952f2c9e3600d4bf7e0dd98c8b803"
   }
 }
