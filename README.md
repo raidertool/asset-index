@@ -8,13 +8,11 @@ Standalone CSV index of ARC Raiders game asset IDs and internal asset names.
 
 ## Automation
 
-This repository is regenerated when Steam publishes a new ARC Raiders build, or the (private) extraction codebase ("exfil") changes. The automation keeps private state for each observed run so unchanged outputs do not create public commits.
+This repository is regenerated when Steam publishes a new ARC Raiders build, or the (private) extraction codebase ("exfil") changes. **This means `HEAD` should always have content from the latest patch**.
 
-**This means `HEAD` should always have content from the latest patch.**
+Generated CSV and image files are committed only when their contents change. The snapshot tag is updated on every game update, even without asset changes. Code changes (without a game update) are only tagged when the assets change (e.g. the code is updated to extract additional metadata).
 
-Generated CSV, image files, metadata, and README snapshot details are committed only when exported public assets change. Version-only generator changes and Steam builds with identical exported assets do not create public commits or tags.
-
-New snapshot tags use `arc-<steam-build-id>-exfil-<exfil-version>` and are created only for content-changing asset snapshots. The current snapshot tag is `arc-23029453-exfil-v0.1.8`.
+New snapshot tags use `arc-<steam-build-id>-exfil-<exfil-version>`. The current snapshot tag is `arc-23029453-exfil-v0.1.8`.
 
 ## Dataset
 
