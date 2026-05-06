@@ -6,7 +6,11 @@ Standalone CSV index of ARC Raiders game asset IDs and internal asset names.
 
 ## Automation
 
-This repository is re-generated when Steam publishes a new ARC Raiders build or when the extraction code changes. **`HEAD` should always reflect the latest update.** New Steam builds are tagged as `arc-<steam-build-id>-exfil-<code-fingerprint>`, even if the assets are unchanged. Code updates create a new tag only when the generated output changes.
+This repository is regenerated when Steam publishes a new ARC Raiders build, or the (private) extraction codebase ("exfil") changes. *This means `HEAD` should always have content from the latest patch*.
+
+Generated CSV and image files are committed only when their contents change. The snapshot tag is updated on every game update, even without asset changes. Code changes (without a game update) are only tagged when the assets change (e.g. the code is updated to extract additional metadata).
+
+New snapshot tags use `arc-<steam-build-id>-exfil-<exfil-version>`. The current snapshot tag is `arc-23029453-exfil-v0.1.8`.
 
 ## Dataset
 
@@ -31,8 +35,8 @@ Current snapshot:
 | Internal asset names | 3,997 |
 | English display names | 2,475 |
 | English descriptions | 729 |
-| PNG icons | 1,125 |
-| Wide icon variants | 101 |
+| PNG icons | 1,132 |
+| Wide icon variants | 103 |
 
 This is intended to cover the integer game asset IDs currently extractable from the game files. It is not a complete index of every Unreal asset, and some display names and descriptions are still blank. More work is being done to extract additional strings.
 
