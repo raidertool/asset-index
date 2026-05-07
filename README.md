@@ -12,7 +12,7 @@ This repository is regenerated when Steam publishes a new ARC Raiders build, or 
 
 Generated CSV and image files are committed only when their contents change. The snapshot tag is updated on every game update, even without asset changes. Code changes (without a game update) are only tagged when the assets change (e.g. the code is updated to extract additional metadata).
 
-New snapshot tags use `arc-<steam-build-id>-exfil-<exfil-version>`. The current snapshot tag is `arc-23029453-exfil-v0.1.8`.
+New snapshot tags use `arc-<steam-build-id>-exfil-<exfil-version>`. The current snapshot tag is `arc-23029453-exfil-v0.4.0`.
 
 ## Dataset
 
@@ -35,7 +35,7 @@ Current snapshot:
 | --- | ---: |
 | Unique asset IDs | 3,997 |
 | Internal asset names | 3,997 |
-| English display names | 2,475 |
+| English display names | 3,230 |
 | English descriptions | 729 |
 | PNG icons | 1,132 |
 | Wide icon variants | 103 |
