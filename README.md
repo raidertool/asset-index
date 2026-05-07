@@ -12,7 +12,7 @@ This repository is regenerated when Steam publishes a new ARC Raiders build, or 
 
 Generated CSV, schema, and image files are committed only when their contents change. The snapshot tag is updated on every game update, even without asset changes. Code changes (without a game update) are only tagged when the assets change (e.g. the code is updated to extract additional metadata).
 
-New snapshot tags use `arc-<steam-build-id>-exfil-<exfil-version>`. The current snapshot tag is `arc-23029453-exfil-v0.5.0`.
+New snapshot tags use `arc-<steam-build-id>-exfil-<exfil-version>`. The current snapshot tag is `arc-23029453-exfil-v0.5.1`.
 
 ## Dataset
 
@@ -38,19 +38,19 @@ Current snapshot:
 | Internal asset names | 3,997 |
 | English display names | 3,230 |
 | English descriptions | 729 |
-| Localization rows | 20,798 |
-| Localized display names (de) | 1,669 |
-| Localized display names (es) | 1,714 |
-| Localized display names (fr) | 1,697 |
-| Localized display names (it) | 1,699 |
-| Localized display names (ja) | 1,771 |
-| Localized display names (ko) | 1,771 |
-| Localized display names (pl) | 1,710 |
-| Localized display names (pt_br) | 1,724 |
-| Localized display names (ru) | 1,771 |
-| Localized display names (tr) | 1,730 |
-| Localized display names (zh_hans) | 1,771 |
-| Localized display names (zh_hant) | 1,771 |
+| Localization rows | 35,745 |
+| Localized display names (de) | 2,827 |
+| Localized display names (es) | 2,841 |
+| Localized display names (fr) | 2,915 |
+| Localized display names (it) | 2,923 |
+| Localized display names (ja) | 3,065 |
+| Localized display names (ko) | 3,065 |
+| Localized display names (pl) | 2,955 |
+| Localized display names (pt_br) | 2,973 |
+| Localized display names (ru) | 3,066 |
+| Localized display names (tr) | 2,984 |
+| Localized display names (zh_hans) | 3,066 |
+| Localized display names (zh_hant) | 3,065 |
 | PNG icons | 1,132 |
 | Wide icon variants | 103 |
 
@@ -68,7 +68,7 @@ Missing rows or blank fields mean that string was not resolved for that locale. 
 
 ## Usage
 
-For production use, pin to a snapshot tag such as `arc-23029453-exfil-v0.5.0` instead of tracking `main`. The dataset is still pre-1.0.0, so schema details may change; update deliberately after checking `schema.json` and this README.
+For production use, pin to a snapshot tag such as `arc-23029453-exfil-v0.5.1` instead of tracking `main`. The dataset is still pre-1.0.0, so schema details may change; update deliberately after checking `schema.json` and this README.
 
 Most applications should load the CSV files into a database and join on `asset_id`. This example SQLite query returns Korean names when available, falls back to English, and finally renders the internal asset name as `({asset_name})` so unnamed assets are still identifiable:
 
