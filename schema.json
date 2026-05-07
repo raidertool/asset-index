@@ -1,45 +1,98 @@
 {
-  "schema_version": 2,
-  "format": "csv",
-  "file": "asset_index.csv",
-  "encoding": "utf-8",
-  "dialect": {
-    "header": true,
-    "delimiter": ",",
-    "quotechar": "\"",
-    "lineterminator": "\n"
-  },
-  "primary_key": [
-    "asset_id"
+  "schema_version": 3,
+  "default_locale": "en",
+  "locales": [
+    "de",
+    "es",
+    "fr",
+    "it",
+    "ja",
+    "ko",
+    "pl",
+    "pt_br",
+    "ru",
+    "tr",
+    "zh_hans",
+    "zh_hant"
   ],
-  "null_values": [
-    ""
-  ],
-  "columns": [
-    {
-      "name": "asset_id",
-      "type": "integer",
-      "required": true,
-      "unique": true,
-      "description": "Integer game asset identifier."
+  "files": {
+    "asset_index.csv": {
+      "type": "table",
+      "primary_key": [
+        "asset_id"
+      ],
+      "fields": {
+        "asset_id": {
+          "type": "integer",
+          "description": "Stable ARC Raiders game asset ID."
+        },
+        "asset_name": {
+          "type": "string",
+          "description": "Resolved internal game asset name used as the public asset key."
+        },
+        "display_name_en": {
+          "type": "string",
+          "description": "Default English display name when resolved from game localization data."
+        },
+        "description_en": {
+          "type": "string",
+          "description": "Default English description when resolved from game localization data."
+        }
+      }
     },
-    {
-      "name": "asset_name",
-      "type": "string",
-      "required": true,
-      "description": "Internal game asset name generated from the game files."
+    "asset_localizations.csv": {
+      "type": "table",
+      "primary_key": [
+        "asset_id",
+        "locale"
+      ],
+      "foreign_keys": [
+        {
+          "fields": [
+            "asset_id"
+          ],
+          "references": [
+            "asset_index.csv:asset_id"
+          ]
+        }
+      ],
+      "fields": {
+        "asset_id": {
+          "type": "integer",
+          "description": "Asset ID matching asset_index.csv."
+        },
+        "locale": {
+          "type": "string",
+          "description": "Locale code for this localization row."
+        },
+        "display_name": {
+          "type": "string",
+          "description": "Localized display name for this asset and locale, blank if unavailable."
+        },
+        "description": {
+          "type": "string",
+          "description": "Localized description for this asset and locale, blank if unavailable."
+        }
+      }
     },
-    {
-      "name": "display_name_en",
-      "type": "string",
-      "required": false,
-      "description": "English player-facing display name, when found in the game files."
-    },
-    {
-      "name": "description_en",
-      "type": "string",
-      "required": false,
-      "description": "English player-facing description text, when found in the game files."
+    "images": {
+      "type": "directory",
+      "primary_key": [
+        "asset_name"
+      ],
+      "foreign_keys": [
+        {
+          "fields": [
+            "asset_name"
+          ],
+          "references": [
+            "asset_index.csv:asset_name"
+          ]
+        }
+      ],
+      "path_pattern": "images/{asset_name}.png",
+      "wide_variant_path_pattern": "images/{asset_name}_wide.png",
+      "description": "PNG images keyed by asset_name. For weapon assets, a wide equipped-view image may also exist at images/{asset_name}_wide.png. Images are shared across locales."
     }
-  ]
+  }
 }

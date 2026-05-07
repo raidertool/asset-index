@@ -10,24 +10,25 @@ Standalone CSV index of ARC Raiders game asset IDs and internal asset names.
 
 This repository is regenerated when Steam publishes a new ARC Raiders build, or the (private) extraction codebase ("exfil") changes. **This means `HEAD` should always have content from the latest patch**.
 
-Generated CSV and image files are committed only when their contents change. The snapshot tag is updated on every game update, even without asset changes. Code changes (without a game update) are only tagged when the assets change (e.g. the code is updated to extract additional metadata).
+Generated CSV, schema, and image files are committed only when their contents change. The snapshot tag is updated on every game update, even without asset changes. Code changes (without a game update) are only tagged when the assets change (e.g. the code is updated to extract additional metadata).
 
-New snapshot tags use `arc-<steam-build-id>-exfil-<exfil-version>`. The current snapshot tag is `arc-23029453-exfil-v0.4.0`.
+New snapshot tags use `arc-<steam-build-id>-exfil-<exfil-version>`. The current snapshot tag is `arc-23029453-exfil-v0.5.0`.
 
 ## Dataset
 
-The canonical dataset is [asset_index.csv](./asset_index.csv). It is generated entirely from the game's files.
+The canonical default-language table is [asset_index.csv](./asset_index.csv). Non-English strings are in [asset_localizations.csv](./asset_localizations.csv) and can be joined on `asset_id`. [schema.json](./schema.json) describes the files, fields, and relationships.
 
-Columns:
+`asset_index.csv` columns:
 
 ```csv
 asset_id,asset_name,display_name_en,description_en
 ```
 
-- `asset_id` - integer game asset ID.
-- `asset_name` - internal game asset string.
-- `display_name_en` - English display name, when found in the game files.
-- `description_en` - English description text, when found in the game files.
+`asset_localizations.csv` columns:
+
+```csv
+asset_id,locale,display_name,description
+```
 
 Current snapshot:
 
@@ -37,6 +38,19 @@ Current snapshot:
 | Internal asset names | 3,997 |
 | English display names | 3,230 |
 | English descriptions | 729 |
+| Localization rows | 20,798 |
+| Localized display names (de) | 1,669 |
+| Localized display names (es) | 1,714 |
+| Localized display names (fr) | 1,697 |
+| Localized display names (it) | 1,699 |
+| Localized display names (ja) | 1,771 |
+| Localized display names (ko) | 1,771 |
+| Localized display names (pl) | 1,710 |
+| Localized display names (pt_br) | 1,724 |
+| Localized display names (ru) | 1,771 |
+| Localized display names (tr) | 1,730 |
+| Localized display names (zh_hans) | 1,771 |
+| Localized display names (zh_hant) | 1,771 |
 | PNG icons | 1,132 |
 | Wide icon variants | 103 |
 
@@ -44,9 +58,41 @@ This is intended to cover the integer game asset IDs currently extractable from 
 
 Every `asset_name` value is an actual string found in the game files. Some currently use `DA_Persistence_*` names because a more specific item or structure name could not be fully resolved yet; those names may become more specific in future revisions.
 
-The `images/` directory contains exported PNG icons named from `asset_name` when an icon could be resolved from the game files. Weapons may also include a wide equipped icon named `<asset_name>_wide.png`.
+The `images/` directory contains exported PNG images keyed by `asset_name` when an image could be resolved from the game files. Weapon assets may also include a wide equipped-view image named `<asset_name>_wide.png`.
 
-## Using The Index
+## Localization
+
+English strings live in `asset_index.csv` as the default language. Non-English strings live in `asset_localizations.csv`, with one row per `asset_id` and `locale` when at least one localized field is available.
+
+Missing rows or blank fields mean that string was not resolved for that locale. Consumers should fall back to English, then to a visible asset-name placeholder.
+
+## Usage
+
+For production use, pin to a snapshot tag such as `arc-23029453-exfil-v0.5.0` instead of tracking `main`. The dataset is still pre-1.0.0, so schema details may change; update deliberately after checking `schema.json` and this README.
+
+Most applications should load the CSV files into a database and join on `asset_id`. This example SQLite query returns Korean names when available, falls back to English, and finally renders the internal asset name as `({asset_name})` so unnamed assets are still identifiable:
+
+```sql
+SELECT
+  a.asset_id,
+  a.asset_name,
+  COALESCE(
+    NULLIF(l.display_name, ''),
+    NULLIF(a.display_name_en, ''),
+    '(' || a.asset_name || ')'
+  ) AS display_name,
+  COALESCE(
+    NULLIF(l.description, ''),
+    NULLIF(a.description_en, ''),
+    '(' || a.asset_name || ')'
+  ) AS description
+FROM asset_index AS a
+LEFT JOIN asset_localizations AS l
+  ON l.asset_id = a.asset_id
+ AND l.locale = 'ko';
+```
+
+## Inventory Structure
 
 The ARC Raiders API usually uses integer asset IDs, not readable names. Join those IDs against `asset_index.csv` to recover names like `DA_Item_*`, `DA_OI_*`, `DA_Inventory_*`, and `DA_ModSlot_*`.
 
@@ -135,4 +181,4 @@ Common shorthand:
 
 ## Contributing
 
-If there is other metadata that would be useful to you, please create an issue describing what you need and where it would help. I will try to extract it from the game files if it is available.
+PRs that improve coverage or correct mistakes are welcome. If there is other metadata that would be useful to you, please create an issue describing what you need and where it would help. I will try to extract it from the game files if it is available.
