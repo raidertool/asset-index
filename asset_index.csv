@@ -20,28 +20,60 @@ asset_id,asset_name,display_name_en,description_en
 888005088,DA_CharacterSkill_AntiTickField,Anti-Tick Field,Automatically throws off attached Ticks after {0}s.
 365000158,DA_CharacterSkill_ArmorBreakFreeDodgeRoll,Unburdened Roll,
 1789653302,DA_CharacterSkill_ArmorSpeedCompensation,Used To The Weight,{0}% Reduced Movement Speed Penalty
+-1837396810,DA_CharacterSkill_BonusFieldCraftRecipes,Traveling Tinkerer,
 338113108,DA_CharacterSkill_BreachGift,A Little Extra,
 1503534407,DA_CharacterSkill_BreachSpeed,Proficient Pryer,{0}% Increased Breach Speed
 2057797492,DA_CharacterSkill_BreachVolume,Gentle Pressure,-{0}% Breaching Noise
+-315200245,DA_CharacterSkill_CarryWeightIncrease,Broad Shoulders,+{0} Carry Weight
+-1964366385,DA_CharacterSkill_ClimbSpeed,Nimble Climber,{0}% Increased Climb Speed
+-490615165,DA_CharacterSkill_CriticalHealthMovementNoise,Suffer In Silence,
 -1925074376,DA_CharacterSkill_CriticalHealthStaminaRegen,Survivor's Stamina,{0}% Increased Stamina Regen
+293660876,DA_CharacterSkill_CrouchedImpairedAIVisibility,Just Another Plant,
+841973225,DA_CharacterSkill_CrouchedStaminaRegen,Revitalizing Squat,{0}% Increased Crouched Stamina Regen
+487458132,DA_CharacterSkill_CrouchSpeed,Agile Croucher,{0}% Increased Crouch Move Speed
 114107392,DA_CharacterSkill_DamageStaminaBoost,Fight Or Flight,{0} Stamina Gained When Damaged
 -1379424521,DA_CharacterSkill_DBNOBleedRate,Downed But Determined,{0}% Reduced Collapse Time When Downed
+-194067812,DA_CharacterSkill_DBNOMovementSpeed,Crawl Before You Walk,{0}% Increased Downed Move Speed
+-271729785,DA_CharacterSkill_DisableExhaustedVault,Vigorous Vaulter,
+782183256,DA_CharacterSkill_DodgeRollStaminaCost,Effortless Roll,{0}% Reduced Dodge Roll Stamina Cost
+-216088820,DA_CharacterSkill_DoubleLootReveal,Looter's Luck,{0}% Chance to Reveal Double Loot
 1105715491,DA_CharacterSkill_EmergencyADDS,Emergency Adrenaline,"Upon Shield break, automatically administers a weak Adrenaline Shot. Has a fixed cooldown."
 -726496223,DA_CharacterSkill_EmergencySmoke,Emergency Smoke,"Upon Shield break, deploys a small smoke grenade. Has a fixed cooldown."
+260984402,DA_CharacterSkill_ExhaustedStateExitThreshold,Three Deep Breaths,{0}% Reduced Exhausted State Time
 576151984,DA_CharacterSkill_ExplosionIntensity,Blast-Born,{0}% Reduced Explosion Impact Duration
+-838278801,DA_CharacterSkill_FallDamage,Sturdy Ankles,{0}% Reduced Fall Damage
+990303217,DA_CharacterSkill_FieldCraftFind,One Raider's Scraps,{0}% Chance To Loot Field Craft Item
 1582749621,DA_CharacterSkill_FullBodyTourniquet,Emergency Tourniquet,"While downed and stationary, health regenerates up to {0}% of max downed health."
+-1338374031,DA_CharacterSkill_HealingStaminaRegen,Good As New,{0}% Increased Stamina Regen
 -758926874,DA_CharacterSkill_HealthRegen,Back On Your Feet,Health Regen Limit: {0}
 1693686894,DA_CharacterSkill_HealthRegen1,Health Regen,"Restores {0} health every {1} seconds. When damage is taken, the effect is paused for {2} seconds."
 -468568924,DA_CharacterSkill_HealthRegen2,Health Regen++,"Restores {0} health every {1} seconds. When damage is taken, the effect is paused for {2} seconds."
+1673354467,DA_CharacterSkill_LevelTwoBreach,Security Breach,
+882365006,DA_CharacterSkill_LootRevealSpeed,Looter's Instincts,{0}% Increased Loot Reveal Speed
+-572130902,DA_CharacterSkill_MaxStamina,Youthful Lungs,+{0} Max Stamina
 451795054,DA_CharacterSkill_MeleeDamageToDrones,Sky-Clearing Swing,{0}% Increased Melee Damage vs ARC
 1223432054,DA_CharacterSkill_MeleeOneHitKill,Flyswatter,
 239822813,DA_CharacterSkill_MeleeStaminaCost,Effortless Swing,{0}% Decreased Melee Stamina Cost
+655822778,DA_CharacterSkill_MineDisarm,Minesweeper,
 -1383736721,DA_CharacterSkill_MobileRepair,Running Repair,Allows Shield Rechargers to be used while running.
+-648744166,DA_CharacterSkill_OverencumberedStaminaRegen,Stubborn Mule,+{0} Carry Weight Limit for Stamina Regen
 -1803869487,DA_CharacterSkill_Quickdraw,Quickdraw,Stowed or unequipped Pistols and Hand Cannons are {0}% faster to equip.
+-1751234875,DA_CharacterSkill_RecoveryRollWindow,Ready To Roll,{0}% Increased Recovery Roll Window
+1486004837,DA_CharacterSkill_ReducedAIAccuracy,Distracting Aura,
 1762907913,DA_CharacterSkill_ReducedDBNODamage,Turtle Crawl,{0}% Reduced Damage While Downed
+-1081018347,DA_CharacterSkill_ReducedLootingNoise,Silent Scavenger,{0}% Reduced Looting Noise
 1005334858,DA_CharacterSkill_ReducedWeaponEncumbrance,Loaded Arms,{0}% Reduced Equipped Weapon Weight
 157122774,DA_CharacterSkill_RevivalTopUp,Cloud of Renewal,"When revived from being downed, releases a healing cloud that restores {0} health over {1} seconds. Has a {2}-second cooldown."
+1884073680,DA_CharacterSkill_SlideFriction,Slip and Slide,{0}% Reduced Friction While Sliding
+-1836746099,DA_CharacterSkill_SprintDodgeRollDistance,Heroic Leap,{0}% Increased Sprint Dodge Roll Distance
+1589526333,DA_CharacterSkill_SprintDodgeRollSprintStamina,Carry The Momentum,
+-790296655,DA_CharacterSkill_StaminaFreeVault,Vaults on Vaults on Vaults,
 -1292067623,DA_CharacterSkill_StaminaRegen,Proper Breathing,
+-1006467082,DA_CharacterSkill_TraversalStaminaCost,Marathon Runner,{0}% Reduced Traversal Stamina Cost
+1074497428,DA_CharacterSkill_UnlockFieldCraft,In-Round Crafting,
+-1223360325,DA_CharacterSkill_VaultSpring,Vault Spring,
+289493464,DA_CharacterSkill_WalkingStaminaRegen,Calming Stroll,
+-1947610892,DA_CharacterSkill_WallLeapDistance,Off The Wall,{0}% Increased Wall Leap Distance
 603418267,DA_Emote_Angry,Angry,
 660621190,DA_Emote_BackpackAdjust_02,Backpack Adjust,
 -1213451322,DA_Emote_Beekeeper,Beekeeper,
@@ -653,6 +685,14 @@ asset_id,asset_name,display_name_en,description_en
 2058762606,DA_Item_ARCFriendifierGadgetV2,Photoelectric Cloak,A gadget that allows the user to conceal themselves from ARC.
 1415022693,DA_Item_ArmorBench_01,Gear Bench,The Gear Bench lets you craft Shields and Augments — provided you have the right resources.
 -380745354,DA_Item_Armorpack,Surge Shield Recharger,A handheld kit that recharges a shield on use.
+103801093,DA_Item_Armor_HeavyBody,Heavy Shield,"A heavy shield that blocks a large portion of incoming damage, but carries a significant cost to mobility."
+9197506,DA_Item_Armor_LightBody,Light Shield,A lightweight shield that blocks a small portion of incoming damage without impacting mobility.
+-2097404337,DA_Item_Armor_MediumBody,Medium Shield,A standard shield that blocks a medium portion of incoming damage at a moderate cost to mobility.
+607122405,DA_Item_AssaultRifle_Bullpup_01,Tempest,Has moderate fire rate and accuracy.
+-2005124131,DA_Item_AssaultRifle_Burst_01,Arpeggio,Has decent damage output and accuracy.
+1293279143,DA_Item_AssaultRifle_Heavy_01,Bettina,Has slow fire rate and high damage output.
+1361649590,DA_Item_AssaultRifle_LowTier_01,Rattler,"A cheap offensive option, but has to be reloaded 2 bullets at a time."
+287628378,DA_Item_AssaultRifle_Pneumatic_01,Kettle,"Quick and accurate, but has low bullet velocity and takes a long time to reload."
 -935249204,DA_Item_AssemblyStation_01,Refiner,Crucial companion for any Raider finding themselves in frequent need of custom parts.
 50992628,DA_Item_Augment_Combat_T1,Combat Mk. 1,"Basic combat augment. Supports stronger shields, but with limited backpack capacity and Quick Use slots."
 -1489261627,DA_Item_Augment_Combat_T2,Combat Mk. 2,A combat augment more focused on maneuverability than absorbing damage.
@@ -664,6 +704,7 @@ asset_id,asset_name,display_name_en,description_en
 433079423,DA_Item_Augment_Looting_T3_Cautious,Looting Mk. 3 (Cautious),A looting augment that swaps some carry capacity to increase survivability.
 303567898,DA_Item_Augment_Looting_T3_DBNO,Looting Mk. 3 (Survivor),A heavy-duty pack mule augment. Large weight capacity and large backpack space.
 -1328695953,DA_Item_Augment_Raider_T4_Revival,Tactical Mk. 3 (Revival),A tactical augment focused on utility over defense and looting.
+947411243,DA_Item_Augment_Raider_T4_Safekeeper,Looting Mk. 3 (Safekeeper),A looting augment that trades weight and utility for increased looting potential.
 966773769,DA_Item_Augment_Utility_T1,Tactical Mk. 1,"Basic tactical augment. More Quick Use slots for more tactical choice, but limited survivability and slightly lower looting potential."
 -1240487285,DA_Item_Augment_Utility_T2,Tactical Mk. 2,Adds more backpack space and an extra utility item slot.
 1101815928,DA_Item_Augment_Utility_T3_Defensive,Tactical Mk. 3 (Defensive),A defense-focused augment for keeping Shields topped up.
@@ -671,6 +712,9 @@ asset_id,asset_name,display_name_en,description_en
 -735920468,DA_Item_Augment_Utility_T3_Smoke,Tactical Mk. 3 (Smoke),"An upgraded version of the Tactical MK. 2 augment, adding expanded capacity across the board."
 411757406,DA_Item_BasicMeleeWeapon,Raider Tool,
 753263571,DA_Item_BasicStickyGrenade,Snap Blast Grenade,"A grenade that sticks to surfaces, dealing explosive damage after a short delay."
+-1180768360,DA_Item_BattleRifle_BreachAction_01,Ferro,"Packs a punch, but must be reloaded between every shot."
+582868715,DA_Item_BattleRifle_EnergyBurst_01,Aphelion,Fires high velocity energy rounds.
+1503794034,DA_Item_BattleRifle_LeverAction_01,Renegade,"Lever-action battle rifle with high damage output, accuracy, and headshot damage."
 -92567848,DA_Item_ChamberStation_ArmorBench_02,Gear Bench,The Gear Bench lets you craft Shields and Augments — provided you have the right resources.
 -1093740163,DA_Item_ChamberStation_ArmorBench_03,Gear Bench,The Gear Bench lets you craft Shields and Augments — provided you have the right resources.
 1517102401,DA_Item_ChamberStation_AssemblyStation_02,Refiner,Crucial companion for any Raider finding themselves in frequent need of custom parts.
@@ -717,6 +761,7 @@ asset_id,asset_name,display_name_en,description_en
 1246914991,DA_Item_Gadget_Instrument_Flute,Recorder,"A playable recorder used to attract ARC's attention, and impress other Raiders."
 1261688505,DA_Item_Gadget_Instrument_Shaker,Shaker,"A rhythmic instrument used to attract ARC's attention, and impress other Raiders."
 -898439395,DA_Item_GrindCurrency,Coins,Used to buy gear from Traders. Earned by selling loot and completing quests.
+-1945077813,DA_Item_HandCannon_SingleAction_01,Anvil,"Has high damage output and headshot damage, but slow handling."
 1827408349,DA_Item_HealingHoT_Improvised,Herbal Bandage,An improvised medical item that gradually restores health over time.
 951468812,DA_Item_HealingHoT_Medium,Sterilized Bandage,A medical item that gradually restores a large amount health over time.
 583877119,DA_Item_HealingHoT_Small,Bandage,A medical item that gradually restores health over time.
@@ -741,7 +786,9 @@ asset_id,asset_name,display_name_en,description_en
 -871523219,DA_Item_LaserTrap_StaminaDoT,Gas Grenade Trap,A laser trip wire that detonates a Gas Grenade.
 305351814,DA_Item_LaserTrap_ThrowableDecoy,Lure Grenade Trap,A laser trip wire that detonates a Lure Grenade.
 562831704,DA_Item_LauncherAmmo,Launcher Ammo,Anti-ARC payloads used mainly by the Hullcracker.
+-1247702575,DA_Item_Launcher_AntiArc_Medium_01,Hullcracker,Fires explosive projectiles that only detonate when hitting ARC.
 -1875547390,DA_Item_LightAmmo,Light Ammo,
+-1448953711,DA_Item_LMG_Medium_01,Torrente,"Has a large ammo capacity, but is only accurate while crouched."
 313013500,DA_Item_MediumAmmo,Medium Ammo,
 -28450091,DA_Item_MetalDetector_01,Dockmaster's Detector,"These detectors seem to be able to locate foreign objects buried in the sands around Riven Tides, though their exact way of functioning is unknown."
 -413627600,DA_Item_NPC_Apollo,Apollo,"When he's not dealing in explosives, Apollo is an avid flute player, so pray he won't blow his fingers off."
@@ -752,6 +799,9 @@ asset_id,asset_name,display_name_en,description_en
 1529697069,DA_Item_NPC_Posh,Posh,
 -284744277,DA_Item_NPC_Shani,Shani,"Shani fights an uphill battle to keep Speranza safe. She could use a hand, but don't look at her sideways."
 -509224542,DA_Item_NPC_TianWen,Tian Wen,"Some call Tian Wen the ""gun nut"", but that's just half the truth. She also has a supernatural knack for tech and construction."
+-1369397808,DA_Item_Pistol_01,Burletta,Has decent damage output and accuracy.
+-2011391235,DA_Item_Pistol_HighPower_01,Venator,Fires two shots at a time.
+151930098,DA_Item_Pistol_Silenced_01,Hairpin,"Has a built-in silencer. Great for stealth, but tricky in combat."
 -1840090314,DA_Item_PotionStation_01,Medical Lab,The Medical Lab is where you can create stimulants to give you that extra boost out in the wilds.
 -287542830,DA_Item_PoweredDescender,Powered Descender,"Reduces fall speed when used in the air, but has a wind-up time before reaching full force. Shuts down once out of power."
 762060615,DA_Item_Recipe_AssaultRifleHeavyRecipe,Bettina Blueprint,
@@ -1129,10 +1179,19 @@ asset_id,asset_name,display_name_en,description_en
 -799395426,DA_Item_Salvage_WovenCloth,Durable Cloth,Used to craft medical supplies.
 -1074160440,DA_Item_ScatterMissileGrenade,Wolfpack,"A grenade that scatters into multiple homing missiles, each one targeting ARC and dealing explosive damage on impact."
 -1873522360,DA_Item_ShotgunAmmo,Shotgun Ammo,
+556377413,DA_Item_Shotgun_Energy_Adjustable_01,Dolabra,"An experimental weapon that can either fire a wide short range blast, or be focused to fire a tight medium range beam of heat."
+-17510831,DA_Item_Shotgun_PumpAction_01,Il Toro,"Has a large bullet spread, sharp falloff, and high damage output."
+970327905,DA_Item_Shotgun_SemiAuto_01,Vulcano,Has good bullet spread but sharp falloff.
 -834400146,DA_Item_Smelter_01,Workbench,
+2073022999,DA_Item_SMG_01,Bobcat,Has high fire rate but low accuracy.
+235682990,DA_Item_SMG_LowTier_01,Stitcher,"Has a good damage output, but has a low fire-rate for an SMG, and can be hard to control."
+885364202,DA_Item_SMG_Medium_01,Canto,Fully automatic submachine gun with a larger caliber.
 984123027,DA_Item_SmokeGrenade,Smoke Grenade,"A grenade that creates a lingering smoke cloud on impact, blocking visibility from ARC and other Raiders."
 -1963108876,DA_Item_SnapHook,Snap Hook,A gadget that allows the user to scale structures and cover large distances.
+-1967716242,DA_Item_SniperRifle_BoltAction_Medium_01,Osprey,Has reliable damage output and accuracy.
 1958396827,DA_Item_Snowball,Snowball,A compact snowball fashioned out of the most malleable and aerodynamic snow.
+1372066888,DA_Item_Special_BeamRifle_01,Equalizer,A high capacity experimental beam rifle.
+1191072273,DA_Item_Special_Railgun_01,Jupiter,"Fires projectiles at an incredible velocity, capable of damaging multiple targets with one shot."
 -88669682,DA_Item_SprayCan_Fire,Flame Spray,"A classic makeshift weapon, sure to leave scorch marks."
 -853193179,DA_Item_StickyRemoteGrenade,Trigger 'Nade,"A remote-detonated grenade that can stick to surfaces and ARC, dealing explosive damage when triggered."
 -2035840261,DA_Item_StunGrenade,Showstopper,"A grenade that detonates after a delay, stunning enemies within its radius."
@@ -1318,6 +1377,7 @@ asset_id,asset_name,display_name_en,description_en
 2024611007,DA_OI_BackpackCharm_VintageMic_01_A,Vintage Mic,
 1034527592,DA_OI_BackpackCharm_WaterBottle_01_A,Water Bottle,
 1906017095,DA_OI_BackpackCharm_WineBottle_01_A,Bottle,
+-639828491,DA_OI_BackpackContainer_Persistence,,
 1269472363,DA_OI_BackpackContainer,,
 1041759434,DA_OI_BackpackContainer_ArcPack,Salvager,
 -692220048,DA_OI_BackpackContainer_ArcPack_Color,Color,
@@ -1359,7 +1419,6 @@ asset_id,asset_name,display_name_en,description_en
 732770759,DA_OI_BackpackContainer_OxygenTank_Color,Color,
 -1369086039,DA_OI_BackpackContainer_OxygenTank_Color_Basic,Basic,
 -1437143229,DA_OI_BackpackContainer_OxygenTank_Color_White,White,
--639828491,DA_OI_BackpackContainer_Persistence,,
 468851010,DA_OI_BackpackContainer_Portmanteau,,
 -294037319,DA_OI_BackpackContainer_Portmanteau_Color,Color,
 -5990074,DA_OI_BackpackContainer_Portmanteau_Color_Basic,Basic,
@@ -1428,8 +1487,8 @@ asset_id,asset_name,display_name_en,description_en
 -2057984878,DA_OI_BackpackContainer_WaterTank,Hydrologist,
 -1556202082,DA_OI_BackpackContainer_WaterTank_Color,Color,
 -1891466728,DA_OI_BackpackContainer_WaterTank_Color_Basic,Basic,
-1896315484,DA_OI_BackpackFrame,,
 -578881641,DA_OI_BackpackFrame_Persistence,,
+1896315484,DA_OI_BackpackFrame,,
 -618114534,DA_OI_BackpackFrame_Standard,Default Backpack Frame,
 -1945669753,DA_OI_BackpackFrame_Standard_Color,Color,
 -1259687796,DA_OI_BackpackFrame_Standard_Color_Basic,Basic,
@@ -1449,9 +1508,10 @@ asset_id,asset_name,display_name_en,description_en
 -1880964748,DA_OI_Body_BodyB,Body Type B,
 407,DA_OI_ChamberGeneratorSlot,,
 937517099,DA_OI_CharacterCustomizationStore,,
-1580756609,DA_OI_Character_01,,
 -1406551826,DA_OI_Character_01_Persistence,,
+1580756609,DA_OI_Character_01,,
 489435858,DA_OI_ColonyRun,,
+-1863030297,DA_OI_Face_Persistence,,
 1993528497,DA_OI_Face,,
 1930942009,DA_OI_FaceStyle,Face Style,
 -2075859127,DA_OI_FaceStyle_AcneScar,Acne Scar,
@@ -1509,7 +1569,6 @@ asset_id,asset_name,display_name_en,description_en
 -480123730,DA_OI_Face_Face_18_Pio,Face 18,
 -2084412649,DA_OI_Face_Face_19_Pio,Face 19,
 -571723644,DA_OI_Face_Face_20_Pio,Face 20,
--1863030297,DA_OI_Face_Persistence,,
 -786318470,DA_OI_FacialHair,,
 -766288644,DA_OI_FacialHair_BeardFull,Full Beard,
 -788270880,DA_OI_FacialHair_BeardFull_Color,Color,
@@ -1698,6 +1757,7 @@ asset_id,asset_name,display_name_en,description_en
 -863411341,DA_OI_Hair_SideSweptFringe_Color_Brown_Persistence,Brown,
 -1765022146,DA_OI_Hair_SideSweptFringe_Color_Persistence,Color,
 -1978197553,DA_OI_Hair_SideSweptFringe_Persistence,Side-Swept Fringe,
+-1877513771,DA_OI_Outfit_Persistence,Outfit,
 1181725795,DA_OI_Outfit,Outfit,
 -2140294840,DA_OI_Outfit_AbandonedAstronaut,Cosmo,
 -545372250,DA_OI_Outfit_AbandonedAstronaut_Color,Color,
@@ -2506,7 +2566,6 @@ asset_id,asset_name,display_name_en,description_en
 1513985294,DA_OI_Outfit_Pauldroid_MeshToggle3,MeshToggle3,
 -1227065044,DA_OI_Outfit_Pauldroid_MeshToggle3_Off,Off,
 -1746192253,DA_OI_Outfit_Pauldroid_MeshToggle3_On,On,
--1877513771,DA_OI_Outfit_Persistence,Outfit,
 -938042033,DA_OI_Outfit_Picket,Riot,
 1539163248,DA_OI_Outfit_Picket_Color,Color,
 -1665687655,DA_OI_Outfit_Picket_Color_Black,Black,
@@ -3033,38 +3092,6 @@ asset_id,asset_name,display_name_en,description_en
 13529440,DA_OI_Workshop_Room_D_01,,
 -1264657974,DA_OI_Workshop_RootItem,,
 -1083540236,DA_Persistence_ArmorXP,,
-103801093,DA_Item_Armor_HeavyBody,Heavy Shield,"A heavy shield that blocks a large portion of incoming damage, but carries a significant cost to mobility."
-203993527,DA_Redirector_Armor_HeavyBody_T0,Heavy Shield,"A heavy shield that blocks a large portion of incoming damage, but carries a significant cost to mobility."
-9197506,DA_Item_Armor_LightBody,Light Shield,A lightweight shield that blocks a small portion of incoming damage without impacting mobility.
-1505999062,DA_Redirector_Armor_LightBody_T0,Light Shield,A lightweight shield that blocks a small portion of incoming damage without impacting mobility.
--2097404337,DA_Item_Armor_MediumBody,Medium Shield,A standard shield that blocks a medium portion of incoming damage at a moderate cost to mobility.
-1237209984,DA_Redirector_Armor_MediumBody_T0,Medium Shield,A standard shield that blocks a medium portion of incoming damage at a moderate cost to mobility.
-1433303640,DA_Redirector_AssaultRifle_01_T0,Tempest,Has moderate fire rate and accuracy.
--1259129540,DA_Redirector_AssaultRifle_01_T1,Tempest,Has moderate fire rate and accuracy.
--672186450,DA_Redirector_AssaultRifle_01_T2,Tempest,Has moderate fire rate and accuracy.
-1629645384,DA_Redirector_AssaultRifle_01_T3,Tempest,Has moderate fire rate and accuracy.
-607122405,DA_Item_AssaultRifle_Bullpup_01,Tempest,Has moderate fire rate and accuracy.
--2005124131,DA_Item_AssaultRifle_Burst_01,Arpeggio,Has decent damage output and accuracy.
--1174500500,DA_Redirector_AssaultRifle_Burst_01_T0,Arpeggio,Has decent damage output and accuracy.
--1010165368,DA_Redirector_AssaultRifle_Burst_01_T1,Arpeggio,Has decent damage output and accuracy.
--868064320,DA_Redirector_AssaultRifle_Burst_01_T2,Arpeggio,Has decent damage output and accuracy.
-1657712312,DA_Redirector_AssaultRifle_Burst_01_T3,Arpeggio,Has decent damage output and accuracy.
-1293279143,DA_Item_AssaultRifle_Heavy_01,Bettina,Has slow fire rate and high damage output.
--1236612582,DA_Redirector_AssaultRifle_Heavy_01_T0,Bettina,Has slow fire rate and high damage output.
-392764783,DA_Redirector_AssaultRifle_Heavy_01_T1,Bettina,Has slow fire rate and high damage output.
--1884805671,DA_Redirector_AssaultRifle_Heavy_01_T2,Bettina,Has slow fire rate and high damage output.
-1506939307,DA_Redirector_AssaultRifle_Heavy_01_T3,Bettina,Has slow fire rate and high damage output.
-1361649590,DA_Item_AssaultRifle_LowTier_01,Rattler,"A cheap offensive option, but has to be reloaded 2 bullets at a time."
-549375413,DA_Redirector_AssaultRifle_LowTier_01_T0,Rattler,"A cheap offensive option, but has to be reloaded 2 bullets at a time."
-1766749662,DA_Redirector_AssaultRifle_LowTier_01_T1,Rattler,"A cheap offensive option, but has to be reloaded 2 bullets at a time."
--980968159,DA_Redirector_AssaultRifle_LowTier_01_T2,Rattler,"A cheap offensive option, but has to be reloaded 2 bullets at a time."
-1984849488,DA_Redirector_AssaultRifle_LowTier_01_T3,Rattler,"A cheap offensive option, but has to be reloaded 2 bullets at a time."
-287628378,DA_Item_AssaultRifle_Pneumatic_01,Kettle,"Quick and accurate, but has low bullet velocity and takes a long time to reload."
-209734646,DA_Redirector_AssaultRifle_Pneumatic_01_T0,Kettle,"Quick and accurate, but has low bullet velocity and takes a long time to reload."
--624801890,DA_Redirector_AssaultRifle_Pneumatic_01_T1,Kettle,"Quick and accurate, but has low bullet velocity and takes a long time to reload."
--1374119783,DA_Redirector_AssaultRifle_Pneumatic_01_T2,Kettle,"Quick and accurate, but has low bullet velocity and takes a long time to reload."
-1349673826,DA_Redirector_AssaultRifle_Pneumatic_01_T3,Kettle,"Quick and accurate, but has low bullet velocity and takes a long time to reload."
-947411243,DA_Item_Augment_Raider_T4_Safekeeper,Looting Mk. 3 (Safekeeper),A looting augment that trades weight and utility for increased looting potential.
 2009759482,DA_Persistence_BattlepassGridLayout_Layout_1,,
 1256588356,DA_Persistence_BattlepassGridLayout_Layout_5_1VH_1V_3,,
 981764183,DA_Persistence_BattlepassGridLayout_Layout_5_1V_1VH_03,,
@@ -3080,52 +3107,9 @@ asset_id,asset_name,display_name_en,description_en
 -2037595939,DA_Persistence_BattlepassGridLayout_Layout_8_1H_7,,
 -1381670029,DA_Persistence_BattlepassGridLayout_Layout_8_1V_7,,
 1438478150,DA_Persistence_BattlepassGridLayout_Layout_9,,
--1180768360,DA_Item_BattleRifle_BreachAction_01,Ferro,"Packs a punch, but must be reloaded between every shot."
--1300343709,DA_Redirector_BattleRifle_BreachAction_01_T0,Ferro,"Packs a punch, but must be reloaded between every shot."
--1347969810,DA_Redirector_BattleRifle_BreachAction_01_T1,Ferro,"Packs a punch, but must be reloaded between every shot."
-1143818817,DA_Redirector_BattleRifle_BreachAction_01_T2,Ferro,"Packs a punch, but must be reloaded between every shot."
--14963185,DA_Redirector_BattleRifle_BreachAction_01_T3,Ferro,"Packs a punch, but must be reloaded between every shot."
-582868715,DA_Item_BattleRifle_EnergyBurst_01,Aphelion,Fires high velocity energy rounds.
--1483497543,DA_Redirector_BattleRifle_EnergyBurst_01_T0,Aphelion,Fires high velocity energy rounds.
-1503794034,DA_Item_BattleRifle_LeverAction_01,Renegade,"Lever-action battle rifle with high damage output, accuracy, and headshot damage."
-1443595066,DA_Redirector_BattleRifle_LeverAction_01_T0,Renegade,"Has high damage output, accuracy, and headshot damage."
--595215449,DA_Redirector_BattleRifle_LeverAction_01_T1,Renegade,"Has high damage output, accuracy, and headshot damage."
--1520827186,DA_Redirector_BattleRifle_LeverAction_01_T2,Renegade,"Has high damage output, accuracy, and headshot damage."
-1650182822,DA_Redirector_BattleRifle_LeverAction_01_T3,Renegade,"Has high damage output, accuracy, and headshot damage."
 1111130253,DA_Persistence_Bilguun_CharacterXP,,
 -431251557,DA_Persistence_CareerXP,,
 -1911953327,DA_Persistence_Celeste_CharacterXP,,
--1837396810,DA_CharacterSkill_BonusFieldCraftRecipes,Traveling Tinkerer,
--315200245,DA_CharacterSkill_CarryWeightIncrease,Broad Shoulders,+{0} Carry Weight
--1964366385,DA_CharacterSkill_ClimbSpeed,Nimble Climber,{0}% Increased Climb Speed
--490615165,DA_CharacterSkill_CriticalHealthMovementNoise,Suffer In Silence,
-293660876,DA_CharacterSkill_CrouchedImpairedAIVisibility,Just Another Plant,
-841973225,DA_CharacterSkill_CrouchedStaminaRegen,Revitalizing Squat,{0}% Increased Crouched Stamina Regen
-487458132,DA_CharacterSkill_CrouchSpeed,Agile Croucher,{0}% Increased Crouch Move Speed
--194067812,DA_CharacterSkill_DBNOMovementSpeed,Crawl Before You Walk,{0}% Increased Downed Move Speed
-782183256,DA_CharacterSkill_DodgeRollStaminaCost,Effortless Roll,{0}% Reduced Dodge Roll Stamina Cost
--216088820,DA_CharacterSkill_DoubleLootReveal,Looter's Luck,{0}% Chance to Reveal Double Loot
-260984402,DA_CharacterSkill_ExhaustedStateExitThreshold,Three Deep Breaths,{0}% Reduced Exhausted State Time
--838278801,DA_CharacterSkill_FallDamage,Sturdy Ankles,{0}% Reduced Fall Damage
-990303217,DA_CharacterSkill_FieldCraftFind,One Raider's Scraps,{0}% Chance To Loot Field Craft Item
--1338374031,DA_CharacterSkill_HealingStaminaRegen,Good As New,{0}% Increased Stamina Regen
-1673354467,DA_CharacterSkill_LevelTwoBreach,Security Breach,
-882365006,DA_CharacterSkill_LootRevealSpeed,Looter's Instincts,{0}% Increased Loot Reveal Speed
--572130902,DA_CharacterSkill_MaxStamina,Youthful Lungs,+{0} Max Stamina
-655822778,DA_CharacterSkill_MineDisarm,Minesweeper,
--648744166,DA_CharacterSkill_OverencumberedStaminaRegen,Stubborn Mule,+{0} Carry Weight Limit for Stamina Regen
--1751234875,DA_CharacterSkill_RecoveryRollWindow,Ready To Roll,{0}% Increased Recovery Roll Window
-1486004837,DA_CharacterSkill_ReducedAIAccuracy,Distracting Aura,
--1081018347,DA_CharacterSkill_ReducedLootingNoise,Silent Scavenger,{0}% Reduced Looting Noise
-1884073680,DA_CharacterSkill_SlideFriction,Slip and Slide,{0}% Reduced Friction While Sliding
--1836746099,DA_CharacterSkill_SprintDodgeRollDistance,Heroic Leap,{0}% Increased Sprint Dodge Roll Distance
-1589526333,DA_CharacterSkill_SprintDodgeRollSprintStamina,Carry The Momentum,
--790296655,DA_CharacterSkill_StaminaFreeVault,Vaults on Vaults on Vaults,
--1006467082,DA_CharacterSkill_TraversalStaminaCost,Marathon Runner,{0}% Reduced Traversal Stamina Cost
-1074497428,DA_CharacterSkill_UnlockFieldCraft,In-Round Crafting,
--1223360325,DA_CharacterSkill_VaultSpring,Vault Spring,
-289493464,DA_CharacterSkill_WalkingStaminaRegen,Calming Stroll,
--1947610892,DA_CharacterSkill_WallLeapDistance,Off The Wall,{0}% Increased Wall Leap Distance
 -809315584,DA_Persistence_CharacterSkill_XLSafePocket,Unrestricted Safe Pocket,A Safe Pocket that allows any item to be stored.
 122658579,DA_Persistence_Clan_Background_1,,
 -342953325,DA_Persistence_Clan_Background_2,,
@@ -3141,7 +3125,6 @@ asset_id,asset_name,display_name_en,description_en
 1646223559,DA_Persistence_Clan_Logo_2,,
 86572884,DA_Persistence_Clan_Logo_3,,
 80243895,DA_Persistence_Clan_Logo_4,,
--271729785,DA_CharacterSkill_DisableExhaustedVault,Vigorous Vaulter,
 1956168178,DA_Persistence_FirearmXP,,
 -1918890564,DA_Persistence_GenericMedia_ARC_Bombardier_EntryTile,Bombardier,
 517187844,DA_Persistence_GenericMedia_ARC_Bombardier_Landscape,Bombardier,
@@ -3349,42 +3332,12 @@ asset_id,asset_name,display_name_en,description_en
 -455321890,DA_Persistence_GenericMedia_TheRaiders_Landscape,,
 -192736909,DA_Persistence_GenericMedia_TheRaiders_Portrait,,
 1174102475,DA_Persistence_GenericMedia_TheRaiders_Square,,
--1945077813,DA_Item_HandCannon_SingleAction_01,Anvil,"Has high damage output and headshot damage, but slow handling."
-1951118983,DA_Redirector_HandCannon_SingleAction_01_T0,Anvil,"Has high damage output and headshot damage, but slow handling."
--1974459892,DA_Redirector_HandCannon_SingleAction_01_T1,Anvil,"Has high damage output and headshot damage, but slow handling."
--39940538,DA_Redirector_HandCannon_SingleAction_01_T2,Anvil,"Has high damage output and headshot damage, but slow handling."
--163859490,DA_Redirector_HandCannon_SingleAction_01_T3,Anvil,"Has high damage output and headshot damage, but slow handling."
 799551165,DA_Persistence_Kalika_CharacterXP,,
 -1307209689,DA_Persistence_KineticLeapGadget,Deprecated Data,Deprecated Data
 -702564018,DA_Persistence_Lance_CharacterXP,,
 240513302,DA_Persistence_LauncherXP,,
--1247702575,DA_Item_Launcher_AntiArc_Medium_01,Hullcracker,Fires explosive projectiles that only detonate when hitting ARC.
--1868876009,DA_Redirector_Launcher_AntiArc_Medium_01_T0,Hullcracker,Fires explosive projectiles that only detonate when hitting ARC.
--1858367047,DA_Redirector_Launcher_AntiArc_Medium_01_T1,Hullcracker,Fires explosive projectiles that only detonate when hitting ARC.
--1390078682,DA_Redirector_Launcher_AntiArc_Medium_01_T2,Hullcracker,Fires explosive projectiles that only detonate when hitting ARC.
-1343472835,DA_Redirector_Launcher_AntiArc_Medium_01_T3,Hullcracker,Fires explosive projectiles that only detonate when hitting ARC.
 -1749999215,DA_Persistence_Level_UnknownDestination,,
--1448953711,DA_Item_LMG_Medium_01,Torrente,"Has a large ammo capacity, but is only accurate while crouched."
-1316261334,DA_Redirector_LMG_Medium_01_T0,Torrente,"Has a large ammo capacity, but is only accurate while crouched."
--595016198,DA_Redirector_LMG_Medium_01_T1,Torrente,"Has a large ammo capacity, but is only accurate while crouched."
-2125834231,DA_Redirector_LMG_Medium_01_T2,Torrente,"Has a large ammo capacity, but is only accurate while crouched."
-747891994,DA_Redirector_LMG_Medium_01_T3,Torrente,"Has a large ammo capacity, but is only accurate while crouched."
 294696667,DA_Persistence_MobilityGadgetXP,,
--1369397808,DA_Item_Pistol_01,Burletta,Has decent damage output and accuracy.
--1921925959,DA_Redirector_Pistol_01_T0,Burletta,Has decent damage output and accuracy.
--2054621793,DA_Redirector_Pistol_01_T1,Burletta,Has decent damage output and accuracy.
-276503907,DA_Redirector_Pistol_01_T2,Burletta,Has decent damage output and accuracy.
-1407799927,DA_Redirector_Pistol_01_T3,Burletta,Has decent damage output and accuracy.
--2011391235,DA_Item_Pistol_HighPower_01,Venator,Fires two shots at a time.
-1858816158,DA_Redirector_Pistol_HighPower_01_T0,Venator,Fires two shots at a time.
--853744599,DA_Redirector_Pistol_HighPower_01_T1,Venator,Fires two shots at a time.
--119018899,DA_Redirector_Pistol_HighPower_01_T2,Venator,Fires two shots at a time.
-168902929,DA_Redirector_Pistol_HighPower_01_T3,Venator,Fires two shots at a time.
-151930098,DA_Item_Pistol_Silenced_01,Hairpin,"Has a built-in silencer. Great for stealth, but tricky in combat."
--1119818372,DA_Redirector_Pistol_Silenced_01_T0,Hairpin,"Has a built-in silencer. Great for stealth, but tricky in combat."
-1992585880,DA_Redirector_Pistol_Silenced_01_T1,Hairpin,"Has a built-in silencer. Great for stealth, but tricky in combat."
-1370600620,DA_Redirector_Pistol_Silenced_01_T2,Hairpin,"Has a built-in silencer. Great for stealth, but tricky in combat."
-1920326798,DA_Redirector_Pistol_Silenced_01_T3,Hairpin,"Has a built-in silencer. Great for stealth, but tricky in combat."
 146701771,DA_Persistence_QuestImage_AbandonedRaiderCache,Abandoned Raider Cache,
 1769385159,DA_Persistence_QuestImage_ADeadEnd,,
 90991003,DA_Persistence_QuestImage_Analyzer,,
@@ -3594,44 +3547,8 @@ asset_id,asset_name,display_name_en,description_en
 2013661866,DA_Persistence_SessionMod_Respawn_Forever,,
 -1564332261,DA_Persistence_SessionMod_Respawn_None,,
 732183126,DA_Persistence_SessionScore,,
-556377413,DA_Item_Shotgun_Energy_Adjustable_01,Dolabra,"An experimental weapon that can either fire a wide short range blast, or be focused to fire a tight medium range beam of heat."
-1249031667,DA_Redirector_Shotgun_Energy_Adjustable_01_T0,Dolabra,"An experimental weapon that can either fire a wide short range blast, or be focused to fire a tight medium range beam of heat."
--17510831,DA_Item_Shotgun_PumpAction_01,Il Toro,"Has a large bullet spread, sharp falloff, and high damage output."
--1123417641,DA_Redirector_Shotgun_PumpAction_01_T0,Il Toro,"Has a large bullet spread, sharp falloff, and high damage output."
-269867465,DA_Redirector_Shotgun_PumpAction_01_T1,Il Toro,"Has a large bullet spread, sharp falloff, and high damage output."
-226834931,DA_Redirector_Shotgun_PumpAction_01_T2,Il Toro,"Has a large bullet spread, sharp falloff, and high damage output."
-331271227,DA_Redirector_Shotgun_PumpAction_01_T3,Il Toro,"Has a large bullet spread, sharp falloff, and high damage output."
-970327905,DA_Item_Shotgun_SemiAuto_01,Vulcano,Has good bullet spread but sharp falloff.
-1123609629,DA_Redirector_Shotgun_SemiAuto_01_T0,Vulcano,Has good bullet spread but sharp falloff.
--131543983,DA_Redirector_Shotgun_SemiAuto_01_T1,Vulcano,Has good bullet spread but sharp falloff.
-737182316,DA_Redirector_Shotgun_SemiAuto_01_T2,Vulcano,Has good bullet spread but sharp falloff.
--630279513,DA_Redirector_Shotgun_SemiAuto_01_T3,Vulcano,Has good bullet spread but sharp falloff.
-2073022999,DA_Item_SMG_01,Bobcat,Has high fire rate but low accuracy.
-637354931,DA_Redirector_SMG_01_T0,Bobcat,Has high fire rate but low accuracy.
-1768889427,DA_Redirector_SMG_01_T1,Bobcat,Has high fire rate but low accuracy.
-708897469,DA_Redirector_SMG_01_T2,Bobcat,Has high fire rate but low accuracy.
--1631078332,DA_Redirector_SMG_01_T3,Bobcat,Has high fire rate but low accuracy.
-235682990,DA_Item_SMG_LowTier_01,Stitcher,"Has a good damage output, but has a low fire-rate for an SMG, and can be hard to control."
--302696283,DA_Redirector_SMG_LowTier_01_T0,Stitcher,"Has a good damage output, but has a low fire-rate for an SMG, and can be hard to control."
-1549911570,DA_Redirector_SMG_LowTier_01_T1,Stitcher,"Has a good damage output, but has a low fire-rate for an SMG, and can be hard to control."
--2007835076,DA_Redirector_SMG_LowTier_01_T2,Stitcher,"Has a good damage output, but has a low fire-rate for an SMG, and can be hard to control."
-1516184045,DA_Redirector_SMG_LowTier_01_T3,Stitcher,"Has a good damage output, but has a low fire-rate for an SMG, and can be hard to control."
-885364202,DA_Item_SMG_Medium_01,Canto,Fully automatic submachine gun with a larger caliber.
--764908128,DA_Redirector_SMG_Medium_01_T0,Canto,Fully automatic submachine gun with a larger caliber.
-756732693,DA_Redirector_SMG_Medium_01_T1,Canto,Fully automatic submachine gun with a larger caliber.
--133724223,DA_Redirector_SMG_Medium_01_T2,Canto,Fully automatic submachine gun with a larger caliber.
-2099640885,DA_Redirector_SMG_Medium_01_T3,Canto,Fully automatic submachine gun with a larger caliber.
 -997894289,DA_Persistence_SniperRifle_BoltAction_Bullpup_01,,
 -360767846,DA_Persistence_SniperRifle_BoltAction_Bullpup_01_T0,,
--1967716242,DA_Item_SniperRifle_BoltAction_Medium_01,Osprey,Has reliable damage output and accuracy.
--1435588212,DA_Redirector_SniperRifle_BoltAction_Medium_01_T0,Osprey,Has reliable damage output and accuracy.
-1640126922,DA_Redirector_SniperRifle_BoltAction_Medium_01_T1,Osprey,Has reliable damage output and accuracy.
-30472313,DA_Redirector_SniperRifle_BoltAction_Medium_01_T2,Osprey,Has reliable damage output and accuracy.
-352204774,DA_Redirector_SniperRifle_BoltAction_Medium_01_T3,Osprey,Has reliable damage output and accuracy.
-1372066888,DA_Item_Special_BeamRifle_01,Equalizer,A high capacity experimental beam rifle.
--1441495265,DA_Redirector_Special_BeamRifle_01_T0,Equalizer,A high capacity experimental beam rifle.
-1191072273,DA_Item_Special_Railgun_01,Jupiter,"Fires projectiles at an incredible velocity, capable of damaging multiple targets with one shot."
--537173438,DA_Redirector_Special_Railgun_01_T0,Jupiter,"Fires projectiles at an incredible velocity, capable of damaging multiple targets with one shot."
 758115684,DA_Persistence_StoreGridLayout_Default,,
 -1957649468,DA_Persistence_StoreGridLayout_Layout1,,
 -797739104,DA_Persistence_StoreGridLayout_Layout2,,
@@ -3916,6 +3833,89 @@ asset_id,asset_name,display_name_en,description_en
 -755911446,DA_PurchasableOffer_WellSummerSet,The Midnight Rooster Set,
 1748881309,DA_PurchasableOffer_WhalerSet,The Whaler Set,
 -739438883,DA_PurchasableOffer_WildernessScoutSet,The Wilderness Scout Set,
+203993527,DA_Redirector_Armor_HeavyBody_T0,Heavy Shield,"A heavy shield that blocks a large portion of incoming damage, but carries a significant cost to mobility."
+1505999062,DA_Redirector_Armor_LightBody_T0,Light Shield,A lightweight shield that blocks a small portion of incoming damage without impacting mobility.
+1237209984,DA_Redirector_Armor_MediumBody_T0,Medium Shield,A standard shield that blocks a medium portion of incoming damage at a moderate cost to mobility.
+1433303640,DA_Redirector_AssaultRifle_01_T0,Tempest,Has moderate fire rate and accuracy.
+-1259129540,DA_Redirector_AssaultRifle_01_T1,Tempest,Has moderate fire rate and accuracy.
+-672186450,DA_Redirector_AssaultRifle_01_T2,Tempest,Has moderate fire rate and accuracy.
+1629645384,DA_Redirector_AssaultRifle_01_T3,Tempest,Has moderate fire rate and accuracy.
+-1174500500,DA_Redirector_AssaultRifle_Burst_01_T0,Arpeggio,Has decent damage output and accuracy.
+-1010165368,DA_Redirector_AssaultRifle_Burst_01_T1,Arpeggio,Has decent damage output and accuracy.
+-868064320,DA_Redirector_AssaultRifle_Burst_01_T2,Arpeggio,Has decent damage output and accuracy.
+1657712312,DA_Redirector_AssaultRifle_Burst_01_T3,Arpeggio,Has decent damage output and accuracy.
+-1236612582,DA_Redirector_AssaultRifle_Heavy_01_T0,Bettina,Has slow fire rate and high damage output.
+392764783,DA_Redirector_AssaultRifle_Heavy_01_T1,Bettina,Has slow fire rate and high damage output.
+-1884805671,DA_Redirector_AssaultRifle_Heavy_01_T2,Bettina,Has slow fire rate and high damage output.
+1506939307,DA_Redirector_AssaultRifle_Heavy_01_T3,Bettina,Has slow fire rate and high damage output.
+549375413,DA_Redirector_AssaultRifle_LowTier_01_T0,Rattler,"A cheap offensive option, but has to be reloaded 2 bullets at a time."
+1766749662,DA_Redirector_AssaultRifle_LowTier_01_T1,Rattler,"A cheap offensive option, but has to be reloaded 2 bullets at a time."
+-980968159,DA_Redirector_AssaultRifle_LowTier_01_T2,Rattler,"A cheap offensive option, but has to be reloaded 2 bullets at a time."
+1984849488,DA_Redirector_AssaultRifle_LowTier_01_T3,Rattler,"A cheap offensive option, but has to be reloaded 2 bullets at a time."
+209734646,DA_Redirector_AssaultRifle_Pneumatic_01_T0,Kettle,"Quick and accurate, but has low bullet velocity and takes a long time to reload."
+-624801890,DA_Redirector_AssaultRifle_Pneumatic_01_T1,Kettle,"Quick and accurate, but has low bullet velocity and takes a long time to reload."
+-1374119783,DA_Redirector_AssaultRifle_Pneumatic_01_T2,Kettle,"Quick and accurate, but has low bullet velocity and takes a long time to reload."
+1349673826,DA_Redirector_AssaultRifle_Pneumatic_01_T3,Kettle,"Quick and accurate, but has low bullet velocity and takes a long time to reload."
+-1300343709,DA_Redirector_BattleRifle_BreachAction_01_T0,Ferro,"Packs a punch, but must be reloaded between every shot."
+-1347969810,DA_Redirector_BattleRifle_BreachAction_01_T1,Ferro,"Packs a punch, but must be reloaded between every shot."
+1143818817,DA_Redirector_BattleRifle_BreachAction_01_T2,Ferro,"Packs a punch, but must be reloaded between every shot."
+-14963185,DA_Redirector_BattleRifle_BreachAction_01_T3,Ferro,"Packs a punch, but must be reloaded between every shot."
+-1483497543,DA_Redirector_BattleRifle_EnergyBurst_01_T0,Aphelion,Fires high velocity energy rounds.
+1443595066,DA_Redirector_BattleRifle_LeverAction_01_T0,Renegade,"Has high damage output, accuracy, and headshot damage."
+-595215449,DA_Redirector_BattleRifle_LeverAction_01_T1,Renegade,"Has high damage output, accuracy, and headshot damage."
+-1520827186,DA_Redirector_BattleRifle_LeverAction_01_T2,Renegade,"Has high damage output, accuracy, and headshot damage."
+1650182822,DA_Redirector_BattleRifle_LeverAction_01_T3,Renegade,"Has high damage output, accuracy, and headshot damage."
+1951118983,DA_Redirector_HandCannon_SingleAction_01_T0,Anvil,"Has high damage output and headshot damage, but slow handling."
+-1974459892,DA_Redirector_HandCannon_SingleAction_01_T1,Anvil,"Has high damage output and headshot damage, but slow handling."
+-39940538,DA_Redirector_HandCannon_SingleAction_01_T2,Anvil,"Has high damage output and headshot damage, but slow handling."
+-163859490,DA_Redirector_HandCannon_SingleAction_01_T3,Anvil,"Has high damage output and headshot damage, but slow handling."
+-1868876009,DA_Redirector_Launcher_AntiArc_Medium_01_T0,Hullcracker,Fires explosive projectiles that only detonate when hitting ARC.
+-1858367047,DA_Redirector_Launcher_AntiArc_Medium_01_T1,Hullcracker,Fires explosive projectiles that only detonate when hitting ARC.
+-1390078682,DA_Redirector_Launcher_AntiArc_Medium_01_T2,Hullcracker,Fires explosive projectiles that only detonate when hitting ARC.
+1343472835,DA_Redirector_Launcher_AntiArc_Medium_01_T3,Hullcracker,Fires explosive projectiles that only detonate when hitting ARC.
+1316261334,DA_Redirector_LMG_Medium_01_T0,Torrente,"Has a large ammo capacity, but is only accurate while crouched."
+-595016198,DA_Redirector_LMG_Medium_01_T1,Torrente,"Has a large ammo capacity, but is only accurate while crouched."
+2125834231,DA_Redirector_LMG_Medium_01_T2,Torrente,"Has a large ammo capacity, but is only accurate while crouched."
+747891994,DA_Redirector_LMG_Medium_01_T3,Torrente,"Has a large ammo capacity, but is only accurate while crouched."
+-1921925959,DA_Redirector_Pistol_01_T0,Burletta,Has decent damage output and accuracy.
+-2054621793,DA_Redirector_Pistol_01_T1,Burletta,Has decent damage output and accuracy.
+276503907,DA_Redirector_Pistol_01_T2,Burletta,Has decent damage output and accuracy.
+1407799927,DA_Redirector_Pistol_01_T3,Burletta,Has decent damage output and accuracy.
+1858816158,DA_Redirector_Pistol_HighPower_01_T0,Venator,Fires two shots at a time.
+-853744599,DA_Redirector_Pistol_HighPower_01_T1,Venator,Fires two shots at a time.
+-119018899,DA_Redirector_Pistol_HighPower_01_T2,Venator,Fires two shots at a time.
+168902929,DA_Redirector_Pistol_HighPower_01_T3,Venator,Fires two shots at a time.
+-1119818372,DA_Redirector_Pistol_Silenced_01_T0,Hairpin,"Has a built-in silencer. Great for stealth, but tricky in combat."
+1992585880,DA_Redirector_Pistol_Silenced_01_T1,Hairpin,"Has a built-in silencer. Great for stealth, but tricky in combat."
+1370600620,DA_Redirector_Pistol_Silenced_01_T2,Hairpin,"Has a built-in silencer. Great for stealth, but tricky in combat."
+1920326798,DA_Redirector_Pistol_Silenced_01_T3,Hairpin,"Has a built-in silencer. Great for stealth, but tricky in combat."
+1249031667,DA_Redirector_Shotgun_Energy_Adjustable_01_T0,Dolabra,"An experimental weapon that can either fire a wide short range blast, or be focused to fire a tight medium range beam of heat."
+-1123417641,DA_Redirector_Shotgun_PumpAction_01_T0,Il Toro,"Has a large bullet spread, sharp falloff, and high damage output."
+269867465,DA_Redirector_Shotgun_PumpAction_01_T1,Il Toro,"Has a large bullet spread, sharp falloff, and high damage output."
+226834931,DA_Redirector_Shotgun_PumpAction_01_T2,Il Toro,"Has a large bullet spread, sharp falloff, and high damage output."
+331271227,DA_Redirector_Shotgun_PumpAction_01_T3,Il Toro,"Has a large bullet spread, sharp falloff, and high damage output."
+1123609629,DA_Redirector_Shotgun_SemiAuto_01_T0,Vulcano,Has good bullet spread but sharp falloff.
+-131543983,DA_Redirector_Shotgun_SemiAuto_01_T1,Vulcano,Has good bullet spread but sharp falloff.
+737182316,DA_Redirector_Shotgun_SemiAuto_01_T2,Vulcano,Has good bullet spread but sharp falloff.
+-630279513,DA_Redirector_Shotgun_SemiAuto_01_T3,Vulcano,Has good bullet spread but sharp falloff.
+637354931,DA_Redirector_SMG_01_T0,Bobcat,Has high fire rate but low accuracy.
+1768889427,DA_Redirector_SMG_01_T1,Bobcat,Has high fire rate but low accuracy.
+708897469,DA_Redirector_SMG_01_T2,Bobcat,Has high fire rate but low accuracy.
+-1631078332,DA_Redirector_SMG_01_T3,Bobcat,Has high fire rate but low accuracy.
+-302696283,DA_Redirector_SMG_LowTier_01_T0,Stitcher,"Has a good damage output, but has a low fire-rate for an SMG, and can be hard to control."
+1549911570,DA_Redirector_SMG_LowTier_01_T1,Stitcher,"Has a good damage output, but has a low fire-rate for an SMG, and can be hard to control."
+-2007835076,DA_Redirector_SMG_LowTier_01_T2,Stitcher,"Has a good damage output, but has a low fire-rate for an SMG, and can be hard to control."
+1516184045,DA_Redirector_SMG_LowTier_01_T3,Stitcher,"Has a good damage output, but has a low fire-rate for an SMG, and can be hard to control."
+-764908128,DA_Redirector_SMG_Medium_01_T0,Canto,Fully automatic submachine gun with a larger caliber.
+756732693,DA_Redirector_SMG_Medium_01_T1,Canto,Fully automatic submachine gun with a larger caliber.
+-133724223,DA_Redirector_SMG_Medium_01_T2,Canto,Fully automatic submachine gun with a larger caliber.
+2099640885,DA_Redirector_SMG_Medium_01_T3,Canto,Fully automatic submachine gun with a larger caliber.
+-1435588212,DA_Redirector_SniperRifle_BoltAction_Medium_01_T0,Osprey,Has reliable damage output and accuracy.
+1640126922,DA_Redirector_SniperRifle_BoltAction_Medium_01_T1,Osprey,Has reliable damage output and accuracy.
+30472313,DA_Redirector_SniperRifle_BoltAction_Medium_01_T2,Osprey,Has reliable damage output and accuracy.
+352204774,DA_Redirector_SniperRifle_BoltAction_Medium_01_T3,Osprey,Has reliable damage output and accuracy.
+-1441495265,DA_Redirector_Special_BeamRifle_01_T0,Equalizer,A high capacity experimental beam rifle.
+-537173438,DA_Redirector_Special_Railgun_01_T0,Jupiter,"Fires projectiles at an incredible velocity, capable of damaging multiple targets with one shot."
 -144893881,DA_SessionMod_BleedOutRate,Faster DBNO Bleed-out,Faster DBNO Bleed-out
 1133767821,DA_SessionMod_BleedOutRate_Less,Slower DBNO Bleed-out,Slower DBNO Bleed-out
 624307541,DA_SessionMod_BleedOutRate_More,Faster DBNO Bleed-out,Faster DBNO Bleed-out

@@ -12,7 +12,7 @@ This repository is regenerated when Steam publishes a new ARC Raiders build, or 
 
 Generated CSV, schema, and image files are committed only when their contents change. The snapshot tag is updated on every game update, even without asset changes. Code changes (without a game update) are only tagged when the assets change (e.g. the code is updated to extract additional metadata).
 
-New snapshot tags use `arc-<steam-build-id>-exfil-<exfil-version>`. The current snapshot tag is `arc-23029453-exfil-v0.5.1`.
+New snapshot tags use `arc-<steam-build-id>-exfil-<exfil-version>`. The current snapshot tag is `arc-23029453-exfil-v0.5.3`.
 
 ## Dataset
 
@@ -51,7 +51,7 @@ Current snapshot:
 | Localized display names (tr) | 2,984 |
 | Localized display names (zh_hans) | 3,066 |
 | Localized display names (zh_hant) | 3,065 |
-| PNG icons | 1,132 |
+| PNG icons | 1,136 |
 | Wide icon variants | 103 |
 
 This is intended to cover the integer game asset IDs currently extractable from the game files. It is not a complete index of every Unreal asset, and some display names and descriptions are still blank. More work is being done to extract additional strings.
@@ -68,7 +68,7 @@ Missing rows or blank fields mean that string was not resolved for that locale. 
 
 ## Usage
 
-For production use, pin to a snapshot tag such as `arc-23029453-exfil-v0.5.1` instead of tracking `main`. The dataset is still pre-1.0.0, so schema details may change; update deliberately after checking `schema.json` and this README.
+For production use, pin to a snapshot tag such as `arc-23029453-exfil-v0.5.3` instead of tracking `main`. The dataset is still pre-1.0.0, so schema details may change; update deliberately after checking `schema.json` and this README.
 
 Most applications should load the CSV files into a database and join on `asset_id`. This example SQLite query returns Korean names when available, falls back to English, and finally renders the internal asset name as `({asset_name})` so unnamed assets are still identifiable:
 
