@@ -12,7 +12,7 @@ This repository is regenerated when Steam publishes a new ARC Raiders build, or 
 
 Generated CSV, schema, and image files are committed only when their contents change. The snapshot tag is updated on every game update, even without asset changes. Code changes (without a game update) are only tagged when the assets change (e.g. the code is updated to extract additional metadata).
 
-New snapshot tags use `arc-<steam-build-id>-exfil-<exfil-version>`. The current snapshot tag is `arc-23213409-exfil-v0.5.5`.
+New snapshot tags use `arc-<steam-build-id>-exfil-<exfil-version>`. The current snapshot tag is `arc-23213409-exfil-v0.5.6`.
 
 ## Dataset
 
@@ -36,23 +36,23 @@ Current snapshot:
 | --- | ---: |
 | Unique asset IDs | 4,228 |
 | Internal asset names | 4,228 |
-| English display names | 3,230 |
-| English descriptions | 729 |
-| Localization rows | 0 |
-| Localized display names (de) | 0 |
-| Localized display names (es) | 0 |
-| Localized display names (fr) | 0 |
-| Localized display names (it) | 0 |
-| Localized display names (ja) | 0 |
-| Localized display names (ko) | 0 |
-| Localized display names (pl) | 0 |
-| Localized display names (pt_br) | 0 |
-| Localized display names (ru) | 0 |
-| Localized display names (tr) | 0 |
-| Localized display names (zh_hans) | 0 |
-| Localized display names (zh_hant) | 0 |
-| PNG icons | 1,135 |
-| Wide icon variants | 103 |
+| English display names | 3,423 |
+| English descriptions | 794 |
+| Localization rows | 31,802 |
+| Localized display names (de) | 2,578 |
+| Localized display names (es) | 2,522 |
+| Localized display names (fr) | 2,608 |
+| Localized display names (it) | 2,617 |
+| Localized display names (ja) | 2,703 |
+| Localized display names (ko) | 2,704 |
+| Localized display names (pl) | 2,640 |
+| Localized display names (pt_br) | 2,656 |
+| Localized display names (ru) | 2,704 |
+| Localized display names (tr) | 2,662 |
+| Localized display names (zh_hans) | 2,704 |
+| Localized display names (zh_hant) | 2,704 |
+| PNG icons | 1,170 |
+| Wide icon variants | 108 |
 
 This is intended to cover the integer game asset IDs currently extractable from the game files. It is not a complete index of every Unreal asset, and some display names and descriptions are still blank. More work is being done to extract additional strings.
 
@@ -68,7 +68,7 @@ Missing rows or blank fields mean that string was not resolved for that locale. 
 
 ## Usage
 
-For production use, pin to a snapshot tag such as `arc-23213409-exfil-v0.5.5` instead of tracking `main`. The dataset is still pre-1.0.0, so schema details may change; update deliberately after checking `schema.json` and this README.
+For production use, pin to a snapshot tag such as `arc-23213409-exfil-v0.5.6` instead of tracking `main`. The dataset is still pre-1.0.0, so schema details may change; update deliberately after checking `schema.json` and this README.
 
 Most applications should load the CSV files into a database and join on `asset_id`. This example SQLite query returns Korean names when available, falls back to English, and finally renders the internal asset name as `({asset_name})` so unnamed assets are still identifiable:
 
