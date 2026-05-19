@@ -12,11 +12,11 @@ This repository is regenerated when Steam publishes a new ARC Raiders build, or 
 
 Generated CSV, schema, and image files are committed only when their contents change. The snapshot tag is updated on every game update, even without asset changes. Code changes (without a game update) are only tagged when the assets change (e.g. the code is updated to extract additional metadata).
 
-New snapshot tags use `arc-<steam-build-id>-exfil-<exfil-version>`. The current snapshot tag is `arc-23213409-exfil-v0.5.9`.
+New snapshot tags use `arc-<steam-build-id>-exfil-<exfil-version>`. The current snapshot tag is `arc-23213409-exfil-v0.5.10`.
 
 ## Dataset
 
-The canonical default-language table is [asset_index.csv](./asset_index.csv). Non-English strings are in [asset_localizations.csv](./asset_localizations.csv) and can be joined on `asset_id`. [schema.json](./schema.json) describes the files, fields, and relationships.
+The canonical asset table is [asset_index.csv](./asset_index.csv). Locale rows, including English (`en`), are in [asset_localizations.csv](./asset_localizations.csv) and can be joined on `asset_id`. [schema.json](./schema.json) describes the files, fields, and relationships.
 
 `asset_index.csv` columns:
 
@@ -38,7 +38,7 @@ Current snapshot:
 | Internal asset names | 4,228 |
 | English display names | 3,423 |
 | English descriptions | 794 |
-| Localization rows | 31,802 |
+| Localization rows | 35,234 |
 | Localized display names (de) | 2,578 |
 | Localized display names (es) | 2,522 |
 | Localized display names (fr) | 2,608 |
@@ -62,13 +62,13 @@ The `images/` directory contains exported PNG images keyed by `asset_name` when 
 
 ## Localization
 
-English strings live in `asset_index.csv` as the default language. Non-English strings live in `asset_localizations.csv`, with one row per `asset_id` and `locale` when at least one localized field is available.
+English strings live in `asset_index.csv` as convenience columns and in `asset_localizations.csv` as `locale = 'en'`. Other localized strings use the same localization table, with one row per `asset_id` and `locale` when at least one localized field is available.
 
 Missing rows or blank fields mean that string was not resolved for that locale. Consumers should fall back to English, then to a visible asset-name placeholder.
 
 ## Usage
 
-For production use, pin to a snapshot tag such as `arc-23213409-exfil-v0.5.9` instead of tracking `main`. The dataset is still pre-1.0.0, so schema details may change; update deliberately after checking `schema.json` and this README.
+For production use, pin to a snapshot tag such as `arc-23213409-exfil-v0.5.10` instead of tracking `main`. The dataset is still pre-1.0.0, so schema details may change; update deliberately after checking `schema.json` and this README.
 
 Most applications should load the CSV files into a database and join on `asset_id`. This example SQLite query returns Korean names when available, falls back to English, and finally renders the internal asset name as `({asset_name})` so unnamed assets are still identifiable:
 

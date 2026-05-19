@@ -1,7 +1,8 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "default_locale": "en",
   "locales": [
+    "en",
     "de",
     "es",
     "fr",
@@ -67,11 +68,11 @@
         },
         "display_name": {
           "type": "string",
-          "description": "Localized display name for this asset and locale, blank if unavailable."
+          "description": "Display name for this asset and locale, blank if unavailable."
         },
         "description": {
           "type": "string",
-          "description": "Localized description for this asset and locale, blank if unavailable."
+          "description": "Description for this asset and locale, blank if unavailable."
         }
       }
     },
