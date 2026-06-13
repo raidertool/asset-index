@@ -10,6 +10,8 @@ Standalone CSV index of ARC Raiders game asset IDs and internal asset names.
 
 This repository is regenerated when Steam publishes a new ARC Raiders build, or the (private) extraction codebase ("exfil") changes. **This means `HEAD` should always have content from the latest patch**.
 
+This only tracks updates to the `1808501` Steam Depot, which are tracked [here](https://steamdb.info/app/1808500/patchnotes/). Embark often announce updates which affect their backend only, which will not be tracked here.
+
 Generated CSV, schema, and image files are committed only when their contents change. The snapshot tag is updated on every game update, even without asset changes. Code changes (without a game update) are only tagged when the assets change (e.g. the code is updated to extract additional metadata).
 
 New snapshot tags use `arc-<steam-build-id>-exfil-<exfil-version>`. The current snapshot tag is `arc-23308193-exfil-v0.5.10`.
