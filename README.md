@@ -184,3 +184,7 @@ Common shorthand:
 ## Contributing
 
 PRs that improve coverage or correct mistakes are welcome. If there is other metadata that would be useful to you, please create an issue describing what you need and where it would help. I will try to extract it from the game files if it is available.
+
+# Credits
+
+Shout out to xivy, whose crazy skills made this possible.
