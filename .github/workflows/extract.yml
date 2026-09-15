@@ -59,6 +59,10 @@ jobs:
           fi
           test -c /dev/fuse
 
+      - name: Prepare extraction disk
+        timeout-minutes: 5
+        run: bash scripts/ci/prepare-runner-disk.sh
+
       - name: Read Steam depot and extract preview
         timeout-minutes: 80
         shell: bash

@@ -26,6 +26,8 @@ must match your game files; `--usmap /path/to/new.usmap` selects another.
 To avoid a full installation, mount the depot with
 [SteamDepotFS](https://github.com/raidertool/SteamDepotFS#usage) using your own
 Steam credentials. Pass its mounted `PioneerGame/Content/Paks` as `--game-dir`.
+Allow at least 32 GiB of free temporary disk for the current build’s package spool,
+Steam cache and generated output; larger builds may need more.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for tests and mapping updates.
 
 ## Output
