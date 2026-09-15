@@ -16,7 +16,7 @@ internal static class Images
         "Icon", "BigIcon", "TinyIcon", "Image", "CurrencyIcon", "CurrencyBigIcon", "EnemyIcon", "EnemyImage",
         "OfferImage", "OfferImage_1x1", "OfferImage_2x1", "OfferImage_9x16", "OfferImage_16x9", "OfferImage_Thumbnail",
         "BigImage", "CollapsedImage", "BattlepassListImage", "BattlepassCoverImage", "LocationPreviewImage",
-        "Portrait", "ImageAsset", "UnlockImage", "PreviewImage", "IconMaterial"
+        "Portrait", "ImageAsset", "UnlockImage", "PreviewImage", "IconMaterial", "EmptySlotImage"
     ];
 
     public static IReadOnlyList<AssetImage> Export(CatalogAsset asset, string output, ICollection<ExtractionIssue> issues)

@@ -9,8 +9,6 @@ namespace AssetIndex;
 
 internal static class Program
 {
-    private static readonly string[] Locales = ["en", "de", "es", "fr", "it", "ja", "ko", "pl", "pt_br", "ru", "tr", "zh_hans", "zh_hant"];
-
     public static int Main(string[] args)
     {
         if (args is ["--help"] or ["-h"])
@@ -77,7 +75,7 @@ internal static class Program
     {
         Console.WriteLine($"Found {assets.Count:N0} IDs. Reading text...");
         var texts = assets.Select(asset => Text.Read(asset, issues)).ToArray();
-        var localized = Text.Localize(provider, texts, Locales, issues).ToLookup(row => row.AssetId);
+        var localized = Text.Localize(provider, texts, issues).ToLookup(row => row.AssetId);
         Console.WriteLine("Exporting referenced images...");
         var records = new List<AssetRecord>();
         foreach (var asset in assets)

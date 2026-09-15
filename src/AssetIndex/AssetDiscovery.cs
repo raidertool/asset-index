@@ -39,7 +39,7 @@ internal static class AssetDiscovery
                     }
                     catch (Exception exception)
                     {
-                        issues.Add(new("decode", path, exception.Message));
+                        issues.Add(new("decode", path, DescribeError(exception)));
                     }
                 }
 
@@ -47,7 +47,7 @@ internal static class AssetDiscovery
             }
             catch (Exception exception)
             {
-                issues.Add(new("package", path, exception.Message));
+                issues.Add(new("package", path, DescribeError(exception)));
             }
 
             attempted++;
@@ -58,6 +58,12 @@ internal static class AssetDiscovery
         ReportUnindexedPackages(provider, registry, issues);
         var assets = Assets.Collect(objects, mappings, issues);
         return new(assets, issues, registry.Count, candidates.Count, loaded);
+    }
+
+    internal static string DescribeError(Exception error)
+    {
+        var cause = error.GetBaseException().Message;
+        return cause == error.Message ? error.Message : $"{error.Message} Cause: {cause}";
     }
 
     private static IReadOnlyList<FAssetData> ReadRegistry(TheiaFileProvider provider, List<ExtractionIssue> issues)
@@ -77,7 +83,7 @@ internal static class AssetDiscovery
             }
             catch (Exception exception)
             {
-                issues.Add(new("registry", file.Path, exception.Message));
+                issues.Add(new("registry", file.Path, DescribeError(exception)));
             }
         }
 

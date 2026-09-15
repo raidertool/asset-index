@@ -27,6 +27,7 @@ internal static class GameFiles
                 throw new InvalidDataException("Containers could not be mounted: " + string.Join(", ", missing.Select(reader => reader.Name)));
             if (provider.Files.Count == 0)
                 throw new InvalidDataException("No game files were mounted.");
+            provider.LoadVirtualPaths();
             provider.ChangeCulture("en");
             return provider;
         }

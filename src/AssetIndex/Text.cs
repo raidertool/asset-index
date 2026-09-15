@@ -29,18 +29,16 @@ internal static class Text
     }
 
     public static IReadOnlyList<LocalizedText> Localize(IFileProvider provider, IReadOnlyList<AssetText> assets,
-        IEnumerable<string> locales, ICollection<ExtractionIssue> issues)
+        ICollection<ExtractionIssue> issues)
     {
         var rows = new List<LocalizedText>();
-        foreach (var locale in locales)
+        var cultures = provider.Internationalization.AvailableCultures
+            .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToArray();
+        if (cultures.Length == 0)
+            issues.Add(new ExtractionIssue("localization", "cultures", "No available cultures were reported by the game."));
+        foreach (var culture in cultures)
         {
-            var culture = locale switch
-            {
-                "pt_br" => "pt-BR",
-                "zh_hans" => "zh-Hans",
-                "zh_hant" => "zh-Hant",
-                _ => locale
-            };
+            var locale = culture.Replace('-', '_').ToLowerInvariant();
             try
             {
                 provider.ChangeCulture(culture);
