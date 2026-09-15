@@ -67,10 +67,12 @@ public sealed partial class PublisherTests
         ChangeLines("discovery/packages.jsonl.gz", rows => rows.Add(new JsonObject
         {
             ["path"] = path,
+            ["name"] = "/Game/" + Path.GetFileNameWithoutExtension(path),
             ["reason"] = "unindexed",
-            ["status"] = "loaded",
+            ["status"] = "succeeded",
             ["exports"] = exports,
-            ["loaded"] = exports
+            ["selected"] = new JsonArray(Enumerable.Range(0, exports).Select(value => (JsonNode?)JsonValue.Create(value)).ToArray()),
+            ["decoded"] = new JsonArray(Enumerable.Range(0, exports).Select(value => (JsonNode?)JsonValue.Create(value)).ToArray())
         }));
         ChangeJson("coverage.json", node =>
         {

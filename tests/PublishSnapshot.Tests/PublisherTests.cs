@@ -293,11 +293,28 @@ public sealed partial class PublisherTests : IDisposable
         });
         WriteLines(directory, "discovery/packages.jsonl.gz", new[]
         {
-            new { path = "PioneerGame/Content/DA_Test.uasset", reason = "definition", status = "loaded", exports = 1, loaded = 1 },
-            new { path = "PioneerGame/Content/T_Test.uasset", reason = "reference", status = "loaded", exports = 1, loaded = 1 }
+            new { path = "PioneerGame/Content/DA_Test.uasset", name = "/Game/DA_Test", reason = "definition", status = "succeeded", exports = 1, selected = new[] { 0 }, decoded = new[] { 0 } },
+            new { path = "PioneerGame/Content/T_Test.uasset", name = "/Game/T_Test", reason = "reference", status = "succeeded", exports = 1, selected = new[] { 0 }, decoded = new[] { 0 } }
+        });
+        WriteLines(directory, "discovery/exports.jsonl.gz", new[]
+        {
+            ExportHeader("PioneerGame/Content/DA_Test.uasset", 0, "/Game/DA_Test.DA_Test", "PersistenceDataAsset", "DataAsset", "Object"),
+            ExportHeader("PioneerGame/Content/T_Test.uasset", 0, Texture, "Texture2D", "Texture", "Object")
         });
         WriteLines(directory, "localization/en.jsonl.gz", new[] { new { @namespace = "Shared", key = "UNCHANGED", value = "Unowned text" } });
     }
+
+    private static JsonObject ExportHeader(string package, int index, string path, string type, params string[] ancestors) => new()
+    {
+        ["package"] = package,
+        ["index"] = index,
+        ["path"] = path,
+        ["class"] = type,
+        ["classPath"] = "/Script/Fixture." + type,
+        ["ancestry"] = new JsonArray(ancestors.Prepend(type).Select(value => (JsonNode?)JsonValue.Create(value)).ToArray()),
+        ["ancestryComplete"] = true,
+        ["error"] = null
+    };
 
     private static JsonObject PropertyHeader(string pointer, string name = "Field", string type = "Int64Property",
         int? arrayIndex = null, int? arraySize = null, string serializeType = "Property") => new()

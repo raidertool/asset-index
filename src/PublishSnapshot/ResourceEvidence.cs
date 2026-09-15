@@ -23,10 +23,13 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, HashSet<str
             Fields(notice, "stage", "path", "message");
             foreach (var field in new[] { "stage", "path", "message" }) String(notice, field);
         }
-        var objects = ReadObjects(files["discovery/objects.jsonl.gz"]);
+        var targets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var objectTypes = ReadObjects(files["discovery/objects.jsonl.gz"], targets);
+        var objects = objectTypes.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
         CheckCount(discovery, "objects", objects.Count);
         var registry = new HashSet<string>(StringComparer.Ordinal);
         var registryPackages = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var uiTextures = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         JsonLines.Read(files["discovery/registry.jsonl.gz"], row =>
         {
             Fields(row, "path", "package", "class", "tags");
@@ -36,41 +39,26 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, HashSet<str
             var tags = new HashSet<string>(StringComparer.Ordinal);
             foreach (var tag in row.GetProperty("tags").EnumerateObject())
                 Require(tags.Add(tag.Name) && tag.Value.ValueKind == JsonValueKind.String, "Invalid registry tag.");
+            if (String(row, "class") == "Texture2D" && row.GetProperty("tags").TryGetProperty("LODGroup", out var group) && group.GetString() == "TEXTUREGROUP_UI")
+                uiTextures.Add(ObjectPath(row, "path"));
         });
         CheckCount(report, "registeredAssets", registry.Count);
         var inputs = MountedInputs.Read(files["discovery/files.jsonl.gz"], registryPackages);
-        var packages = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        long exportsTotal = 0;
-        JsonLines.Read(files["discovery/packages.jsonl.gz"], row =>
-        {
-            Fields(row, "path", "reason", "status", "exports", "loaded");
-            var path = String(row, "path");
-            Require(inputs.Paths.Contains(path), $"Discovered package is absent from mounted inputs: {path}.");
-            Require(packages.Add(path), "Duplicate discovered package.");
-            String(row, "reason");
-            var exports = row.GetProperty("exports").GetInt32();
-            Require(String(row, "status") == "loaded" && exports >= 0 && row.GetProperty("loaded").GetInt32() == exports,
-                "Discovery contains an incomplete package.");
-            exportsTotal += exports;
-        });
-        CheckCount(report, "candidates", packages.Count);
-        Require(exportsTotal == objects.Count, "Discovered export and object counts differ.");
-        Require(inputs.Unindexed.IsSubsetOf(packages), "An unindexed mounted package was not discovered.");
+        ExportCoverage.Validate(files, report, inputs, objectTypes, targets, uiTextures);
         var locales = ReadLocalizations(files);
         var resources = ReadResources(files, objects);
+        Require(uiTextures.IsSubsetOf(resources.Keys), "A registry UI texture lacks a published resource.");
         CheckCount(discovery, "resources", resources.Count);
         return new(objects, locales, resources);
     }
 
-    private static HashSet<string> ReadObjects(SnapshotFile file)
+    private static Dictionary<string, string> ReadObjects(SnapshotFile file, HashSet<string> targets)
     {
-        var objects = new HashSet<string>(StringComparer.Ordinal);
-        var targets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var objects = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         JsonLines.Read(file, row =>
         {
             Fields(row, "path", "class", "properties", "references", "texts", "values", "tableEntries", "issues");
-            Require(objects.Add(ObjectPath(row, "path")), "Duplicate discovered object.");
-            String(row, "class");
+            Require(objects.TryAdd(ObjectPath(row, "path"), String(row, "class")), "Ambiguous discovered object paths differ only by case or repeat.");
             Require(row.GetProperty("issues").GetArrayLength() == 0, "Object evidence contains diagnostics.");
             var properties = PropertyHeaders.Read(row.GetProperty("properties"));
             foreach (var reference in row.GetProperty("references").EnumerateArray())
@@ -105,7 +93,6 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, HashSet<str
             }
         });
         Require(objects.Count > 0, "No object evidence.");
-        ReferenceClosure.Validate(objects, targets);
         return objects;
     }
 

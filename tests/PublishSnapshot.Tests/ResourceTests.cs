@@ -10,6 +10,7 @@ public sealed partial class PublisherTests
     [Theory]
     [InlineData("resources.json")]
     [InlineData("discovery/objects.jsonl.gz")]
+    [InlineData("discovery/exports.jsonl.gz")]
     [InlineData("discovery/files.jsonl.gz")]
     [InlineData("discovery/registry.jsonl.gz")]
     [InlineData("discovery/packages.jsonl.gz")]
@@ -52,7 +53,7 @@ public sealed partial class PublisherTests
             case "missing-object": ChangeJson("resources.json", n => n[0]!["path"] = "/Game/Undiscovered.Undiscovered"); break;
             case "object-issues": ChangeLines("discovery/objects.jsonl.gz", rows => rows[0]!["issues"]!.AsArray().Add(new JsonObject { ["message"] = "failed" })); break;
             case "package-partial": ChangeLines("discovery/packages.jsonl.gz", rows => rows[0]!["status"] = "partial"); break;
-            case "export-object-count": ChangeLines("discovery/packages.jsonl.gz", rows => { rows[0]!["exports"] = 2; rows[0]!["loaded"] = 2; }); break;
+            case "export-object-count": ChangeLines("discovery/packages.jsonl.gz", rows => rows[0]!["exports"] = 2); break;
             case "object-count": ChangeJson("coverage.json", n => n["discovery"]!["objects"] = 3); break;
             case "resource-count": ChangeJson("coverage.json", n => n["discovery"]!["resources"] = 2); break;
             case "old-image-field":
@@ -128,7 +129,10 @@ public sealed partial class PublisherTests
             evidence["class"] = resourceClass;
             rows.Add(evidence);
         });
-        AddUnindexedPackage("PioneerGame/Content/" + resource["/Game/".Length..].Split('.', 2)[0] + ".uasset", loaded: true, exports: 1);
+        var physical = "PioneerGame/Content/" + resource["/Game/".Length..].Split('.', 2)[0] + ".uasset";
+        AddUnindexedPackage(physical, loaded: true, exports: 1);
+        ChangeLines("discovery/exports.jsonl.gz", rows => rows.Add(ExportHeader(physical, 0, resource, resourceClass,
+            resourceClass == "Texture2D" ? "Texture" : "MaterialInterface", "Object")));
         ChangeJson("coverage.json", n => { n["discovery"]!["objects"] = 3; n["discovery"]!["resources"] = 2; });
 
         var result = Publisher.Publish(preview, remote, NextExtractor, "456");

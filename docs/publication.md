@@ -6,7 +6,7 @@ It does not create the initial branch.
 
 - `assets.json`: catalog rows and presentation provenance.
 - `resources.json` and `images/`: every exported image resource, including unowned UI images.
-- `discovery/{objects,files,registry,packages}.jsonl.gz`: typed source evidence and coverage.
+- `discovery/{objects,exports,files,registry,packages}.jsonl.gz`: typed source evidence and coverage.
 - `localization/<locale>.jsonl.gz`: merged localization dictionaries, including English.
 - `coverage.json`: extraction counts, errors, notices, mapping hash, and discovery scope.
 
@@ -21,15 +21,19 @@ PNG decoding checks. Every catalog source and image resource must have object ev
 every PNG must belong to the resource inventory. Image filenames hash their
 declared resource paths, not their PNG bytes.
 
-Every registry package must map to a mounted input. Every unindexed input must
-have a completed read; completed export totals must match the object count.
-Named references within packages represented by object evidence must match the
-full path, including outer objects, case-insensitively. Native, package-only, and
-unobserved-package references remain outside this publisher check.
+Every mounted package needs a complete export-header inventory. Each selected
+index needs a decoded object with the same full path and class. Candidate classes
+and registry UI textures cannot remain header-only; UI textures also need PNGs.
+Unknown or conflicting metadata blocks publication.
+
+Every non-native reference needs an inspected package. Named targets must match
+the complete object/outer path, case-insensitively; relevant classes also need
+decoded evidence. Known unrelated classes can remain header-only. Registry aliases
+prove package inspection, without rewriting object paths.
 
 Property headers require unique, contiguous ordinal slots and valid array metadata.
 Field pointers must resolve within declared property containers; native fields
-retain their own paths.
+retain their own paths. Binary values require canonical, lossless base64.
 
 Validation reads a private copy on disk. Later changes to the input directory
 cannot change the validated payload; large images and evidence streams are not

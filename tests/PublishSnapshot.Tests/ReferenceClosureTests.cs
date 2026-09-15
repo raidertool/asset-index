@@ -31,8 +31,7 @@ public sealed partial class PublisherTests
     [InlineData("/Game/DA_Test.DA_Test")]
     [InlineData("/Game/DA_Test")]
     [InlineData("/script/CoreUObject.Object")]
-    [InlineData("/Game/Unobserved.Unobserved:Child")]
-    public void ValidAndOutOfScopeReferencesKeepTheNarrowClosureCheck(string target)
+    public void ExactObjectsPackageRootsAndNativeReferencesAreAccepted(string target)
     {
         AddReferenceFixture(target);
 
@@ -41,6 +40,19 @@ public sealed partial class PublisherTests
         Assert.True(result.Changed);
         Assert.Equal(result.Commit, RemoteRef("refs/heads/data"));
         Assert.Equal(result.Commit, RemoteRef("refs/tags/" + result.Tag));
+    }
+
+    [Theory]
+    [InlineData("/Game/Unobserved.Unobserved:Child")]
+    [InlineData("/Game/Unobserved")]
+    public void UninspectedReferencePackagesAreRejected(string target)
+    {
+        AddReferenceFixture(target);
+
+        var error = Assert.Throws<InvalidDataException>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
+
+        Assert.Contains("Referenced package was not inspected", error.Message);
+        Assert.Equal(initialCommit, RemoteRef("refs/heads/data"));
     }
 
     [Fact]
@@ -85,7 +97,17 @@ public sealed partial class PublisherTests
             });
         });
         ChangeJson("coverage.json", node => node["discovery"]!["objects"] = 4);
-        ChangeLines("discovery/packages.jsonl.gz", rows => { rows[0]!["exports"] = 3; rows[0]!["loaded"] = 3; });
+        ChangeLines("discovery/packages.jsonl.gz", rows =>
+        {
+            rows[0]!["exports"] = 3;
+            rows[0]!["selected"] = new JsonArray(0, 1, 2);
+            rows[0]!["decoded"] = new JsonArray(0, 1, 2);
+        });
+        ChangeLines("discovery/exports.jsonl.gz", rows =>
+        {
+            rows.Add(ExportHeader("PioneerGame/Content/DA_Test.uasset", 1, "/Game/DA_Test.DA_Test:Parent", "PersistenceDataAsset", "DataAsset", "Object"));
+            rows.Add(ExportHeader("PioneerGame/Content/DA_Test.uasset", 2, "/Game/DA_Test.DA_Test:Parent.Leaf", "PersistenceDataAsset", "DataAsset", "Object"));
+        });
     }
 
     private static string[] HashFiles(string directory) => Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories)
