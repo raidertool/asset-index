@@ -206,11 +206,26 @@ public sealed class ClassSchemaTests
     {
         var source = Object("Contradiction", headerParent, ("AssetId", new Int64Property(42)));
         var declaration = RuntimeClassFixture.Derive(source);
-        declaration.SuperStruct = new FPackageIndex(new FixturePackage(new UScriptClass(bodyParent)), 1);
+        declaration.SuperStruct = new FPackageIndex(new FixturePackage(new UScriptClass(bodyParent)
+        { Outer = new ResolvedPackageObject(new FixturePackage { Name = "/Script/Fixture" }) }), 1);
         var issues = new List<ExtractionIssue>();
 
         // Header inventory is metadata-only, while projection validates the layout parent.
         Assert.Null(ClassSchema.Read(source.Class!, Mappings.Value).Error);
+        Assert.Empty(Assets.Collect([source], Mappings.Value, issues));
+
+        Assert.Contains(issues, issue => issue.Stage == "asset" && issue.Message.Contains("superclass disagrees"));
+    }
+
+    [Fact]
+    public void RuntimeParentComparisonIncludesTheNativePackageIdentity()
+    {
+        var source = Object("Contradiction", "PersistenceDataAsset", ("AssetId", new Int64Property(42)));
+        var declaration = RuntimeClassFixture.Derive(source);
+        declaration.SuperStruct = new FPackageIndex(new FixturePackage(new UScriptClass("PersistenceDataAsset")
+        { Outer = new ResolvedPackageObject(new FixturePackage { Name = "/Script/DifferentModule" }) }), 1);
+        var issues = new List<ExtractionIssue>();
+
         Assert.Empty(Assets.Collect([source], Mappings.Value, issues));
 
         Assert.Contains(issues, issue => issue.Stage == "asset" && issue.Message.Contains("superclass disagrees"));

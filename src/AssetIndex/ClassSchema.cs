@@ -87,17 +87,9 @@ internal sealed class ClassSchema
                 throw new InvalidDataException($"Runtime property declarations are unavailable for {ObjectMetadata.Path(reference)}.");
             var headerParent = ObjectMetadata.Super(reference);
             var bodyParent = body.SuperStruct?.ResolvedObject;
-            if (headerParent is null || bodyParent is null || !SameDeclaration(headerParent, bodyParent))
+            if (headerParent is null || bodyParent is null || !ObjectMetadata.Path(headerParent).Equals(ObjectMetadata.Path(bodyParent), StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException($"Runtime superclass disagrees between header and body for {ObjectMetadata.Path(reference)}.");
         }
-    }
-
-    private static bool SameDeclaration(ResolvedObject left, ResolvedObject right)
-    {
-        // Already-loaded synthetic/native placeholders may have no outer path.
-        if (left is ResolvedLoadedObject && right is ResolvedLoadedObject)
-            return ReferenceEquals(left.Object?.Value, right.Object?.Value);
-        return ObjectMetadata.Path(left).Equals(ObjectMetadata.Path(right), StringComparison.OrdinalIgnoreCase);
     }
 
     private void ReadAncestry(ResolvedObject declaration, TypeMappings mappings)
