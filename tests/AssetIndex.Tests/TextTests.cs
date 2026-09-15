@@ -118,6 +118,56 @@ public sealed class TextTests
         Assert.Equal("A new quest", Text.Read(asset, []).Name?.Source);
     }
 
+    [Theory]
+    [InlineData("ItemName")]
+    [InlineData("Description")]
+    public void DifferentKeysOnTwoDefinitionsReportBothPaths(string field)
+    {
+        var first = WithText(field, new FText("items", "first", "Shared source"));
+        first.Name = "DA_First";
+        var second = WithText(field, new FText("items", "second", "Shared source"));
+        second.Name = "DA_Second";
+        var issues = new List<ExtractionIssue>();
+
+        var text = Text.Read(new CatalogAsset(42, [first, second], []), issues);
+
+        Assert.Equal(new TextReference("items", "first", "Shared source"),
+            field == "ItemName" ? text.Name : text.Description);
+        var issue = Assert.Single(issues);
+        Assert.Equal("text", issue.Stage);
+        Assert.Equal($"{second.GetPathName()}.{field}", issue.Path);
+        Assert.Contains($"{first.GetPathName()}.{field}", issue.Message);
+        Assert.Contains($"{second.GetPathName()}.{field}", issue.Message);
+    }
+
+    [Fact]
+    public void IdenticalReferencesAcrossDefinitionsDoNotReportAConflict()
+    {
+        var first = WithText("ItemName", new FText("items", "name", "Shared name"));
+        first.Name = "DA_First";
+        var second = WithText("ItemName", new FText("items", "name", "Shared name"));
+        second.Name = "DA_Second";
+        var issues = new List<ExtractionIssue>();
+
+        var text = Text.Read(new CatalogAsset(42, [first, second], []), issues);
+
+        Assert.Equal(new TextReference("items", "name", "Shared name"), text.Name);
+        Assert.Empty(issues);
+    }
+
+    [Fact]
+    public void ShortNameKeepsPriorityOverLongNameWithoutAConflict()
+    {
+        var shortName = WithText("ShortName", new FText("XP"));
+        var longName = WithText("LongName", new FText("Experience points"));
+        var issues = new List<ExtractionIssue>();
+
+        var text = Text.Read(new CatalogAsset(42, [], [longName, shortName]), issues);
+
+        Assert.Equal("XP", text.Name?.Source);
+        Assert.Empty(issues);
+    }
+
     private static CatalogAsset Asset(UObject metadata) =>
         new(1, [new UObject { Name = "DA_Test" }], [metadata]);
 

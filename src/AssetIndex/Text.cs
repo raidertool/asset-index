@@ -81,6 +81,8 @@ internal static class Text
     {
         foreach (var field in fields)
         {
+            TextReference? selected = null;
+            string? selectedPath = null;
             foreach (var source in sources)
             {
                 var path = $"{source.GetPathName()}.{field}";
@@ -88,14 +90,25 @@ internal static class Text
                 {
                     if (!Properties.TryGet<FText>(source, field, out var text)) continue;
                     var reference = ReadReference(text, source.Owner?.Provider, path, issues);
-                    if (reference is not null && (reference.Key.Length > 0 || reference.Source.Length > 0))
-                        return reference;
+                    if (reference is null || (reference.Key.Length == 0 && reference.Source.Length == 0))
+                        continue;
+                    if (selected is null)
+                    {
+                        selected = reference;
+                        selectedPath = path;
+                    }
+                    else if (reference != selected)
+                    {
+                        issues.Add(new ExtractionIssue("text", path,
+                            $"Conflicting {field} text references at {selectedPath} and {path}; retaining the first reference."));
+                    }
                 }
                 catch (Exception error)
                 {
                     issues.Add(new ExtractionIssue("text", path, error.Message));
                 }
             }
+            if (selected is not null) return selected;
         }
         return null;
     }
