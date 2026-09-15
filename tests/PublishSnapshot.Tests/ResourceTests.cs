@@ -28,6 +28,9 @@ public sealed partial class PublisherTests
     [InlineData("object-issues")]
     [InlineData("package-partial")]
     [InlineData("object-count")]
+    [InlineData("resource-count")]
+    [InlineData("old-image-field")]
+    [InlineData("old-resource-count")]
     [InlineData("selected-reference")]
     [InlineData("template-provenance")]
     [InlineData("missing-selected-name")]
@@ -48,6 +51,21 @@ public sealed partial class PublisherTests
             case "object-issues": ChangeLines("discovery/objects.jsonl.gz", rows => rows[0]!["issues"]!.AsArray().Add(new JsonObject { ["message"] = "failed" })); break;
             case "package-partial": ChangeLines("discovery/packages.jsonl.gz", rows => rows[0]!["status"] = "partial"); break;
             case "object-count": ChangeJson("coverage.json", n => n["discovery"]!["objects"] = 3); break;
+            case "resource-count": ChangeJson("coverage.json", n => n["discovery"]!["resources"] = 2); break;
+            case "old-image-field":
+                ChangeJson("assets.json", n =>
+            {
+                var image = n[0]!["images"]![0]!.AsObject();
+                image["texture"] = image["resource"]!.DeepClone();
+                image.Remove("resource");
+            }); break;
+            case "old-resource-count":
+                ChangeJson("coverage.json", n =>
+            {
+                var discovery = n["discovery"]!.AsObject();
+                discovery["textures"] = discovery["resources"]!.DeepClone();
+                discovery.Remove("resources");
+            }); break;
             case "selected-reference": ChangeJson("assets.json", n => n[0]!["presentation"]!["name"]!["source"] = "Unbacked label"); break;
             case "template-provenance": ChangeJson("assets.json", n => n[0]!["presentation"]!["candidates"]![0]!["definedAt"] = "/Game/Missing.Missing"); break;
             case "missing-selected-name": ChangeJson("assets.json", n => n[0]!["presentation"]!["name"] = null); break;
@@ -80,11 +98,12 @@ public sealed partial class PublisherTests
         Assert.False(Publisher.Publish(preview, remote, NextExtractor, "456").Changed);
     }
 
-    [Fact]
-    public void AnUnownedTextureIsPublishedThroughTheResourceInventory()
+    [Theory]
+    [InlineData("/Game/T_Unowned.T_Unowned", "Texture2D")]
+    [InlineData("/Game/MI_Unowned.MI_Unowned", "MaterialInstanceConstant")]
+    public void AnUnownedImageIsPublishedThroughTheResourceInventory(string resource, string resourceClass)
     {
         WritePreview(preview, "Initial name");
-        const string resource = "/Game/T_Unowned.T_Unowned";
         var file = "images/" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(resource))) + ".png";
         File.Copy(Path.Combine(preview, Image), Path.Combine(preview, file));
         ChangeJson("resources.json", rows => rows.AsArray().Add(new JsonObject
@@ -97,11 +116,12 @@ public sealed partial class PublisherTests
         }));
         ChangeLines("discovery/objects.jsonl.gz", rows =>
         {
-            var texture = rows[1]!.DeepClone();
-            texture["path"] = resource;
-            rows.Add(texture);
+            var evidence = rows[1]!.DeepClone();
+            evidence["path"] = resource;
+            evidence["class"] = resourceClass;
+            rows.Add(evidence);
         });
-        ChangeJson("coverage.json", n => { n["discovery"]!["objects"] = 3; n["discovery"]!["textures"] = 2; });
+        ChangeJson("coverage.json", n => { n["discovery"]!["objects"] = 3; n["discovery"]!["resources"] = 2; });
 
         var result = Publisher.Publish(preview, remote, NextExtractor, "456");
 

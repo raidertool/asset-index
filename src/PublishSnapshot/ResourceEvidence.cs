@@ -14,7 +14,7 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, HashSet<str
     public static ResourceEvidence Read(IReadOnlyDictionary<string, SnapshotFile> files, JsonElement report)
     {
         var discovery = report.GetProperty("discovery");
-        Fields(discovery, "nativeScope", "mappingSha256", "objects", "textures");
+        Fields(discovery, "nativeScope", "mappingSha256", "objects", "resources");
         String(discovery, "nativeScope");
         Require(Regex.IsMatch(String(discovery, "mappingSha256"), "\\A[0-9a-f]{64}\\z"), "Invalid mapping hash.");
         foreach (var notice in report.GetProperty("notices").EnumerateArray())
@@ -49,7 +49,7 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, HashSet<str
         CheckCount(report, "candidates", packages.Count);
         var locales = ReadLocalizations(files);
         var resources = ReadResources(files, objects);
-        CheckCount(discovery, "textures", resources.Count);
+        CheckCount(discovery, "resources", resources.Count);
         return new(objects, locales, resources);
     }
 
@@ -123,13 +123,13 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, HashSet<str
         {
             Fields(row, "path", "status", "file", "width", "height");
             var path = ObjectPath(row, "path");
-            Require(objects.Contains(path), "Texture resource lacks object evidence.");
-            Require(String(row, "status") == "exported", "Texture resource failed to export.");
+            Require(objects.Contains(path), "Image resource lacks object evidence.");
+            Require(String(row, "status") == "exported", "Image resource failed to export.");
             var file = String(row, "file");
             var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(path)));
-            Require(file == $"images/{hash}.png" && images.Add(file), "Invalid or duplicate texture file.");
+            Require(file == $"images/{hash}.png" && images.Add(file), "Invalid or duplicate resource file.");
             var image = new ResourceImage(file, row.GetProperty("width").GetInt32(), row.GetProperty("height").GetInt32());
-            Require(image.Width > 0 && image.Height > 0 && resources.TryAdd(path, image), "Invalid or duplicate texture resource.");
+            Require(image.Width > 0 && image.Height > 0 && resources.TryAdd(path, image), "Invalid or duplicate image resource.");
             Require(files.TryGetValue(file, out var source), "Missing resource PNG.");
             ValidatePng(source!, image);
         }

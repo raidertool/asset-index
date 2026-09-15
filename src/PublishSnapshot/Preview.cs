@@ -105,24 +105,24 @@ internal sealed record Preview(SnapshotFiles Snapshot) : IDisposable
         var exported = false;
         foreach (var image in images.EnumerateArray())
         {
-            Fields(image, "field", "source", "texture", "status", "file", "width", "height");
+            Fields(image, "field", "source", "resource", "status", "file", "width", "height");
             var source = String(image, "source");
             Require(objectPaths.Contains(source) && sources.Add((source, String(image, "field"))), "Invalid or duplicate image source/field.");
             var status = String(image, "status");
             if (status == "absent")
             {
-                Require(new[] { "texture", "file", "width", "height" }.All(field => image.GetProperty(field).ValueKind == JsonValueKind.Null), "Absent image has export values.");
+                Require(new[] { "resource", "file", "width", "height" }.All(field => image.GetProperty(field).ValueKind == JsonValueKind.Null), "Absent image has export values.");
                 continue;
             }
             Require(status == "exported", "Preview contains a failed or unsupported image.");
-            var texture = String(image, "texture");
+            var resourcePath = String(image, "resource");
             var path = String(image, "file");
             Require(ImagePath.IsMatch(path), "Image path must be images/<64 lowercase hex>.png.");
-            var textureHash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(texture)));
-            Require(path == $"images/{textureHash}.png", "Image filename does not match its declared texture path.");
+            var resourceHash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(resourcePath)));
+            Require(path == $"images/{resourceHash}.png", "Image filename does not match its declared resource path.");
             var size = (Width: image.GetProperty("width").GetInt32(), Height: image.GetProperty("height").GetInt32());
             Require(size.Width > 0 && size.Height > 0, "Image dimensions must be positive.");
-            Require(resources.TryGetValue(texture, out var resource) && resource.File == path
+            Require(resources.TryGetValue(resourcePath, out var resource) && resource.File == path
                 && resource.Width == size.Width && resource.Height == size.Height, "Image does not match its resource record.");
             exported = true;
         }

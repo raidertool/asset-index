@@ -5,7 +5,7 @@ branch containing the complete generated snapshot below and `metadata.json`.
 It does not create the initial branch.
 
 - `assets.json`: catalog rows and presentation provenance.
-- `resources.json` and `images/`: every exported texture, including unowned UI images.
+- `resources.json` and `images/`: every exported image resource, including unowned UI images.
 - `discovery/{objects,registry,packages}.jsonl.gz`: typed source evidence and coverage.
 - `localization/<locale>.jsonl.gz`: merged localization dictionaries, including English.
 - `coverage.json`: extraction counts, errors, notices, mapping hash, and discovery scope.
@@ -17,7 +17,7 @@ dotnet run --project src/PublishSnapshot -c Release -- \
 
 The preview must report success without errors, have a definition for every ID,
 and pass provenance, evidence-count, gzip integrity, resource-reference, and full
-PNG decoding checks. Every catalog source and texture must have object evidence;
+PNG decoding checks. Every catalog source and image resource must have object evidence;
 every PNG must belong to the resource inventory. Image filenames hash their
 declared resource paths, not their PNG bytes.
 

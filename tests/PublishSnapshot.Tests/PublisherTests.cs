@@ -107,7 +107,7 @@ public sealed partial class PublisherTests : IDisposable
     [InlineData("image-trailing-newline")]
     [InlineData("foreign-image-source")]
     [InlineData("metadata-only")]
-    [InlineData("mismatched-texture")]
+    [InlineData("mismatched-resource")]
     public void InvalidPreviewLeavesAllRemoteReferencesUnchanged(string mutation)
     {
         Corrupt(mutation);
@@ -188,7 +188,7 @@ public sealed partial class PublisherTests : IDisposable
                 ChangeJson("assets.json", n => n[0]!["images"]![0]!["file"] = Image + "\n");
                 break;
             case "foreign-image-source": ChangeJson("assets.json", n => n[0]!["images"]![0]!["source"] = "/Game/Other.Other"); break;
-            case "mismatched-texture": ChangeJson("assets.json", n => n[0]!["images"]![0]!["texture"] = "/Game/T_Other.T_Other"); break;
+            case "mismatched-resource": ChangeJson("assets.json", n => n[0]!["images"]![0]!["resource"] = "/Game/T_Other.T_Other"); break;
             case "metadata-only":
                 ChangeJson("assets.json", n =>
                 {
@@ -222,7 +222,7 @@ public sealed partial class PublisherTests : IDisposable
             definitions = new[] { new { name = "DA_Test", @class = "PersistenceDataAsset", path = "/Game/DA_Test.DA_Test" } },
             metadata = Array.Empty<object>(),
             text = new[] { new { locale = "en", displayName = name, description = "Description" } },
-            images = new[] { new { field = "Icon", source = "/Game/DA_Test.DA_Test", texture = Texture, status = "exported", file = Image, width = 2, height = 1 } },
+            images = new[] { new { field = "Icon", source = "/Game/DA_Test.DA_Test", resource = Texture, status = "exported", file = Image, width = 2, height = 1 } },
             presentation = new
             {
                 name = new { @namespace = "", key = "", source = name, cultureInvariant = true },
@@ -248,7 +248,7 @@ public sealed partial class PublisherTests : IDisposable
             images = 1,
             issues = Array.Empty<object>(),
             notices = Array.Empty<object>(),
-            discovery = new { nativeScope = "Tagged fields", mappingSha256 = new string('a', 64), objects = 2, textures = 1 }
+            discovery = new { nativeScope = "Tagged fields", mappingSha256 = new string('a', 64), objects = 2, resources = 1 }
         }, Preview.Json));
         File.WriteAllBytes(Path.Combine(directory, "resources.json"), JsonSerializer.SerializeToUtf8Bytes(new[]
         {
