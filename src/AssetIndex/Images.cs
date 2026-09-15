@@ -14,13 +14,15 @@ internal static class Images
     private static readonly string[] Fields =
     [
         "Icon", "BigIcon", "TinyIcon", "Image", "CurrencyIcon", "CurrencyBigIcon", "EnemyIcon", "EnemyImage",
-        "OfferImage", "OfferImage_1x1", "OfferImage_2x1", "OfferImage_9x16", "OfferImage_16x9", "OfferImage_Thumbnail"
+        "OfferImage", "OfferImage_1x1", "OfferImage_2x1", "OfferImage_9x16", "OfferImage_16x9", "OfferImage_Thumbnail",
+        "BigImage", "CollapsedImage", "BattlepassListImage", "BattlepassCoverImage", "LocationPreviewImage",
+        "Portrait", "ImageAsset", "UnlockImage", "PreviewImage", "IconMaterial"
     ];
 
     public static IReadOnlyList<AssetImage> Export(CatalogAsset asset, string output, ICollection<ExtractionIssue> issues)
     {
         var images = new List<AssetImage>();
-        foreach (var source in asset.Metadata.Prepend(asset.Definition))
+        foreach (var source in asset.Definitions.Concat(asset.Metadata))
         {
             foreach (var field in Fields)
             {
@@ -35,7 +37,11 @@ internal static class Images
                         continue;
                     }
                     if (reference is not UTexture2D texture)
-                        throw new InvalidDataException($"Expected Texture2D, found {reference.ExportType}.");
+                    {
+                        issues.Add(new("image", $"{path}.{field}", $"Unsupported image source: {reference.ExportType}."));
+                        images.Add(new(field, path, reference.GetPathName(), "unsupported"));
+                        continue;
+                    }
                     var texturePath = texture.GetPathName();
                     var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(texturePath)));
                     var file = $"images/{hash}.png";

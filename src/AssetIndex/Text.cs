@@ -15,14 +15,15 @@ internal static class Text
     private static readonly string[] NameFields =
     [
         "ItemName", "DisplayName", "ShortName", "LongName", "Text", "OfferTitle", "EnemyName",
-        "LocationName", "PlayerStatsRaiderTargetAllegiance", "InteractName", "PoiName", "XPEventCategoryName"
+        "Title", "LocationName", "PlayerStatsRaiderTargetAllegiance", "InteractName", "PoiName", "XPEventCategoryName",
+        "BattlepassName", "BucketName", "ViewName", "UnlockTitle"
     ];
     private static readonly string[] DescriptionFields =
-        ["Description", "OfferDescription", "LocationDescription", "InteractDescription", "PoiDescription"];
+        ["Description", "OfferDescription", "LocationDescription", "InteractDescription", "PoiDescription", "UnlockDescription", "ScoreDescription"];
 
     public static AssetText Read(CatalogAsset asset, ICollection<ExtractionIssue> issues)
     {
-        var sources = asset.Metadata.Prepend(asset.Definition).ToArray();
+        var sources = asset.Definitions.Concat(asset.Metadata).ToArray();
         return new AssetText(asset.Id, ReadField(sources, NameFields, issues),
             ReadField(sources, DescriptionFields, issues));
     }

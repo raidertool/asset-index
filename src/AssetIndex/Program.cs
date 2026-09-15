@@ -31,6 +31,11 @@ internal static class Program
             return 2;
         }
 
+        return Run(options);
+    }
+
+    private static int Run(Options options)
+    {
         var diagnostics = new ParserDiagnostics();
         using var logger = new LoggerConfiguration().MinimumLevel.Warning().WriteTo.Sink(diagnostics).CreateLogger();
         Log.Logger = logger;
@@ -77,8 +82,10 @@ internal static class Program
         var records = new List<AssetRecord>();
         foreach (var asset in assets)
         {
-            records.Add(new(asset.Id, asset.Name, asset.Definition.ExportType, asset.Definition.GetPathName(),
-                asset.Metadata.Select(source => source.GetPathName()).ToArray(), localized[asset.Id].ToArray(),
+            records.Add(new(asset.Id,
+                asset.Definitions.Select(source => new ObjectReference(source.Name, source.ExportType, source.GetPathName())).ToArray(),
+                asset.Metadata.Select(source => new ObjectReference(source.Name, source.ExportType, source.GetPathName())).ToArray(),
+                localized[asset.Id].Select(text => new Translation(text.Locale, text.DisplayName, text.Description)).ToArray(),
                 Images.Export(asset, output, issues)));
             if (records.Count % 250 == 0)
                 Console.WriteLine($"Processed {records.Count:N0}/{assets.Count:N0} assets.");

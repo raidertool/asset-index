@@ -36,13 +36,42 @@ public sealed class RunTests : IDisposable
         Assert.Equal("published snapshot", File.ReadAllText(published));
     }
 
-    [Fact]
-    public void JsonPreservesSignedInt64IdsAndEscapedText()
+    [Theory]
+    [InlineData(long.MinValue)]
+    [InlineData(long.MaxValue)]
+    [InlineData(9007199254740993L)]
+    [InlineData(-9007199254740993L)]
+    public void JsonWritesIdsAsExactDecimalStringsForBrowserConsumers(long id)
     {
-        var text = new LocalizedText(long.MinValue, "en", "Name\n\"quoted\"", "Description");
-        Snapshot.Write(directory, "sample.json", text);
-        var result = JsonSerializer.Deserialize<LocalizedText>(File.ReadAllText(Path.Combine(directory, "sample.json")), Snapshot.Json);
-        Assert.Equal(text, result);
+        var asset = new AssetRecord(id, [], [], [], []);
+        Snapshot.Write(directory, "sample.json", asset);
+        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(directory, "sample.json")));
+
+        var value = document.RootElement.GetProperty("id");
+        Assert.Equal(JsonValueKind.String, value.ValueKind);
+        Assert.Equal(id.ToString(System.Globalization.CultureInfo.InvariantCulture), value.GetString());
+    }
+
+    [Fact]
+    public void JsonPreservesAllObjectReferencesAndNestedTextWithoutRepeatedIds()
+    {
+        var name = "Name\n\"quoted\"";
+        var asset = new AssetRecord(42,
+            [new("DA_Item", "Item", "/Game/DA_Item"), new("DA_Persistence", "Persistence", "/Game/DA_Persistence")],
+            [new("UI_Item", "UI", "/Game/UI_Item")],
+            [new("en", name, "Description")], []);
+        Snapshot.Write(directory, "sample.json", asset);
+        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(directory, "sample.json")));
+        var row = document.RootElement;
+
+        Assert.Equal(2, row.GetProperty("definitions").GetArrayLength());
+        Assert.Equal("/Game/DA_Persistence", row.GetProperty("definitions")[1].GetProperty("path").GetString());
+        Assert.Equal("/Game/UI_Item", row.GetProperty("metadata")[0].GetProperty("path").GetString());
+        var text = row.GetProperty("text")[0];
+        Assert.Equal(["locale", "displayName", "description"], text.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(name, text.GetProperty("displayName").GetString());
+        Assert.False(row.TryGetProperty("name", out _));
+        Assert.False(row.TryGetProperty("path", out _));
     }
 
     [Theory]

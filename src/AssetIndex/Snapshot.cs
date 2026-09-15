@@ -1,9 +1,14 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace AssetIndex;
 
-internal sealed record AssetRecord(long Id, string Name, string Class, string Path,
-    IReadOnlyList<string> Metadata, IReadOnlyList<LocalizedText> Text, IReadOnlyList<AssetImage> Images);
+internal sealed record ObjectReference(string Name, string Class, string Path);
+internal sealed record Translation(string Locale, string DisplayName, string Description);
+internal sealed record AssetRecord(
+    [property: JsonNumberHandling(JsonNumberHandling.WriteAsString)] long Id,
+    IReadOnlyList<ObjectReference> Definitions, IReadOnlyList<ObjectReference> Metadata,
+    IReadOnlyList<Translation> Text, IReadOnlyList<AssetImage> Images);
 
 internal static class Snapshot
 {

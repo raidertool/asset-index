@@ -51,6 +51,10 @@ instructions; this extractor does not manage Steam accounts.
 | `images/` | Decoded images |
 | `coverage.json` | Extraction counts and unresolved or failed extraction details |
 
+IDs are decimal strings so JavaScript can preserve every signed 64-bit value.
+Each ID retains all associated definitions and UI metadata; it can have multiple
+image references. Unsupported image sources are reported in coverage.
+
 Review coverage before using a preview. A successful run does not prove every
 game asset was found. Missing data may need a mapping update or an extractor fix.
 Local output under `.work/` is ignored by Git.

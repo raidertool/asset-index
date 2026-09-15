@@ -110,8 +110,16 @@ public sealed class TextTests
         Assert.Contains("NamedFormat", Assert.Single(issues).Message);
     }
 
+    [Fact]
+    public void QuestDefinitionTitleDoesNotRequireItemMetadata()
+    {
+        var definition = WithText("Title", new FText("quests", "title", "A new quest"));
+        var asset = new CatalogAsset(42, [definition], []);
+        Assert.Equal("A new quest", Text.Read(asset, []).Name?.Source);
+    }
+
     private static CatalogAsset Asset(UObject metadata) =>
-        new(1, new UObject { Name = "DA_Test" }, [metadata]);
+        new(1, [new UObject { Name = "DA_Test" }], [metadata]);
 
     private static UObject WithText(string field, FText text)
     {

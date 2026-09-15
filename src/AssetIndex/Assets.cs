@@ -4,10 +4,7 @@ using CUE4Parse.UE4.Objects.UObject;
 
 namespace AssetIndex;
 
-internal sealed record CatalogAsset(long Id, UObject Definition, IReadOnlyList<UObject> Metadata)
-{
-    public string Name => Definition.Name;
-}
+internal sealed record CatalogAsset(long Id, IReadOnlyList<UObject> Definitions, IReadOnlyList<UObject> Metadata);
 
 internal static class Assets
 {
@@ -36,9 +33,12 @@ internal static class Assets
                     AssociateMetadata(source, mappings, definitions, metadata);
                 else
                 {
-                    var id = DefinitionId(source, mappings);
-                    if (id is not null)
-                        Add(definitions, id.Value, source);
+                    var id = DefinitionId(source, mappings, out var persistence);
+                    if (id is null)
+                        continue;
+                    Add(definitions, id.Value, source);
+                    if (persistence is not null)
+                        Add(definitions, id.Value, persistence);
                 }
             }
             catch (Exception exception)
@@ -47,7 +47,7 @@ internal static class Assets
             }
         }
 
-        return BuildCatalog(mappings, definitions, metadata, issues);
+        return BuildCatalog(definitions, metadata, issues);
     }
 
     private static void AssociateMetadata(UObject source, TypeMappings mappings,
@@ -61,37 +61,34 @@ internal static class Assets
 
         var id = OverrideId(source, "bOverrideAssetId", "OverrideAssetId");
         var target = id is null ? Properties.Reference(source, referenceName) : null;
-        id ??= target is null ? null : DefinitionId(target, mappings);
+        UObject? persistence = null;
+        id ??= target is null ? null : DefinitionId(target, mappings, out persistence);
         if (id is null)
             throw new InvalidDataException($"UI metadata has no resolvable {referenceName} or enabled asset ID override.");
 
         Add(metadata, id.Value, source);
         if (target is not null)
             Add(definitions, id.Value, target);
+        if (persistence is not null)
+            Add(definitions, id.Value, persistence);
     }
 
-    private static IReadOnlyList<CatalogAsset> BuildCatalog(TypeMappings mappings,
+    private static IReadOnlyList<CatalogAsset> BuildCatalog(
         Dictionary<long, Dictionary<string, UObject>> definitions, Dictionary<long, Dictionary<string, UObject>> metadata,
         List<ExtractionIssue> issues)
     {
         var result = new List<CatalogAsset>();
-        foreach (var (id, candidates) in definitions.OrderBy(pair => pair.Key))
+        foreach (var id in definitions.Keys.Union(metadata.Keys).Order())
         {
-            var items = candidates.Values
-                .Where(source => IsA(mappings, source.ExportType, "ItemDataAssetBase") == true)
-                .ToArray();
-            var preferred = (items.Length > 0 ? items : candidates.Values.ToArray())
-                .OrderBy(source => source.GetPathName(), StringComparer.Ordinal).ToArray();
-            if (preferred.Length > 1)
-                issues.Add(new("asset", id.ToString(), "Multiple definitions: " + string.Join(", ", preferred.Select(source => source.GetPathName()))));
-
+            var sources = definitions.GetValueOrDefault(id)?.Values
+                .OrderBy(source => source.GetPathName(), StringComparer.Ordinal).ToArray() ?? [];
             var associated = metadata.GetValueOrDefault(id)?.Values
                 .OrderBy(source => source.GetPathName(), StringComparer.Ordinal).ToArray() ?? [];
-            result.Add(new(id, preferred[0], associated));
+            if (sources.Length == 0)
+                issues.Add(new("asset", id.ToString(), "UI metadata has no matching asset definition; retaining its explicit ID."));
+            result.Add(new(id, sources, associated));
         }
 
-        foreach (var id in metadata.Keys.Except(definitions.Keys))
-            issues.Add(new("asset", id.ToString(), "UI metadata has no matching asset definition."));
         return result;
     }
 
@@ -102,19 +99,25 @@ internal static class Assets
         return RequireId(id);
     }
 
-    private static long? DefinitionId(UObject source, TypeMappings mappings)
+    private static long? DefinitionId(UObject source, TypeMappings mappings, out UObject? persistence)
     {
+        persistence = null;
         if (IsA(mappings, source.ExportType, "PersistenceDataAsset") == true)
             return ReadId(source) ?? throw new InvalidDataException("Persistence asset has no AssetId.");
-        if (IsA(mappings, source.ExportType, "ItemDataAssetBase") != true)
+        if (IsA(mappings, source.ExportType, "ItemDataAssetBase") == true)
+        {
+            var overridden = OverrideId(source, "bOverrideItemAssetId", "OverrideItemAssetId");
+            if (overridden is not null)
+                return overridden;
+        }
+        if (IsA(mappings, source.ExportType, "DataAsset") != true ||
+            !HasProperty(mappings, source.ExportType, "PersistenceDataAsset"))
             return null;
 
-        var overridden = OverrideId(source, "bOverrideItemAssetId", "OverrideItemAssetId");
-        if (overridden is not null)
-            return overridden;
-        var target = Properties.Reference(source, "PersistenceDataAsset");
-        return (target is null ? null : ReadId(target))
-            ?? throw new InvalidDataException("Item has no resolvable persistence asset or enabled asset ID override.");
+        persistence = Properties.Reference(source, "PersistenceDataAsset");
+        // This is the definition's identity link, not a traversal of rewards or other asset references.
+        return (persistence is null ? null : ReadId(persistence))
+            ?? throw new InvalidDataException("Data asset has no resolvable persistence asset or enabled asset ID override.");
     }
 
     internal static long? OverrideId(UObject source, string enabledName, string overrideName)

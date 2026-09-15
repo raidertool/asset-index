@@ -45,7 +45,7 @@ public sealed class AssetsTests
     }
 
     [Fact]
-    public void DisabledOverrideUsesReferencedIdAndPrefersItemName()
+    public void DisabledOverrideUsesReferencedIdAndPreservesBothDefinitions()
     {
         var persistence = Object("Persistence", "PersistenceDataAsset", ("AssetId", new Int64Property(42)));
         var package = new TestPackage(persistence);
@@ -58,7 +58,7 @@ public sealed class AssetsTests
         var asset = Assert.Single(Assets.Collect([persistence, item], Mappings.Value, issues));
 
         Assert.Equal(42, asset.Id);
-        Assert.Equal("ReadableItem", asset.Name);
+        Assert.Equal(["Persistence", "ReadableItem"], asset.Definitions.Select(source => source.Name));
         Assert.Empty(issues);
     }
 
@@ -73,13 +73,13 @@ public sealed class AssetsTests
 
         var asset = Assert.Single(Assets.Collect([metadata], Mappings.Value, issues));
 
-        Assert.Same(target, asset.Definition);
+        Assert.Same(target, Assert.Single(asset.Definitions));
         Assert.Same(metadata, Assert.Single(asset.Metadata));
         Assert.Empty(issues);
     }
 
     [Fact]
-    public void ConflictingDefinitionsAreVisibleAndDoNotDependOnDiscoveryOrder()
+    public void SharedIdDefinitionsArePreservedWithoutDependingOnDiscoveryOrder()
     {
         var first = Object("First", "ItemDataAsset", ("bOverrideItemAssetId", new BoolProperty(true)),
             ("OverrideItemAssetId", new Int64Property(42)));
@@ -88,12 +88,106 @@ public sealed class AssetsTests
         var forwardIssues = new List<ExtractionIssue>();
         var reverseIssues = new List<ExtractionIssue>();
 
-        var forward = Assert.Single(Assets.Collect([first, second], Mappings.Value, forwardIssues));
+        var forward = Assert.Single(Assets.Collect([first, second, first], Mappings.Value, forwardIssues));
         var reverse = Assert.Single(Assets.Collect([second, first], Mappings.Value, reverseIssues));
 
-        Assert.Equal(forward.Name, reverse.Name);
-        Assert.Contains("Multiple definitions", Assert.Single(forwardIssues).Message);
-        Assert.Equal(forwardIssues, reverseIssues);
+        Assert.Equal(["First", "Second"], forward.Definitions.Select(source => source.Name));
+        Assert.Equal(forward.Definitions, reverse.Definitions);
+        Assert.Empty(forwardIssues);
+        Assert.Empty(reverseIssues);
+    }
+
+    [Theory]
+    [InlineData("QuestDefinition")]
+    [InlineData("BattlepassDataAsset")]
+    [InlineData("PioneerMatchmakableLevelDataAsset")]
+    [InlineData("SessionModifierDataAsset")]
+    [InlineData("StoreOfferDataAsset")]
+    [InlineData("ItemWithQualityRedirectorAsset")]
+    [InlineData("WeaponRedirectorAsset")]
+    public void GenericDataAssetUsesExactPersistenceLink(string type)
+    {
+        var persistence = Object("Identity", "PersistenceDataAsset", ("AssetId", new Int64Property(42)));
+        var package = new TestPackage(persistence);
+        var definition = Object("Definition", type,
+            ("PersistenceDataAsset", new ObjectProperty(new FPackageIndex(package, 1))));
+        var issues = new List<ExtractionIssue>();
+
+        var asset = Assert.Single(Assets.Collect([definition], Mappings.Value, issues));
+
+        Assert.Equal(42, asset.Id);
+        Assert.Equal(["Definition", "Identity"], asset.Definitions.Select(source => source.Name));
+        Assert.Empty(issues);
+    }
+
+    [Fact]
+    public void MetadataCanReferToGenericQuestDefinition()
+    {
+        var persistence = Object("Identity", "PersistenceDataAsset", ("AssetId", new Int64Property(42)));
+        var persistencePackage = new TestPackage(persistence);
+        var quest = Object("Quest", "QuestDefinition",
+            ("PersistenceDataAsset", new ObjectProperty(new FPackageIndex(persistencePackage, 1))));
+        var questPackage = new TestPackage(quest);
+        var metadata = Object("QuestUI", "UIQuestObjectiveParameterMetaDataItem",
+            ("Asset", new ObjectProperty(new FPackageIndex(questPackage, 1))));
+        var issues = new List<ExtractionIssue>();
+
+        var asset = Assert.Single(Assets.Collect([metadata], Mappings.Value, issues));
+
+        Assert.Equal(42, asset.Id);
+        Assert.Equal(["Identity", "Quest"], asset.Definitions.Select(source => source.Name));
+        Assert.Same(metadata, Assert.Single(asset.Metadata));
+        Assert.Empty(issues);
+    }
+
+    [Fact]
+    public void MetadataOverrideIdSurvivesWithoutADefinition()
+    {
+        var metadata = Object("KnownUI", "UIGameplayItemMetaDataItem",
+            ("bOverrideAssetId", new BoolProperty(true)),
+            ("OverrideAssetId", new Int64Property(-42)),
+            ("PersistenceDataAsset", new ObjectProperty(new FPackageIndex((IPackage)null!, 1))));
+        var issues = new List<ExtractionIssue>();
+
+        var asset = Assert.Single(Assets.Collect([metadata], Mappings.Value, issues));
+
+        Assert.Equal(-42, asset.Id);
+        Assert.Empty(asset.Definitions);
+        Assert.Same(metadata, Assert.Single(asset.Metadata));
+        Assert.Contains("retaining its explicit ID", Assert.Single(issues).Message);
+    }
+
+    [Theory]
+    [InlineData("FakeInventoryServiceItemData", "PersistenceDataAsset")]
+    [InlineData("QuestReward", "Item")]
+    public void RuntimeAndRewardReferencesDoNotCreateDefinitions(string type, string field)
+    {
+        var target = Object("Identity", "PersistenceDataAsset", ("AssetId", new Int64Property(99)));
+        var package = new TestPackage(target);
+        var payload = Object("Payload", type, (field, new ObjectProperty(new FPackageIndex(package, 1))));
+        var issues = new List<ExtractionIssue>();
+
+        Assert.Empty(Assets.Collect([payload], Mappings.Value, issues));
+        Assert.Empty(issues);
+    }
+
+    [Fact]
+    public void PersistenceLinkDoesNotTraverseACycleOfDefinitions()
+    {
+        var first = Object("First", "QuestDefinition");
+        var second = Object("Second", "QuestDefinition");
+        first.Properties.Add(new FPropertyTag
+        {
+            Name = "PersistenceDataAsset", Tag = new ObjectProperty(new FPackageIndex(new TestPackage(second), 1))
+        });
+        second.Properties.Add(new FPropertyTag
+        {
+            Name = "PersistenceDataAsset", Tag = new ObjectProperty(new FPackageIndex(new TestPackage(first), 1))
+        });
+        var issues = new List<ExtractionIssue>();
+
+        Assert.Empty(Assets.Collect([first], Mappings.Value, issues));
+        Assert.Contains("no resolvable persistence asset", Assert.Single(issues).Message);
     }
 
     [Fact]
