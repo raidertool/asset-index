@@ -18,6 +18,7 @@ internal sealed partial class EvidenceReader
     // Native adapters cover tables, declarations, class links and material fields. Shader, mesh, audio and other
     // opaque export payloads are outside field evidence; their resource still exists.
     public const string NativeScope = "Tagged and sparse properties; data/curve/string tables; class references and field declarations; cached material fields and texture dependencies. Binary payloads and composite curve evaluation are not decoded.";
+    private readonly List<PropertyEvidence> properties = [];
     private readonly List<ReferenceEvidence> references = [];
     private readonly List<TextEvidence> texts = [];
     private readonly List<ValueEvidence> values = [];
@@ -32,21 +33,29 @@ internal sealed partial class EvidenceReader
         var reader = new EvidenceReader();
         var path = reader.DescribePath(new ResolvedLoadedObject(source), "");
         reader.ReadObject(source);
-        return new(path ?? "", source.ExportType, reader.references.ToArray(), reader.texts.ToArray(),
+        return new(path ?? "", source.ExportType, reader.properties.ToArray(), reader.references.ToArray(), reader.texts.ToArray(),
             reader.values.ToArray(), reader.tableEntries.ToArray(), reader.issues.ToArray());
     }
 
-    private void ReadProperties(IEnumerable<FPropertyTag> properties, string pointer, int depth, string containerType = "properties")
+    private void ReadProperties(IEnumerable<FPropertyTag> tags, string pointer, int depth, string containerType = "properties")
     {
-        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var indexed = new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
         var count = 0;
-        foreach (var property in properties)
+        foreach (var property in tags)
         {
-            count++;
-            var path = Child(pointer, property.Name.Text);
-            if (property.IsIndexed) path = Child(path, property.ArrayIndex.ToString(CultureInfo.InvariantCulture));
+            var path = Child(pointer, (count++).ToString(CultureInfo.InvariantCulture));
             var type = property.PropertyType.IsNone ? property.Tag?.GetType().Name ?? "UnknownProperty" : property.PropertyType.Text;
-            if (!seen.Add(path)) issues.Add(new(path, type, "Duplicate property pointer."));
+            properties.Add(new(path, property.Name.Text, type, property.IsIndexed ? property.ArrayIndex : null,
+                property.ArraySize, property.SerializeType.ToString()));
+            if (property.ArrayIndex < 0 || property.ArraySize is <= 0 ||
+                property.ArraySize is { } size && property.ArrayIndex >= size)
+                issues.Add(new(path, type, "Invalid static-array tag metadata."));
+            if (property.IsIndexed)
+            {
+                if (!indexed.TryGetValue(property.Name.Text, out var indices)) indexed[property.Name.Text] = indices = [];
+                if (!indices.Add(property.ArrayIndex))
+                    issues.Add(new(path, type, "Repeated indexed property element has no distinct declaration identity."));
+            }
             if (property.Tag is null)
             {
                 values.Add(new(path, type, "unread", null));
@@ -83,7 +92,7 @@ internal sealed partial class EvidenceReader
             case null: values.Add(new(pointer, type, "null", null)); return;
             case FPropertyTagType property: Visit(property.GenericValue, pointer, type, depth + 1); return;
             case FScriptStruct structure: Visit(structure.StructType, pointer, type, depth + 1); return;
-            case FStructFallback structure: ReadProperties(structure.Properties, pointer, depth, type); return;
+            case FStructFallback structure: ReadProperties(structure.Properties, Child(pointer, "Properties"), depth, type); return;
             case UScriptArray array: ReadSequence(array.Properties, pointer, type, "array", depth); return;
             case UScriptSet set: ReadSequence(set.Properties, pointer, type, "set", depth); return;
             case UScriptMap map: ReadMap(map.Properties, pointer, type, depth); return;

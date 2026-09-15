@@ -16,6 +16,7 @@ internal sealed partial class EvidenceReader
         ReadResolvedReference(source.Outer, "/Outer", "outer");
         ReadResolvedReference(source.Super, "/Super", "super");
         ReadResolvedReference(source.Template, "/Template", "template");
+        CheckRuntimeLayout(source);
         ReadProperties(source.Properties, "/Properties", 0);
         if (source.SerializedSparseClassData is not null) Visit(source.SerializedSparseClassData, "/SparseClassData");
         if (source.CustomGameData is not null) Visit(source.CustomGameData, "/CustomGameData");
@@ -38,6 +39,30 @@ internal sealed partial class EvidenceReader
             Visit(structure.ChildProperties, "/Native/ChildProperties");
         }
         if (source is UClass type) ReadClassReferences(type);
+    }
+
+    private void CheckRuntimeLayout(UObject source)
+    {
+        try
+        {
+            var seen = new HashSet<UStruct>(ReferenceEqualityComparer.Instance);
+            var current = source.Class?.Object?.Value as UStruct;
+            // The pinned CUE runtime declaration mapper cannot safely expand static arrays.
+            // Native UScriptClass layouts use usmap's separate, correct array expansion.
+            while (current is not null && current is not UScriptClass)
+            {
+                if (!seen.Add(current) || seen.Count > 128)
+                    throw new InvalidDataException("Runtime class ancestry repeats or exceeds 128 levels.");
+                foreach (var field in current.ChildProperties ?? [])
+                    if (field is FProperty { ArrayDim: > 1 } property)
+                        issues.Add(new("/Class", "runtime-schema",
+                            $"Runtime declaration {current.GetPathName()}.{property.Name.Text} has ArrayDim {property.ArrayDim}; the pinned decoder cannot safely map it."));
+                if (current.SuperStruct is null or { IsNull: true }) break;
+                current = current.SuperStruct.Load<UStruct>()
+                    ?? throw new InvalidDataException("Runtime class parent could not be loaded.");
+            }
+        }
+        catch (Exception error) { issues.Add(new("/Class", "runtime-schema", AssetDiscovery.DescribeError(error))); }
     }
 
     private void ReadMaterialDependencies(UMaterial material)

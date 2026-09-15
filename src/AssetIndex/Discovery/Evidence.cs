@@ -3,11 +3,15 @@ namespace AssetIndex.Discovery;
 internal sealed record ObjectEvidence(
     string Path,
     string Class,
+    IReadOnlyList<PropertyEvidence> Properties,
     IReadOnlyList<ReferenceEvidence> References,
     IReadOnlyList<TextEvidence> Texts,
     IReadOnlyList<ValueEvidence> Values,
     IReadOnlyList<TableEntryEvidence> TableEntries,
     IReadOnlyList<EvidenceIssue> Issues);
+
+internal sealed record PropertyEvidence(
+    string Pointer, string Name, string Type, int? ArrayIndex, int? ArraySize, string SerializeType);
 
 internal sealed record ReferenceEvidence(
     string Pointer, string Kind, string Role, string? TargetPath, bool IsNull,

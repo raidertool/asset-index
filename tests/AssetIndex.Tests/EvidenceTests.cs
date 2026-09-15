@@ -20,7 +20,7 @@ namespace AssetIndex.Tests;
 public sealed class EvidenceTests
 {
     [Fact]
-    public void ReadsTypedNestedValuesAndEscapesPropertyPointers()
+    public void ReadsTypedNestedValuesWithOrdinalPointersAndExactNames()
     {
         var nested = new FStructFallback([
             Property("A/B~C", new Int64Property(long.MinValue)),
@@ -31,10 +31,11 @@ public sealed class EvidenceTests
 
         var evidence = EvidenceReader.Read(source);
 
-        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/Nested/A~1B~0C" && value.Type == "Int64Property" && value.Value == "-9223372036854775808");
+        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/0/Properties/0" && value.Type == "Int64Property" && value.Value == "-9223372036854775808");
         Assert.Contains(evidence.Values, value => value.Value == "18446744073709551615" && value.Kind == "integer");
         var text = Assert.Single(evidence.Texts);
-        Assert.Equal("/Properties/Nested/Label", text.Pointer);
+        Assert.Equal("/Properties/0/Properties/2", text.Pointer);
+        Assert.Contains(evidence.Properties, property => property.Pointer == "/Properties/0/Properties/0" && property.Name == "A/B~C");
         Assert.Equal("Actual", text.Source);
         Assert.DoesNotContain(evidence.Values, value => value.Value == "Cached translation");
         Assert.Empty(evidence.Issues);
@@ -50,11 +51,11 @@ public sealed class EvidenceTests
         });
         var evidence = EvidenceReader.Read(Object("Map", Property("Data", new MapProperty(map))));
 
-        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/Data/entries/0/key" && value.Kind == "string");
-        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/Data/entries/1/key" && value.Value == "-42");
+        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/0/entries/0/key" && value.Kind == "string");
+        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/0/entries/1/key" && value.Value == "-42");
         Assert.DoesNotContain(evidence.References, reference => reference.TargetPath == "/Game/LooksLikeAPath.Asset");
-        Assert.Contains(evidence.References, reference => reference.Pointer == "/Properties/Data/entries/0/value" && reference.IsNull);
-        Assert.Equal("/Properties/Data/entries/1/value", Assert.Single(evidence.Texts).Pointer);
+        Assert.Contains(evidence.References, reference => reference.Pointer == "/Properties/0/entries/0/value" && reference.IsNull);
+        Assert.Equal("/Properties/0/entries/1/value", Assert.Single(evidence.Texts).Pointer);
     }
 
     [Fact]
@@ -72,13 +73,13 @@ public sealed class EvidenceTests
 
         var evidence = EvidenceReader.Read(source);
 
-        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/Array" && value.Kind == "empty-array");
-        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/Set" && value.Kind == "empty-set");
-        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/Map" && value.Kind == "empty-map");
-        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/Empty" && value.Value == "");
-        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/Enabled" && value.Value == "false");
+        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/0" && value.Kind == "empty-array");
+        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/1" && value.Kind == "empty-set");
+        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/2" && value.Kind == "empty-map");
+        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/3" && value.Value == "");
+        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/5" && value.Value == "false");
         Assert.Contains(evidence.References, reference => reference.Pointer == "/Template" && reference.Role == "template" && reference.TargetPath == "Parent");
-        Assert.Contains(evidence.References, reference => reference.Pointer == "/Properties/Null" && reference.IsNull);
+        Assert.Contains(evidence.References, reference => reference.Pointer == "/Properties/4" && reference.IsNull);
         Assert.Empty(evidence.Issues);
     }
 
@@ -95,11 +96,11 @@ public sealed class EvidenceTests
 
         var evidence = EvidenceReader.Read(source);
 
-        var hard = Assert.Single(evidence.References, reference => reference.Pointer == "/Properties/Hard");
+        var hard = Assert.Single(evidence.References, reference => reference.Pointer == "/Properties/0");
         Assert.Equal("Target", hard.TargetPath);
         Assert.Equal(1, hard.PackageIndex);
         Assert.Null(hard.Error);
-        var broken = Assert.Single(evidence.References, reference => reference.Pointer == "/Properties/Broken");
+        var broken = Assert.Single(evidence.References, reference => reference.Pointer == "/Properties/1");
         Assert.False(broken.IsNull);
         Assert.Null(broken.TargetPath);
         Assert.NotNull(broken.Error);
@@ -119,13 +120,13 @@ public sealed class EvidenceTests
             Property("Single", new DelegateProperty(callback)),
             Property("Many", new MulticastDelegateProperty(multicast))));
 
-        Assert.Contains(evidence.References, reference => reference.Pointer == "/Properties/Single/Object" && reference.TargetPath == "Handler");
-        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/Single/FunctionName" && value.Value == "OnChanged");
-        Assert.Contains(evidence.References, reference => reference.Pointer == "/Properties/Many/InvocationList/0/Object" && reference.TargetPath == "Handler");
-        var broken = Assert.Single(evidence.References, reference => reference.Pointer == "/Properties/Many/InvocationList/1/Object");
+        Assert.Contains(evidence.References, reference => reference.Pointer == "/Properties/0/Object" && reference.TargetPath == "Handler");
+        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/0/FunctionName" && value.Value == "OnChanged");
+        Assert.Contains(evidence.References, reference => reference.Pointer == "/Properties/1/InvocationList/0/Object" && reference.TargetPath == "Handler");
+        var broken = Assert.Single(evidence.References, reference => reference.Pointer == "/Properties/1/InvocationList/1/Object");
         Assert.False(broken.IsNull);
         Assert.NotNull(broken.Error);
-        Assert.Contains(evidence.References, reference => reference.Pointer == "/Properties/Many/InvocationList/2/Object" && reference.IsNull);
+        Assert.Contains(evidence.References, reference => reference.Pointer == "/Properties/1/InvocationList/2/Object" && reference.IsNull);
         Assert.Empty(evidence.Issues);
     }
 
@@ -134,7 +135,7 @@ public sealed class EvidenceTests
     {
         var evidence = EvidenceReader.Read(Object("Empty", Property("Callback", new MulticastDelegateProperty(new FMulticastScriptDelegate([])))));
 
-        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/Callback/InvocationList" && value.Kind == "empty-array");
+        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/0/InvocationList" && value.Kind == "empty-array");
         Assert.Empty(evidence.Issues);
     }
 
@@ -145,9 +146,9 @@ public sealed class EvidenceTests
         var path = new FFieldPath { Path = ["Target", "Nested"], ResolvedOwner = new FPackageIndex(package, 2) };
         var evidence = EvidenceReader.Read(Object("Fields", Property("Field", new FieldPathProperty(path))));
 
-        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/Field/Path/0" && value.Value == "Target");
-        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/Field/Path/1" && value.Value == "Nested");
-        var owner = Assert.Single(evidence.References, reference => reference.Pointer == "/Properties/Field/ResolvedOwner");
+        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/0/Path/0" && value.Value == "Target");
+        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/0/Path/1" && value.Value == "Nested");
+        var owner = Assert.Single(evidence.References, reference => reference.Pointer == "/Properties/0/ResolvedOwner");
         Assert.False(owner.IsNull);
         Assert.Equal(2, owner.PackageIndex);
         Assert.NotNull(owner.Error);
@@ -162,8 +163,8 @@ public sealed class EvidenceTests
             Property("Bound", new InterfaceProperty(new FScriptInterface(new FPackageIndex(package, 1)))),
             Property("Null", new InterfaceProperty(new FScriptInterface(new FPackageIndex())))));
 
-        Assert.Contains(evidence.References, reference => reference.Pointer == "/Properties/Bound/Object" && reference.TargetPath == "Implementation");
-        Assert.Contains(evidence.References, reference => reference.Pointer == "/Properties/Null/Object" && reference.IsNull);
+        Assert.Contains(evidence.References, reference => reference.Pointer == "/Properties/0/Object" && reference.TargetPath == "Implementation");
+        Assert.Contains(evidence.References, reference => reference.Pointer == "/Properties/1/Object" && reference.IsNull);
         Assert.Empty(evidence.Issues);
     }
 
@@ -174,8 +175,8 @@ public sealed class EvidenceTests
         var evidence = EvidenceReader.Read(Object("Lazy", Property("Object", new LazyObjectProperty(guid))));
 
         Assert.Equal(["1", "2", "3", "4294967295"], evidence.Values
-            .Where(value => value.Pointer.StartsWith("/Properties/Object/Guid/", StringComparison.Ordinal)).Select(value => value.Value));
-        Assert.DoesNotContain(evidence.References, reference => reference.Pointer.StartsWith("/Properties/Object", StringComparison.Ordinal));
+            .Where(value => value.Pointer.StartsWith("/Properties/0/Guid/", StringComparison.Ordinal)).Select(value => value.Value));
+        Assert.DoesNotContain(evidence.References, reference => reference.Pointer.StartsWith("/Properties/0", StringComparison.Ordinal));
         Assert.Empty(evidence.Issues);
     }
 
@@ -191,8 +192,8 @@ public sealed class EvidenceTests
         var evidence = EvidenceReader.Read(Object("Text", Property("Label", new TextProperty(new FText(0, ETextHistoryType.NamedFormat, history)))));
 
         Assert.Equal(3, evidence.Texts.Count);
-        Assert.Contains(evidence.Texts, text => text.Pointer == "/Properties/Label" && text.History == "NamedFormat");
-        Assert.Contains(evidence.Texts, text => text.Pointer == "/Properties/Label/History/SourceFmt" && text.Source == "{item}" && text.Key == "Count");
+        Assert.Contains(evidence.Texts, text => text.Pointer == "/Properties/0" && text.History == "NamedFormat");
+        Assert.Contains(evidence.Texts, text => text.Pointer == "/Properties/0/History/SourceFmt" && text.Source == "{item}" && text.Key == "Count");
         Assert.Contains(evidence.Texts, text => text.Source == "Invariant" && text.Flags == (uint)ETextFlag.CultureInvariant);
         Assert.Empty(evidence.Issues);
     }
@@ -227,7 +228,7 @@ public sealed class EvidenceTests
 
         var evidence = EvidenceReader.Read(table);
 
-        Assert.Contains(evidence.Values, value => value.Pointer == "/Rows/Row~1/QuestId" && value.Value == "42");
+        Assert.Contains(evidence.Values, value => value.Pointer == "/Rows/Row~1/Properties/0" && value.Value == "42");
         Assert.Empty(evidence.Issues);
     }
 
@@ -237,7 +238,7 @@ public sealed class EvidenceTests
         var table = new UCurveTable { Name = "Weather" };
         table.RowMap.Add("Wind/Intensity", new FStructFallback([Property("DefaultValue", new FloatProperty(0.75f))]));
         var evidence = EvidenceReader.Read(table);
-        Assert.Contains(evidence.Values, value => value.Pointer == "/Rows/Wind~1Intensity/DefaultValue" && value.Value == "0.75");
+        Assert.Contains(evidence.Values, value => value.Pointer == "/Rows/Wind~1Intensity/Properties/0" && value.Value == "0.75");
         Assert.Empty(evidence.Issues);
     }
 
@@ -287,11 +288,11 @@ public sealed class EvidenceTests
 
         var evidence = EvidenceReader.Read(material);
 
-        Assert.Contains(evidence.References, reference => reference.Pointer == "/Native/CachedExpressionData/ReferencedTextures/0"
+        Assert.Contains(evidence.References, reference => reference.Pointer == "/Native/CachedExpressionData/Properties/0/0"
             && reference.Role == "property" && reference.TargetPath == "BackgroundMask");
-        Assert.Contains(evidence.References, reference => reference.Pointer == "/Native/CachedExpressionData/ReferencedTextures/1"
+        Assert.Contains(evidence.References, reference => reference.Pointer == "/Native/CachedExpressionData/Properties/0/1"
             && reference.Error is not null);
-        Assert.Contains(evidence.Values, value => value.Pointer == "/Native/CachedExpressionData/ParameterName" && value.Value == "Background");
+        Assert.Contains(evidence.Values, value => value.Pointer == "/Native/CachedExpressionData/Properties/1" && value.Value == "Background");
         Assert.DoesNotContain(evidence.Values, value => value.Pointer.Contains("LoadedMaterialResources"));
     }
 
@@ -402,7 +403,7 @@ public sealed class EvidenceTests
         var evidence = EvidenceReader.Read(Object("Native", Property("Value", new ValueProperty(native))));
 
         Assert.Equal("Nested", Assert.Single(evidence.Texts).Source);
-        Assert.Equal("/Properties/Value/Unsupported", Assert.Single(evidence.Issues).Pointer);
+        Assert.Equal("/Properties/0/Unsupported", Assert.Single(evidence.Issues).Pointer);
     }
 
     [Fact]
@@ -415,9 +416,9 @@ public sealed class EvidenceTests
         var evidence = EvidenceReader.Read(source);
 
         Assert.Equal("Still readable", Assert.Single(evidence.Texts).Source);
-        Assert.Contains(evidence.Issues, issue => issue.Pointer == "/Properties/Value/Unsupported" && issue.Message.Contains("cycle"));
-        Assert.Contains(evidence.Issues, issue => issue.Pointer == "/Properties/Missing");
-        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/Missing" && value.Kind == "unread");
+        Assert.Contains(evidence.Issues, issue => issue.Pointer == "/Properties/0/Unsupported" && issue.Message.Contains("cycle"));
+        Assert.Contains(evidence.Issues, issue => issue.Pointer == "/Properties/1");
+        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/1" && value.Kind == "unread");
     }
 
     [Fact]
@@ -486,7 +487,7 @@ public sealed class EvidenceTests
         var evidence = EvidenceReader.Read(Object("Spline", Property("Spline", new ValueProperty(spline))));
 
         Assert.Equal(1, archive.Position);
-        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/Spline" && value.Kind == "empty-struct");
+        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/0" && value.Kind == "empty-struct");
         Assert.Empty(evidence.Issues);
     }
 
@@ -498,6 +499,126 @@ public sealed class EvidenceTests
         using var archive = new FByteArchive("Enabled spline", [enabled]);
 
         Assert.Throws<NotSupportedException>(() => new FSpline(archive));
+    }
+
+    [Fact]
+    public void RepeatedScalarNamesKeepSeparateOrderedHeadersAndValues()
+    {
+        var source = Object("Repeated", Property("Value", new IntProperty(1)), Property("Value", new IntProperty(2)));
+        source.Class = new ResolvedLoadedObject(new UStruct
+        {
+            Name = "RuntimeLayout",
+            ChildProperties = [new FIntProperty { Name = "Value", ArrayDim = 1 }, new FIntProperty { Name = "Value", ArrayDim = 1 }]
+        });
+
+        var evidence = EvidenceReader.Read(source);
+
+        Assert.Equal(["/Properties/0", "/Properties/1"], evidence.Properties.Select(property => property.Pointer));
+        Assert.All(evidence.Properties, property =>
+        {
+            Assert.Equal("Value", property.Name);
+            Assert.Equal("IntProperty", property.Type);
+            Assert.Null(property.ArrayIndex);
+            Assert.Null(property.ArraySize);
+            Assert.Equal("Property", property.SerializeType);
+        });
+        Assert.Equal(["1", "2"], evidence.Values.Select(value => value.Value));
+        Assert.Empty(evidence.Issues);
+    }
+
+    [Fact]
+    public void RepeatedNestedNamesAndArrayPositionsHaveIndependentPropertyContainers()
+    {
+        var nested = new FStructFallback([Property("0/~", new IntProperty(3)), Property("0/~", new IntProperty(4))]);
+        var source = Object("Nested", Property("Array", new ArrayProperty(new UScriptArray([
+            new StructProperty(new FScriptStruct(nested))
+        ], "StructProperty"))));
+
+        var evidence = EvidenceReader.Read(source);
+
+        Assert.Equal(["/Properties/0", "/Properties/0/0/Properties/0", "/Properties/0/0/Properties/1"],
+            evidence.Properties.Select(property => property.Pointer));
+        Assert.Equal(["Array", "0/~", "0/~"], evidence.Properties.Select(property => property.Name));
+        Assert.Empty(evidence.Issues);
+    }
+
+    [Fact]
+    public void IndexedTagsRetainElementsAndStillRejectAmbiguousRepeatedElements()
+    {
+        var first = Property("Array", new IntProperty(1));
+        first.PropertyTagFlags = EPropertyTagFlags.HasArrayIndex;
+        first.ArraySize = 2;
+        var second = Property("Array", new IntProperty(2));
+        second.PropertyTagFlags = EPropertyTagFlags.HasArrayIndex;
+        second.ArrayIndex = 1;
+        second.ArraySize = 2;
+
+        var valid = EvidenceReader.Read(Object("Array", first, second));
+
+        Assert.Equal<int?>([0, 1], valid.Properties.Select(property => property.ArrayIndex));
+        Assert.All(valid.Properties, property => Assert.Equal(2, property.ArraySize));
+        Assert.Empty(valid.Issues);
+        second.Name = "array";
+        second.ArrayIndex = 0;
+        var invalid = EvidenceReader.Read(Object("Array", first, second));
+        Assert.Equal(2, invalid.Values.Count);
+        Assert.Contains(invalid.Issues, issue => issue.Pointer == "/Properties/1" && issue.Message.Contains("Repeated indexed"));
+    }
+
+    [Fact]
+    public void UnreadAndMalformedTagsKeepTheirHeadersAndDiagnostics()
+    {
+        var skipped = new FPropertyTag { Name = "Unread", PropertyType = "TextProperty", PropertyTagFlags = EPropertyTagFlags.SkippedSerialize };
+        var malformed = Property("Array", new IntProperty(1));
+        malformed.ArrayIndex = 2;
+        malformed.ArraySize = 2;
+        var evidence = EvidenceReader.Read(Object("Invalid", skipped, malformed));
+
+        Assert.Equal(2, evidence.Properties.Count);
+        Assert.Equal("Skipped", evidence.Properties[0].SerializeType);
+        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/0" && value.Kind == "unread");
+        Assert.Contains(evidence.Issues, issue => issue.Pointer == "/Properties/0" && issue.Message.Contains("no decoded value"));
+        Assert.Contains(evidence.Issues, issue => issue.Pointer == "/Properties/1" && issue.Message.Contains("Invalid static-array"));
+    }
+
+    [Fact]
+    public void RuntimeStaticArrayLayoutsAreRejectedThroughActualAncestors()
+    {
+        var parent = new UStruct { Name = "RuntimeParent", ChildProperties = [new FIntProperty { Name = "Values", ArrayDim = 2 }] };
+        var package = new TestPackage(new ResolvedLoadedObject(parent));
+        var child = new UStruct { Name = "RuntimeChild", ChildProperties = [], SuperStruct = new FPackageIndex(package, 1) };
+        var source = Object("Instance", Property("Value", new IntProperty(3)));
+        source.Class = new ResolvedLoadedObject(child);
+
+        var evidence = EvidenceReader.Read(source);
+
+        Assert.Contains(evidence.Issues, issue => issue.Type == "runtime-schema" && issue.Message.Contains("RuntimeParent.Values") && issue.Message.Contains("ArrayDim 2"));
+        Assert.Contains(evidence.Values, value => value.Value == "3");
+    }
+
+    [Fact]
+    public void RuntimeLayoutGuardStopsAtTheNativeUsmapBoundary()
+    {
+        var native = new UScriptClass("Native") { ChildProperties = [new FIntProperty { Name = "Values", ArrayDim = 2 }] };
+        var package = new TestPackage(new ResolvedLoadedObject(native));
+        var runtime = new UStruct { Name = "Runtime", ChildProperties = [], SuperStruct = new FPackageIndex(package, 1) };
+        var source = Object("Instance");
+        source.Class = new ResolvedLoadedObject(runtime);
+
+        Assert.Empty(EvidenceReader.Read(source).Issues);
+        source.Class = new ResolvedLoadedObject(native);
+        Assert.Empty(EvidenceReader.Read(source).Issues);
+    }
+
+    [Fact]
+    public void CyclicRuntimeLayoutBecomesADiagnostic()
+    {
+        var runtime = new UStruct { Name = "Cycle", ChildProperties = [] };
+        runtime.SuperStruct = new FPackageIndex(new TestPackage(new ResolvedLoadedObject(runtime)), 1);
+        var source = Object("Instance");
+        source.Class = new ResolvedLoadedObject(runtime);
+
+        Assert.Contains(EvidenceReader.Read(source).Issues, issue => issue.Type == "runtime-schema" && issue.Message.Contains("ancestry repeats"));
     }
 
     private static UObject Object(string name, params FPropertyTag[] properties) => new(properties.ToList()) { Name = name };
