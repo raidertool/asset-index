@@ -70,7 +70,8 @@ internal sealed class ExportCoverage
             Require(value.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(value.GetString()), "Invalid export ancestry.");
             return value.GetString()!;
         }).ToArray();
-        Require(ancestry.Length is > 0 and <= 128 && ancestry[0] == type && ancestry[^1] == "Object", "Incomplete export ancestry.");
+        Require(ancestry.Length is > 0 and <= 128 && ancestry[0].Equals(type, StringComparison.OrdinalIgnoreCase) &&
+            ancestry[^1].Equals("Object", StringComparison.OrdinalIgnoreCase), "Incomplete export ancestry.");
         var header = new Header(path, type, ancestry);
         Require(headers[package].TryAdd(index, header), "Duplicate export header index.");
         Require(paths.TryAdd(path, header), "Ambiguous export header paths differ only by case or repeat.");
@@ -87,7 +88,7 @@ internal sealed class ExportCoverage
                 var selected = owner.Selected.Contains(index);
                 Require(selected || !(header.Candidate || uiTextures.Contains(header.Path)), $"Required export was not selected: {header.Path}.");
                 if (!selected) continue;
-                Require(objects.TryGetValue(header.Path, out var type) && type == header.Class, $"Selected export lacks matching object evidence: {header.Path}.");
+                Require(objects.TryGetValue(header.Path, out var type) && type!.Equals(header.Class, StringComparison.OrdinalIgnoreCase), $"Selected export lacks matching object evidence: {header.Path}.");
                 decoded.Add(header.Path);
             }
         }

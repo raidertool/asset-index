@@ -50,6 +50,16 @@ public sealed partial class PublisherTests
     }
 
     [Fact]
+    public void ExportClassNamesUseUnrealCaseInsensitiveIdentity()
+    {
+        ChangeLines("discovery/exports.jsonl.gz", rows =>
+            rows[0]!["ancestry"] = new JsonArray("persistencedataasset", "dataasset", "object"));
+        ChangeLines("discovery/objects.jsonl.gz", rows => rows[0]!["class"] = "PERSISTENCEDATAASSET");
+
+        Assert.True(Publisher.Publish(preview, remote, NextExtractor, "456").Changed);
+    }
+
+    [Fact]
     public void ReferencedActorCanRemainHeaderOnlyWhileDataAssetIsDecoded()
     {
         var target = AddHeaderSibling("Actor", ["Object"]);
