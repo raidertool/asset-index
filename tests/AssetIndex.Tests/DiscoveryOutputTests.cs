@@ -1,16 +1,6 @@
 using System.IO.Compression;
 using System.Text.Json;
 using AssetIndex.Discovery;
-using CUE4Parse.Compression;
-using CUE4Parse.FileProvider.Objects;
-using CUE4Parse.GameTypes.Theia.FileProvider;
-using CUE4Parse.MappingsProvider.Usmap;
-using CUE4Parse.UE4.Assets;
-using CUE4Parse.UE4.Assets.Exports;
-using CUE4Parse.UE4.Assets.Objects;
-using CUE4Parse.UE4.Objects.UObject;
-using CUE4Parse.UE4.Readers;
-using CUE4Parse.UE4.Versions;
 
 namespace AssetIndex.Tests;
 
@@ -24,18 +14,19 @@ public sealed class DiscoveryOutputTests : IDisposable
     [Fact]
     public void InventoriesSurviveACrawlFailureAndObjectEvidenceIsNeverFinalized()
     {
-        using var provider = new TestProvider(() =>
+        using var provider = Provider();
+        provider.BeforeLoad = _ =>
         {
             AssertInventories(); // Executed at the first package load, before any export is decoded.
             Assert.False(File.Exists(Path.Combine(output, "discovery/objects.jsonl.gz")));
-        });
-        using (var evidence = new EvidenceFile(output))
+        };
+        using (var evidence = new JsonLinesFile<ObjectEvidence>(output, "discovery/objects.jsonl.gz"))
         {
             var crawler = new ObjectCrawler(provider, value =>
             {
                 evidence.Write(value);
                 throw new IOException("Deliberate crawl output failure.");
-            });
+            }, _ => { });
 
             var error = Assert.Throws<IOException>(() => crawler.Read([Registered], WriteInventory));
 
@@ -55,14 +46,15 @@ public sealed class DiscoveryOutputTests : IDisposable
         using var log = new StringWriter();
         var clock = new ExtractionProgressTests.ManualTimeProvider();
         using var progress = new ExtractionProgress(log, clock);
-        using var provider = new TestProvider(() =>
+        using var provider = Provider();
+        provider.BeforeLoad = _ =>
         {
             clock.Advance(30);
             using var sample = JsonDocument.Parse(log.ToString());
             Assert.Equal("load-package", sample.RootElement.GetProperty("phase").GetString());
             Assert.Equal(Package, sample.RootElement.GetProperty("package").GetString());
             log.GetStringBuilder().Clear();
-        });
+        };
         var crawler = new ObjectCrawler(provider, _ =>
         {
             clock.Advance(30);
@@ -70,13 +62,15 @@ public sealed class DiscoveryOutputTests : IDisposable
             Assert.Equal("write-evidence", sample.RootElement.GetProperty("phase").GetString());
             Assert.Equal(Package, sample.RootElement.GetProperty("package").GetString());
             Assert.Equal(0, sample.RootElement.GetProperty("exportIndex").GetInt32());
-        }, progress);
+        }, _ => { }, progress);
 
         var result = crawler.Read([Registered], WriteInventory);
 
         Assert.Empty(result.Issues);
         Assert.Equal(1, result.Loaded);
     }
+
+    private static CrawlerProvider Provider() => new(new CrawlerPackage(Package, "/Plugin/Asset", new CrawlerExport("Object")));
 
     private void WriteInventory(IReadOnlyList<RegisteredObject> registry, IReadOnlyList<PackageFile> files)
     {
@@ -104,45 +98,4 @@ public sealed class DiscoveryOutputTests : IDisposable
         if (Directory.Exists(output)) Directory.Delete(output, recursive: true);
     }
 
-    private sealed class TestProvider : TheiaFileProvider
-    {
-        private readonly Action loading;
-
-        public TestProvider(Action loading) : base(Path.GetTempPath(), SearchOption.TopDirectoryOnly,
-            new VersionContainer(EGame.GAME_ArcRaiders), StringComparer.OrdinalIgnoreCase)
-        {
-            this.loading = loading;
-            MappingsContainer = new FileUsmapTypeMappingsProvider(Path.Combine(AppContext.BaseDirectory, "mappings", "ArcRaiders.usmap"));
-            Files.AddFiles(new Dictionary<string, GameFile> { [Package] = new TestFile() });
-        }
-
-        public override IPackage LoadPackage(GameFile file)
-        {
-            loading();
-            return new TestPackage();
-        }
-    }
-
-    private sealed class TestPackage : AbstractUePackage
-    {
-        public TestPackage() : base("/Plugin/Asset", null)
-        {
-            var value = new UObject { Name = "Object", Outer = new ResolvedLoadedObject(this) };
-            ExportsLazy = [new(() => value)];
-        }
-        public override FPackageFileSummary Summary => throw new NotSupportedException();
-        public override FNameEntrySerialized[] NameMap => [];
-        public override int ImportMapLength => 0;
-        public override int ExportMapLength => ExportsLazy.Length;
-        public override int GetExportIndex(string name, StringComparison comparisonType = StringComparison.Ordinal) => -1;
-        public override ResolvedObject? ResolvePackageIndex(FPackageIndex? index) => null;
-    }
-
-    private sealed class TestFile() : GameFile(Package, 0)
-    {
-        public override bool IsEncrypted => false;
-        public override CompressionMethod CompressionMethod => CompressionMethod.None;
-        public override byte[] Read(FByteBulkDataHeader? header = null) => throw new NotSupportedException();
-        public override FArchive CreateReader(FByteBulkDataHeader? header = null) => throw new NotSupportedException();
-    }
 }

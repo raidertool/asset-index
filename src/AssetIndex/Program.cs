@@ -57,15 +57,17 @@ internal static class Program
             Console.WriteLine("Mounting game containers...");
             using var provider = GameFiles.Open(options);
             Console.WriteLine($"Mounted {provider.Files.Count:N0} files. Reading typed object fields and references...");
-            using (var evidence = new EvidenceFile(options.OutputDirectory))
+            using (var evidence = new JsonLinesFile<Discovery.ObjectEvidence>(options.OutputDirectory, "discovery/objects.jsonl.gz"))
+            using (var headers = new JsonLinesFile<Discovery.ExportHeader>(options.OutputDirectory, "discovery/exports.jsonl.gz"))
             using (var progress = new ExtractionProgress(Console.Error))
             {
-                discovery = AssetDiscovery.Read(provider, evidence.Write, (registry, files) =>
+                discovery = AssetDiscovery.Read(provider, evidence.Write, headers.Write, (registry, files) =>
                 {
                     Snapshot.WriteLines(options.OutputDirectory, "discovery/files.jsonl.gz", files);
                     Snapshot.WriteLines(options.OutputDirectory, "discovery/registry.jsonl.gz", registry);
                 }, progress);
                 progress.Set("finish-evidence");
+                headers.Complete();
                 evidence.Complete();
             }
             issues.AddRange(discovery.Issues);
@@ -74,8 +76,8 @@ internal static class Program
                 new(TextureAddress.TA_Wrap, TextureAddress.TA_Wrap, TextureFilter.TF_Bilinear),
                 new(TextureAddress.TA_Clamp, TextureAddress.TA_Clamp, TextureFilter.TF_Bilinear));
             var resources = new ImageResources(options.OutputDirectory, issues, materials);
-            Console.WriteLine("Exporting UI and referenced textures...");
-            foreach (var texture in discovery.Objects.OfType<UTexture2D>()) resources.Export(texture);
+            Console.WriteLine("Exporting registry UI textures...");
+            foreach (var texture in UiTextures(discovery)) resources.Export(texture);
             records = ExportAssets(discovery.Assets, provider, options.OutputDirectory, resources, issues);
             Snapshot.Write(options.OutputDirectory, "resources.json", resources.Entries);
             resourceCount = resources.Entries.Count;
@@ -98,6 +100,13 @@ internal static class Program
         Snapshot.Write(options.OutputDirectory, "coverage.json", report);
         Console.WriteLine($"{report.Status}: {report.AssetIds:N0} IDs, {report.EnglishNames:N0} English names, {report.Images:N0} assets with images, {issues.Count:N0} issues.");
         return issues.Count == 0 ? 0 : 1;
+    }
+
+    internal static IEnumerable<UTexture2D> UiTextures(DiscoveryResult discovery)
+    {
+        var paths = discovery.Registry.Where(Discovery.Registry.IsUiTexture).Select(entry => entry.Path)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return discovery.Objects.OfType<UTexture2D>().Where(texture => paths.Contains(texture.GetPathName()));
     }
 
     private static List<AssetRecord> ExportAssets(IReadOnlyList<CatalogAsset> assets, IFileProvider provider,

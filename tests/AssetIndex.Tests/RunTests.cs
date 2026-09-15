@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.IO.Compression;
 
 namespace AssetIndex.Tests;
 
@@ -43,7 +44,43 @@ public sealed class RunTests : IDisposable
     public void GameDerivedFilenamesCannotEscapeTheOutput(string name)
     {
         Assert.Throws<InvalidDataException>(() => Snapshot.Write(directory, name, "invalid"));
+        Assert.Throws<InvalidDataException>(() => new JsonLinesFile<int>(directory, name));
         Assert.Empty(Directory.EnumerateFileSystemEntries(directory));
+    }
+
+    [Fact]
+    public void JsonLinesFilesRequireCompletionAndNeverReplacePublishedData()
+    {
+        const string name = "discovery/rows.jsonl.gz";
+        var path = Path.Combine(directory, name);
+        using (var partial = new JsonLinesFile<string>(directory, name))
+        {
+            partial.Write("partial");
+            Assert.False(File.Exists(path));
+        }
+        Assert.Empty(Directory.EnumerateFiles(Path.GetDirectoryName(path)!));
+
+        using (var complete = new JsonLinesFile<string>(directory, name))
+        {
+            complete.Write("first\nline");
+            complete.Write("한국어");
+            complete.Complete();
+        }
+        var published = File.ReadAllBytes(path);
+        using (var gzip = new GZipStream(File.OpenRead(path), CompressionMode.Decompress))
+        using (var reader = new StreamReader(gzip))
+        {
+            Assert.Equal("first\nline", JsonSerializer.Deserialize<string>(reader.ReadLine()!));
+            Assert.Equal("한국어", JsonSerializer.Deserialize<string>(reader.ReadLine()!));
+            Assert.Null(reader.ReadLine());
+        }
+        using (var replacement = new JsonLinesFile<string>(directory, name))
+        {
+            replacement.Write("replacement");
+            Assert.Throws<IOException>(replacement.Complete);
+        }
+        Assert.Equal(published, File.ReadAllBytes(path));
+        Assert.Single(Directory.EnumerateFiles(Path.GetDirectoryName(path)!));
     }
 
     [Fact]

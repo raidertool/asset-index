@@ -33,8 +33,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for tests and mapping updates.
 | Path | Contents |
 | --- | --- |
 | `assets.json` | IDs, definitions, UI metadata, localized text, and image references |
-| `resources.json`, `images/` | UI/referenced textures and supported material icons, including unowned resources |
-| `discovery/` | Compressed object fields, registry inventory and package coverage |
+| `resources.json`, `images/` | Registry UI textures and explicit asset image roles, including supported material icons |
+| `discovery/` | Object fields, every package's export headers and selected-body coverage |
 | `localization/` | Compressed translation dictionaries |
 | `coverage.json` | Counts and extraction diagnostics |
 

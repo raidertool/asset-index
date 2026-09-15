@@ -33,9 +33,7 @@ internal static class Snapshot
 
     public static void WriteFile(string output, string name, Action<Stream> write)
     {
-        if (Path.IsPathRooted(name) || name.Contains('\\') || name.Split('/').Any(part => part is "" or "." or ".."))
-            throw new InvalidDataException("Snapshot filenames must be relative paths inside the output directory.");
-        var path = Path.Combine(output, name);
+        var path = OutputPath(output, name);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
@@ -55,34 +53,45 @@ internal static class Snapshot
         });
 
     internal static readonly JsonSerializerOptions CompactJson = new(Json) { WriteIndented = false };
+
+    internal static string OutputPath(string output, string name)
+    {
+        if (Path.IsPathRooted(name) || name.Contains('\\') || name.Split('/').Any(part => part is "" or "." or ".."))
+            throw new InvalidDataException("Snapshot filenames must be relative paths inside the output directory.");
+        return Path.Combine(output, name);
+    }
 }
 
-// Streaming object evidence avoids retaining a second object graph in memory.
-internal sealed class EvidenceFile : IDisposable
+// A stream becomes a snapshot file only after the caller completes every row.
+internal sealed class JsonLinesFile<T> : IDisposable
 {
     private readonly string path;
     private readonly string temporary;
-    private readonly StreamWriter writer;
+    private readonly GZipStream stream;
 
-    public EvidenceFile(string output)
+    public JsonLinesFile(string output, string name)
     {
-        path = Path.Combine(output, "discovery", "objects.jsonl.gz");
+        path = Snapshot.OutputPath(output, name);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        writer = new StreamWriter(new GZipStream(new FileStream(temporary, FileMode.CreateNew, FileAccess.Write), CompressionLevel.SmallestSize));
+        stream = new GZipStream(new FileStream(temporary, FileMode.CreateNew, FileAccess.Write), CompressionLevel.SmallestSize);
     }
 
-    public void Write(Discovery.ObjectEvidence evidence) => writer.WriteLine(JsonSerializer.Serialize(evidence, Snapshot.CompactJson));
+    public void Write(T row)
+    {
+        JsonSerializer.Serialize(stream, row, Snapshot.CompactJson);
+        stream.WriteByte((byte)'\n');
+    }
 
     public void Complete()
     {
-        writer.Dispose();
+        stream.Dispose();
         File.Move(temporary, path);
     }
 
     public void Dispose()
     {
-        writer.Dispose();
+        stream.Dispose();
         File.Delete(temporary);
     }
 }

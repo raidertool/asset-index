@@ -5,10 +5,12 @@ every string, texture, UI object or API node.
 
 ## Read the source
 
-`Discovery/Registry.cs` inventories every registry entry. The crawler decodes
-data assets, UI metadata, tables, blueprints, unknown classes, unindexed packages,
-and UI textures selected by their registry group. Typed references also bring in
-texture/material dependencies. Other registered classes remain inventoried.
+`Discovery/Registry.cs` inventories every registry entry. Every effective mounted
+package has its export headers inspected. Actual class ancestry selects data assets,
+UI metadata, tables, blueprints and unknown classes, including unregistered exports.
+Registry UI textures and exact typed texture/material targets are also decoded;
+known Actor, world and other noncandidate bodies remain inventoried. Metadata
+ambiguity is a diagnostic, never a silent exclusion.
 
 IoStore package bytes use a 256 MiB memory cache and a temporary disk spool,
 deleted when the provider closes. Lazy readers can revisit evicted bytes;
@@ -38,17 +40,24 @@ layout identity is not always retained upstream, so this check does not certify
 every nested layout or recover fields skipped by the decoder.
 
 `discovery/objects.jsonl.gz` retains unassociated fields and strings;
-`registry.jsonl.gz` and `packages.jsonl.gz` show selection and decode coverage.
+`registry.jsonl.gz` and `exports.jsonl.gz` retain registry entries and export headers.
+`packages.jsonl.gz` records each physical path, actual package `name`, total export
+count, and sorted `selected`/`decoded` export-index sets. Package `succeeded` and
+report `loaded` mean valid inspected headers and successful selected bodies;
+they do not mean every body was decoded. Selected registry entries require an exact
+export path or an explicit, validated `GeneratedClass` tag.
 `files.jsonl.gz` inventories effective mounted UE package paths and their resolved
-`registryPackages`. Empty lists identify unindexed inputs; each must have an
-attempt in `packages.jsonl.gz`. The crosswalk uses the provider's mount resolution,
+`registryPackages`. Every effective mounted input must have a header-read attempt
+in `packages.jsonl.gz`; empty lists identify unindexed inputs. The crosswalk uses the provider's mount resolution,
 including package IDs, and excludes older shadowed archive versions and payloads.
 Registry and file inventories are saved before crawling. Every 30 seconds, stderr
 reports the active discovery operation, requested package and export index. Nested
 decoder dependencies may be loaded within that operation. Interrupted object streams
 remain temporary; inventories alone do not establish completed extraction.
 `localization/` retains the game's merged translation dictionaries. `resources.json`
-indexes UI/referenced textures and supported material images independently of catalog ownership.
+indexes registry UI textures and explicit catalog image roles, including supported
+material images. Other referenced textures remain discovery evidence; they do not
+automatically become standalone PNGs.
 
 ```sh
 gzip -dc .work/preview/discovery/objects.jsonl.gz | rg 'ResearchPoints'
@@ -57,7 +66,9 @@ gzip -dc .work/preview/discovery/objects.jsonl.gz | rg 'ResearchPoints'
 Binary native payloads and composite-curve evaluation are outside field discovery.
 Unsupported compound fields and failed reads are explicit diagnostics. A loaded
 package does not mean every export or every native payload was decoded. Selected
-object references must match a decoded export and its complete outer chain.
+object references must match their complete outer chain in the inspected headers.
+Followable targets also require decoded evidence; known noncandidate targets can
+remain header-only.
 
 ## Assign presentation
 

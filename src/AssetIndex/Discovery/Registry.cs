@@ -9,6 +9,7 @@ internal sealed record RegisteredObject(string Path, string Package, string Clas
 
 internal static class Registry
 {
+    private static readonly string[] CandidateRoots = ["DataAsset", "UIMetaDataItem", "DataTable", "CurveTable", "StringTable", "Blueprint", "BlueprintGeneratedClass"];
     public static IReadOnlyList<RegisteredObject> Read(TheiaFileProvider provider, ICollection<ExtractionIssue> issues)
     {
         var objects = new SortedDictionary<string, RegisteredObject>(StringComparer.Ordinal);
@@ -49,11 +50,17 @@ internal static class Registry
     // Binary media remain inventoried; typed references can select textures and materials.
     internal static bool SelectClass(TypeMappings mappings, string type)
     {
-        string[] roots = ["DataAsset", "UIMetaDataItem", "DataTable", "CurveTable", "StringTable", "Blueprint", "BlueprintGeneratedClass"];
-        var ancestry = roots.Select(root => Assets.IsA(mappings, type, root)).ToArray();
+        var ancestry = CandidateRoots.Select(root => Assets.IsA(mappings, type, root)).ToArray();
         return ancestry.Any(result => result == true) || ancestry.Any(result => result is null);
     }
 
     internal static bool FollowClass(TypeMappings mappings, string type) => SelectClass(mappings, type) ||
         Assets.IsA(mappings, type, "Texture") == true || Assets.IsA(mappings, type, "MaterialInterface") == true;
+
+    internal static bool SelectClass(ExportHeader header) => header.Error is not null || !header.AncestryComplete ||
+        CandidateRoots.Any(root => header.Ancestry.Contains(root, StringComparer.OrdinalIgnoreCase));
+
+    internal static bool FollowClass(ExportHeader header) => SelectClass(header) ||
+        header.Ancestry.Contains("Texture", StringComparer.OrdinalIgnoreCase) ||
+        header.Ancestry.Contains("MaterialInterface", StringComparer.OrdinalIgnoreCase);
 }

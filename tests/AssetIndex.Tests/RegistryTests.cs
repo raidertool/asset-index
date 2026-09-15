@@ -6,6 +6,21 @@ namespace AssetIndex.Tests;
 public sealed class RegistryTests
 {
     [Theory]
+    [InlineData("Actor", false, false)]
+    [InlineData("DataAsset", true, true)]
+    [InlineData("Texture", false, true)]
+    [InlineData("MaterialInterface", false, true)]
+    public void RuntimeClassSelectionUsesItsActualCompleteAncestry(string parent, bool selected, bool followed)
+    {
+        var header = new ExportHeader("Map.umap", 0, "/Game/Map.Instance", "RuntimeClass_C", "/Game/Classes.RuntimeClass_C",
+            ["RuntimeClass_C", parent, "Object"], true, null);
+
+        Assert.Equal(selected, Registry.SelectClass(header));
+        Assert.Equal(followed, Registry.FollowClass(header));
+        Assert.True(Registry.SelectClass(header with { AncestryComplete = false, Error = "Unresolved parent." }));
+    }
+
+    [Theory]
     [InlineData("PersistenceDataAsset", true, true)]
     [InlineData("UIItemMetaDataItem", true, true)]
     [InlineData("StringTable", true, true)]
