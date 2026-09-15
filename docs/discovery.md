@@ -41,6 +41,8 @@ every nested layout or recover fields skipped by the decoder.
 
 `discovery/objects.jsonl.gz` retains unassociated fields and strings;
 `registry.jsonl.gz` and `exports.jsonl.gz` retain registry entries and export headers.
+Headers record `classPath` and the export's own nullable superclass `superPath`;
+these links come from metadata without loading bodies.
 `packages.jsonl.gz` records each physical path, actual package `name`, total export
 count, and sorted `selected`/`decoded` export-index sets. Package `succeeded` and
 report `loaded` mean valid inspected headers and successful selected bodies;

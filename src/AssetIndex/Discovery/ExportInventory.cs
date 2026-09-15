@@ -5,7 +5,7 @@ using CUE4Parse.UE4.Objects.UObject;
 namespace AssetIndex.Discovery;
 
 internal sealed record ExportHeader(string Package, int Index, string? Path, string? Class, string? ClassPath,
-    IReadOnlyList<string> Ancestry, bool AncestryComplete, string? Error);
+    IReadOnlyList<string> Ancestry, bool AncestryComplete, string? Error, string? SuperPath = null);
 
 internal static class ExportInventory
 {
@@ -27,7 +27,7 @@ internal static class ExportInventory
 
     private static ExportHeader ReadHeader(IPackage package, string physicalPath, int index, TypeMappings mappings)
     {
-        string? path = null, type = null, classPath = null, error = null;
+        string? path = null, type = null, classPath = null, superPath = null, error = null;
         var ancestry = new List<string>();
         var complete = false;
         try
@@ -35,6 +35,8 @@ internal static class ExportInventory
             var export = package.ResolvePackageIndex(new FPackageIndex(package, index + 1))
                 ?? throw new InvalidDataException("Export index has no resolved metadata.");
             path = ObjectMetadata.Path(export);
+            var parent = ObjectMetadata.Super(export);
+            superPath = parent is null ? null : ObjectMetadata.Path(parent);
             var declaration = export.Class ?? throw new InvalidDataException("Export class metadata is missing.");
             type = declaration.Name.Text;
             classPath = ObjectMetadata.Path(declaration);
@@ -44,7 +46,7 @@ internal static class ExportInventory
             complete = error is null;
         }
         catch (Exception exception) { error = AssetDiscovery.DescribeError(exception); }
-        return new(physicalPath, index, path, type, classPath, ancestry.ToArray(), complete, error);
+        return new(physicalPath, index, path, type, classPath, ancestry.ToArray(), complete, error, superPath);
     }
 
 }

@@ -1,14 +1,11 @@
-using System.Reflection;
-using System.Runtime.CompilerServices;
 using AssetIndex.Discovery;
 using CUE4Parse.MappingsProvider;
 using CUE4Parse.UE4.Assets;
 using CUE4Parse.UE4.Assets.Exports;
-using CUE4Parse.UE4.IO;
 using CUE4Parse.UE4.IO.Objects;
 using CUE4Parse.UE4.Objects.UObject;
-using CUE4Parse.UE4.Readers;
-using CUE4Parse.UE4.Versions;
+
+using static AssetIndex.Tests.IoMetadataFixture;
 
 namespace AssetIndex.Tests;
 
@@ -202,6 +199,12 @@ public sealed class ExportInventoryTests
         var headers = ExportInventory.Read(package, "Map.umap", Mappings());
 
         Assert.Equal(entries.Length, headers.Count);
+        Assert.Null(headers[0].SuperPath);
+        Assert.Null(headers[0].Error);
+        Assert.Equal("/Script/Fixture.World", headers[1].SuperPath);
+        Assert.Null(headers[1].Error);
+        Assert.Null(headers[2].SuperPath);
+        Assert.Contains("Serialized superclass index", headers[2].Error);
         Assert.Null(headers[3].Error);
         Assert.Equal(["RuntimeWorld", "World", "Object"], headers[3].Ancestry);
         Assert.Contains("Serialized outer index", headers[4].Error);
@@ -212,58 +215,14 @@ public sealed class ExportInventoryTests
 
     private static IoPackage IoMetadata(FExportMapEntry[] entries, string[] names, Action payloadRead)
     {
-        // Install parsed headers only to isolate CUE's public metadata API. This
-        // fixture does not claim to exercise mounting or the container parser.
-        var package = (IoPackage)RuntimeHelpers.GetUninitializedObject(typeof(IoPackage));
-        package.Name = "/Game/Map";
-        Set(typeof(IoPackage), package, "ExportMap", entries);
-        Set(typeof(IoPackage), package, "ImportMap", Array.Empty<FPackageObjectIndex>());
-        Set(typeof(IoPackage), package, "<NameMap>k__BackingField", names.Select(name => new FNameEntrySerialized(name)).ToArray());
-        var globals = (IoGlobalData)RuntimeHelpers.GetUninitializedObject(typeof(IoGlobalData));
         var script = 1UL << FPackageObjectIndex.TypeShift;
-        Set(typeof(IoGlobalData), globals, "ScriptObjectEntriesMap", new Dictionary<FPackageObjectIndex, FScriptObjectEntry>
+        return Create(entries, names, new()
         {
             [new(script | 1)] = ScriptEntry(9, script | 1, FPackageObjectIndex.Invalid),
             [new(script | 2)] = ScriptEntry(7, script | 2, script | 1),
             [new(script | 3)] = ScriptEntry(8, script | 3, script | 1)
-        });
-        Set(typeof(IoPackage), package, "_globalData", globals);
-        Set(typeof(AbstractUePackage), package, "<ExportsLazy>k__BackingField", entries.Select(_ => new Lazy<UObject>(() =>
-        {
-            payloadRead();
-            throw new InvalidOperationException("Inventory must not read an instance payload.");
-        })).ToArray());
-        return package;
+        }, payloadRead);
     }
-
-    private static FExportMapEntry Entry(int name, ulong type, ulong? super = null, ulong? outer = null)
-    {
-        using var stream = new MemoryStream();
-        using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, true))
-        {
-            writer.Write(0UL); writer.Write(0UL); writer.Write((uint)name); writer.Write(0U);
-            writer.Write(outer ?? FPackageObjectIndex.Invalid); writer.Write(type);
-            writer.Write(super ?? FPackageObjectIndex.Invalid); writer.Write(FPackageObjectIndex.Invalid);
-            writer.Write(0UL); writer.Write(0U); writer.Write(0U);
-        }
-        using var archive = new FByteArchive("Synthetic export header", stream.ToArray(), new VersionContainer(EGame.GAME_ArcRaiders));
-        return new FExportMapEntry(archive);
-    }
-
-    private static FScriptObjectEntry ScriptEntry(uint name, ulong index, ulong outer)
-    {
-        using var stream = new MemoryStream();
-        using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, true))
-        {
-            writer.Write(name); writer.Write(0U); writer.Write(index);
-            writer.Write(outer); writer.Write(FPackageObjectIndex.Invalid);
-        }
-        using var archive = new FByteArchive("Synthetic native script entry", stream.ToArray());
-        return archive.Read<FScriptObjectEntry>();
-    }
-
-    private static void Set(Type type, object target, string name, object value) =>
-        type.GetField(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!.SetValue(target, value);
 
     private static TypeMappings Mappings()
     {
