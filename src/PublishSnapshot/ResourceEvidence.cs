@@ -25,28 +25,36 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, HashSet<str
         var objects = ReadObjects(files["discovery/objects.jsonl.gz"]);
         CheckCount(discovery, "objects", objects.Count);
         var registry = new HashSet<string>(StringComparer.Ordinal);
+        var registryPackages = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         JsonLines.Read(files["discovery/registry.jsonl.gz"], row =>
         {
             Fields(row, "path", "package", "class", "tags");
             Require(registry.Add(ObjectPath(row, "path")), "Duplicate registry object.");
-            ObjectPath(row, "package");
+            registryPackages.Add(ObjectPath(row, "package"));
             String(row, "class");
             var tags = new HashSet<string>(StringComparer.Ordinal);
             foreach (var tag in row.GetProperty("tags").EnumerateObject())
                 Require(tags.Add(tag.Name) && tag.Value.ValueKind == JsonValueKind.String, "Invalid registry tag.");
         });
         CheckCount(report, "registeredAssets", registry.Count);
+        var inputs = MountedInputs.Read(files["discovery/files.jsonl.gz"], registryPackages);
         var packages = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        long exportsTotal = 0;
         JsonLines.Read(files["discovery/packages.jsonl.gz"], row =>
         {
             Fields(row, "path", "reason", "status", "exports", "loaded");
-            Require(packages.Add(String(row, "path")), "Duplicate discovered package.");
+            var path = String(row, "path");
+            Require(inputs.Paths.Contains(path), $"Discovered package is absent from mounted inputs: {path}.");
+            Require(packages.Add(path), "Duplicate discovered package.");
             String(row, "reason");
             var exports = row.GetProperty("exports").GetInt32();
             Require(String(row, "status") == "loaded" && exports >= 0 && row.GetProperty("loaded").GetInt32() == exports,
                 "Discovery contains an incomplete package.");
+            exportsTotal += exports;
         });
         CheckCount(report, "candidates", packages.Count);
+        Require(exportsTotal == objects.Count, "Discovered export and object counts differ.");
+        Require(inputs.Unindexed.IsSubsetOf(packages), "An unindexed mounted package was not discovered.");
         var locales = ReadLocalizations(files);
         var resources = ReadResources(files, objects);
         CheckCount(discovery, "resources", resources.Count);
@@ -56,6 +64,7 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, HashSet<str
     private static HashSet<string> ReadObjects(SnapshotFile file)
     {
         var objects = new HashSet<string>(StringComparer.Ordinal);
+        var targets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         JsonLines.Read(file, row =>
         {
             Fields(row, "path", "class", "references", "texts", "values", "tableEntries", "issues");
@@ -69,7 +78,7 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, HashSet<str
                 Require(reference.GetProperty("error").ValueKind == JsonValueKind.Null, "Object reference failed to resolve.");
                 var isNull = reference.GetProperty("isNull").GetBoolean();
                 Require(isNull == (reference.GetProperty("targetPath").ValueKind == JsonValueKind.Null), "Inconsistent null reference.");
-                if (!isNull) ObjectPath(reference, "targetPath");
+                if (!isNull) targets.Add(ObjectPath(reference, "targetPath"));
                 NullableString(reference, "package");
                 foreach (var field in new[] { "packageIndex", "exportIndex" })
                     if (reference.GetProperty(field).ValueKind != JsonValueKind.Null) reference.GetProperty(field).GetInt32();
@@ -93,6 +102,7 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, HashSet<str
             }
         });
         Require(objects.Count > 0, "No object evidence.");
+        ReferenceClosure.Validate(objects, targets);
         return objects;
     }
 

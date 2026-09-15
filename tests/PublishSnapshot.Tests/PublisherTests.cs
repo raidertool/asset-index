@@ -111,11 +111,7 @@ public sealed partial class PublisherTests : IDisposable
     public void InvalidPreviewLeavesAllRemoteReferencesUnchanged(string mutation)
     {
         Corrupt(mutation);
-        var before = remoteGit.Run("show-ref");
-
-        Assert.ThrowsAny<Exception>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
-
-        Assert.Equal(before, remoteGit.Run("show-ref"));
+        AssertRejected();
     }
 
     [Theory]
@@ -239,9 +235,9 @@ public sealed partial class PublisherTests : IDisposable
         File.WriteAllBytes(Path.Combine(directory, "coverage.json"), JsonSerializer.SerializeToUtf8Bytes(new
         {
             status = "succeeded",
-            registeredAssets = 1,
-            candidates = 1,
-            loaded = 1,
+            registeredAssets = 2,
+            candidates = 2,
+            loaded = 2,
             assetIds = 1,
             englishNames = 1,
             descriptions = 1,
@@ -264,8 +260,21 @@ public sealed partial class PublisherTests : IDisposable
             tableEntries = Array.Empty<object>(),
             issues = Array.Empty<object>()
         }));
-        WriteLines(directory, "discovery/registry.jsonl.gz", new[] { new { path = "/Game/DA_Test.DA_Test", package = "/Game/DA_Test", @class = "PersistenceDataAsset", tags = new { } } });
-        WriteLines(directory, "discovery/packages.jsonl.gz", new[] { new { path = "Game/DA_Test.uasset", reason = "definition", status = "loaded", exports = 2, loaded = 2 } });
+        WriteLines(directory, "discovery/registry.jsonl.gz", new[]
+        {
+            new { path = "/Game/DA_Test.DA_Test", package = "/Game/DA_Test", @class = "PersistenceDataAsset", tags = new { } },
+            new { path = Texture, package = "/Game/T_Test", @class = "Texture2D", tags = new { } }
+        });
+        WriteLines(directory, "discovery/files.jsonl.gz", new[]
+        {
+            new { path = "PioneerGame/Content/DA_Test.uasset", registryPackages = new[] { "/Game/DA_Test" } },
+            new { path = "PioneerGame/Content/T_Test.uasset", registryPackages = new[] { "/Game/T_Test" } }
+        });
+        WriteLines(directory, "discovery/packages.jsonl.gz", new[]
+        {
+            new { path = "PioneerGame/Content/DA_Test.uasset", reason = "definition", status = "loaded", exports = 1, loaded = 1 },
+            new { path = "PioneerGame/Content/T_Test.uasset", reason = "reference", status = "loaded", exports = 1, loaded = 1 }
+        });
         WriteLines(directory, "localization/en.jsonl.gz", new[] { new { @namespace = "Shared", key = "UNCHANGED", value = "Unowned text" } });
     }
 
