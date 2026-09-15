@@ -69,11 +69,20 @@ and depot manifest; the downloaded JSON does not yet record them.
 | Preview code and bundled mapping | Repository commit; no extractor release or stable JSON version yet |
 | Dependencies | CUE4Parse submodule commit, SDK in `global.json`, SteamDepotFS commit in the workflow |
 
-For publication, the proposed layout is source on `main` and snapshots on `data`.
-A snapshot needs its extractor commit, depot manifest, and JSON format version.
-The importer should use the snapshot commit so source-only edits create no data
-version. This is pending: the current importer still follows `main`. Its private
-normalization version is separate from the public file format.
+For publication, use `main` for source and `data` for snapshots. This split is
+pending; the current importer still follows `main`.
+
+- Extractor releases: `vX.Y.Z` tags in **this repository**. The old `exfil-v…`
+  component identifies the retired producer, not this extractor.
+- Snapshots: the immutable `data` commit; optional `arc-<build>-<dataShortSha>`
+  tags for browsing. Existing historical tags stay unchanged.
+- Snapshot metadata: extractor commit, Steam app/depot/manifest, and JSON format
+  version. The source commit also identifies the bundled mapping.
+- Importer: use the data commit, so source-only edits create no database version.
+  Its private normalization version stays separate from the public file format.
+
+These are publication conventions; no extractor release or data branch has
+been created. A run that leaves the dataset unchanged should create no snapshot.
 
 ## Layout
 
