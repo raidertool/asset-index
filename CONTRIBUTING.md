@@ -1,7 +1,6 @@
 # Contributing
 
-Keep patches small. The extractor has one executable and one test project;
-add abstractions when a concrete feature needs them.
+Keep patches small. Add abstractions when a concrete feature needs them.
 
 ## Test
 
@@ -9,11 +8,15 @@ Initialize submodules as shown in the [README](README.md#run-locally), then run:
 
 ```sh
 CUE4PARSE_SKIP_NATIVE=true dotnet test tests/AssetIndex.Tests/AssetIndex.Tests.csproj -c Release
+dotnet test tests/PublishSnapshot.Tests/PublishSnapshot.Tests.csproj -c Release
 ```
 
 PR CI runs offline without game files or credentials. For live checks, use your
 installed game or SteamDepotFS with your own local Steam credentials. Keep
 credentials, game files, depot caches, and generated previews out of Git and issues.
+
+Publisher tests use temporary local Git repositories. See [publication](docs/publication.md)
+for the draft snapshot contract and activation requirements.
 
 ## Fix coverage
 

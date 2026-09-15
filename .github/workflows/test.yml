@@ -30,3 +30,5 @@ jobs:
         run: bash tests/ci/test-prepare-runner-disk.sh
       - name: Run offline tests
         run: dotnet test tests/AssetIndex.Tests/AssetIndex.Tests.csproj -c Release --nologo
+      - name: Test snapshot publisher offline
+        run: dotnet test tests/PublishSnapshot.Tests/PublishSnapshot.Tests.csproj -c Release --nologo
