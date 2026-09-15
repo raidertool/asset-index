@@ -68,28 +68,22 @@ and depot manifest; the downloaded JSON does not yet record them.
 
 ## Versioning
 
-| What | Current identity |
+The current published CSVs use `schema.json` v4 and legacy
+`arc-<build>-exfil-v<version>` tags. Preview JSON has no stable release yet;
+the source commit identifies its code and bundled mapping.
+
+The planned source/data split is not active:
+
+| Identity | Convention |
 | --- | --- |
-| Published dataset | `metadata.json`: Steam build/manifest and `arc-<build>-exfil-v<version>` tag |
-| Published dataset format | `schema.json` version 4; does not describe preview JSON |
-| Preview code and bundled mapping | Repository commit; no extractor release or stable JSON version yet |
-| Dependencies | CUE4Parse submodule commit, SDK in `global.json`, SteamDepotFS commit in the workflow |
+| Extractor | Source on `main`; `vX.Y.Z` releases in this repository |
+| Snapshot | Immutable `data` commit; `arc-<manifestId>-<dataCommit12>` tag |
+| Metadata | Extractor commit, Steam app/depot/manifest, JSON format version |
+| Database import | Data commit; private normalization version tracked separately |
 
-For publication, use `main` for source and `data` for snapshots. This split is
-pending; the current importer still follows `main`.
-
-- Extractor releases: `vX.Y.Z` tags in **this repository**. The old `exfil-v…`
-  component identifies the legacy producer, not this extractor.
-- Snapshots: the immutable `data` commit and its lightweight
-  `arc-<manifestId>-<dataCommit12>` tag, published atomically. Existing historical
-  tags stay unchanged.
-- Snapshot metadata: extractor commit, Steam app/depot/manifest, and JSON format
-  version. The source commit also identifies the bundled mapping.
-- Importer: use the data commit, so source-only edits create no database version.
-  Its private normalization version stays separate from the public file format.
-
-These are publication conventions; no extractor release or data branch has
-been created. Source-only changes with identical output should create no snapshot.
+Publish the data commit and tag atomically. Identical output creates no snapshot
+or database version. Historical tags stay unchanged. The importer still follows
+`main`; no data branch or extractor release has been created.
 
 ## Layout
 
