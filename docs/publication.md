@@ -61,6 +61,8 @@ payload equality. Unowned text or resource changes therefore create a snapshot;
 source-only edits with unchanged output do not. New run provenance stays in its
 logs/artifacts. Retrying identical input creates no revision.
 
-Before activation, initialize and validate the data branch, transfer ownership
-from the old publisher, and configure the importer to follow `data`. No scheduled or
-production publishing workflow is enabled by this draft.
+Before merging source changes, upgrade the importer, pin it to a reviewed legacy
+data commit, and drain older runs. Then transfer ownership from the old publisher,
+initialize and validate `data`, and switch the importer to it. Verify the first
+import before scheduling publication. No scheduled or production publishing
+workflow is enabled by this draft.
