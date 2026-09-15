@@ -12,7 +12,8 @@ if [[ "${RUNNER_TEMP:-}" != /* || ! -d "$RUNNER_TEMP" ]]; then
 fi
 
 # Unused preinstalled SDKs only. Keep .NET and the rest of the tool cache.
-sudo rm -rf -- /usr/local/lib/android /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+sudo rm -rf -- /usr/local/lib/android /usr/local/.ghcup \
+  /opt/hostedtoolcache/CodeQL /usr/share/swift /usr/lib/jvm
 
 # Current build: ~19 GiB raw packages + 8 GiB Steam cache + guard/output space.
 available_kib="$(df -Pk -- "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')"

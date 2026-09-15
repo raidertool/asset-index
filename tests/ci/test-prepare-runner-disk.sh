@@ -49,6 +49,8 @@ rm
 /usr/local/lib/android
 /usr/local/.ghcup
 /opt/hostedtoolcache/CodeQL
+/usr/share/swift
+/usr/lib/jvm
 EXPECTED
 diff -u "$test_dir/expected" "$DISK_TEST_LOG"
 echo "Runner disk preparation: 10 mocked cases passed."
