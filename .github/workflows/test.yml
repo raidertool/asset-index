@@ -1,0 +1,30 @@
+name: Test extractor
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-extractor-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CUE4PARSE_SKIP_NATIVE: "true"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.302
+      - name: Run offline tests
+        run: dotnet test tests/AssetIndex.Tests/AssetIndex.Tests.csproj -c Release --nologo
