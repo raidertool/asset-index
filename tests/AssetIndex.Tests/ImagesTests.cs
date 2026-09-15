@@ -43,10 +43,15 @@ public sealed class ImagesTests
     }
 
     [Theory]
-    [InlineData(false, "Icon")]
-    [InlineData(false, "icon")]
-    [InlineData(true, "Icon")]
-    public void ExportPreservesResolvedTexturePathEvenWhenDecodingFails(bool missingMip, string field)
+    [InlineData(false, "Icon", false)]
+    [InlineData(false, "icon", false)]
+    [InlineData(true, "Icon", false)]
+    [InlineData(false, "ModifierIcon", true)]
+    [InlineData(false, "ObscuredPreviewImage", true)]
+    [InlineData(false, "OptionalLocationIcon", true)]
+    [InlineData(false, "UnlockVideoPreviewImage", true)]
+    [InlineData(true, "ModifierIcon", true)]
+    public void ExportPreservesResolvedTexturePathEvenWhenDecodingFails(bool missingMip, string field, bool metadata)
     {
         TextureDecoder.UseAssetRipperTextureDecoder = true;
         var texture = new CompressedTexture { Name = "KnownTexture" };
@@ -62,7 +67,7 @@ public sealed class ImagesTests
         try
         {
             var resources = new ImageResources(output, issues);
-            var image = Assert.Single(Images.Export(new CatalogAsset(42, [definition], []), resources, issues));
+            var image = Assert.Single(Images.Export(new CatalogAsset(42, metadata ? [] : [definition], metadata ? [definition] : []), resources, issues));
             Assert.Equal(image.Resource, Assert.Single(resources.Entries).Path);
             Assert.Equal(texture.GetPathName(), image.Resource);
             Assert.Equal(field, image.Field);
