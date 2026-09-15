@@ -32,9 +32,9 @@ internal static class Publisher
 {
     public static Publication Publish(string previewDirectory, string remote, string extractorCommit, string manifestId)
     {
-        // Retain the validated bytes: later input changes cannot alter the published snapshot.
+        // Capture and validate private files before any Git operation.
         var metadata = Metadata.Create(extractorCommit, manifestId);
-        var preview = Preview.Read(previewDirectory);
+        using var preview = Preview.Read(previewDirectory);
         var directory = Path.Combine(Path.GetTempPath(), "asset-index-publish-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         try
@@ -42,7 +42,7 @@ internal static class Publisher
             var git = new Git(directory);
             git.Run("init", "--quiet");
             git.Run("remote", "add", "origin", remote);
-            git.Run("fetch", "--quiet", "--no-tags", "origin", "refs/heads/data");
+            git.Run("fetch", "--quiet", "--no-tags", "--depth", "1", "origin", "refs/heads/data");
             var parent = git.Run("rev-parse", "FETCH_HEAD").Trim();
             var paths = ValidateTree(git, parent);
             git.Run("checkout", "--quiet", "--detach", parent);
@@ -55,11 +55,11 @@ internal static class Publisher
                 return new(false, parent, tag);
             }
             git.Run("rm", "--quiet", "-r", "--ignore-unmatch", "--", ".");
-            foreach (var (path, bytes) in preview.Files)
+            foreach (var (path, file) in preview.Files)
             {
                 var target = Path.Combine(directory, path);
                 Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-                File.WriteAllBytes(target, bytes);
+                File.Copy(file.Path, target);
             }
             File.WriteAllBytes(Path.Combine(directory, "metadata.json"), JsonSerializer.SerializeToUtf8Bytes(metadata, Preview.Json));
             git.Run("add", "--all", "--", ".");
@@ -85,18 +85,17 @@ internal static class Publisher
             var parts = entry.Split('\t', 2);
             Preview.Require(parts.Length == 2 && parts[0].StartsWith("100644 blob ", StringComparison.Ordinal), "Data branch must contain ordinary generated files only.");
             var path = parts[1];
-            Preview.Require(path is "assets.json" or "coverage.json" or "metadata.json" || Regex.IsMatch(path, "\\Aimages/[0-9a-f]{64}\\.png\\z", RegexOptions.CultureInvariant), "Data branch contains a file outside the generated snapshot.");
+            Preview.Require(path == "metadata.json" || SnapshotFiles.Allowed(path), "Data branch contains a file outside the generated snapshot.");
             paths.Add(path);
         }
-        Preview.Require(new[] { "assets.json", "coverage.json", "metadata.json" }.All(paths.Contains), "Existing data branch is not an initialized snapshot.");
+        Preview.Require(SnapshotFiles.Required.Append("metadata.json").All(paths.Contains), "Existing data branch is not an initialized snapshot.");
         return paths.ToArray();
     }
 
-    private static bool SameContent(string directory, IEnumerable<string> existing, IReadOnlyDictionary<string, byte[]> incoming)
+    private static bool SameContent(string directory, IEnumerable<string> existing, IReadOnlyDictionary<string, SnapshotFile> incoming)
     {
-        static bool Payload(string path) => path == "assets.json" || path.StartsWith("images/", StringComparison.Ordinal);
-        var paths = existing.Where(Payload).ToHashSet(StringComparer.Ordinal);
-        return paths.SetEquals(incoming.Keys.Where(Payload)) && paths.All(path => File.ReadAllBytes(Path.Combine(directory, path)).AsSpan().SequenceEqual(incoming[path]));
+        var paths = existing.Where(SnapshotFiles.Payload).ToHashSet(StringComparer.Ordinal);
+        return paths.SetEquals(incoming.Keys.Where(SnapshotFiles.Payload)) && paths.All(path => incoming[path].Matches(Path.Combine(directory, path)));
     }
 
     internal static string Tag(string manifest, string commit) => $"arc-{manifest}-{commit[..12]}";

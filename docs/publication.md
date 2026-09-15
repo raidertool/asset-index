@@ -1,17 +1,30 @@
 # Snapshot publication
 
 Activation is pending. The publisher requires an existing initialized `data`
-branch containing only `assets.json`, `coverage.json`, `metadata.json`, and PNGs
-under `images/`. It does not create the initial branch.
+branch containing the complete generated snapshot below and `metadata.json`.
+It does not create the initial branch.
+
+- `assets.json`: catalog rows and presentation provenance.
+- `resources.json` and `images/`: every exported texture, including unowned UI images.
+- `discovery/{objects,registry,packages}.jsonl.gz`: typed source evidence and coverage.
+- `localization/<locale>.jsonl.gz`: merged localization dictionaries, including English.
+- `coverage.json`: extraction counts, errors, notices, mapping hash, and discovery scope.
 
 ```sh
 dotnet run --project src/PublishSnapshot -c Release -- \
   <preview-directory> <remote> <extractor-commit> <manifest-id>
 ```
 
-The preview must report success without diagnostics, have a definition for every
-ID, and pass row, image-reference, filename-hash, and full PNG decoding checks.
-Image filenames hash their declared texture paths, not their PNG bytes.
+The preview must report success without errors, have a definition for every ID,
+and pass provenance, evidence-count, gzip integrity, resource-reference, and full
+PNG decoding checks. Every catalog source and texture must have object evidence;
+every PNG must belong to the resource inventory. Image filenames hash their
+declared resource paths, not their PNG bytes.
+
+Validation reads a private copy on disk. Later changes to the input directory
+cannot change the validated payload; large images and evidence streams are not
+held together in memory. These checks verify structure and consistency, not
+whether the extractor found every game object or chose the intended UI label.
 
 `metadata.json` records:
 
@@ -28,9 +41,11 @@ The data Git commit identifies the snapshot. Its lightweight tag is
 Changed snapshots push `data` and the tag atomically, without force. A rejected
 push applies neither update; a concurrent writer is never overwritten.
 
-Identical `assets.json` and PNG bytes keep the existing commit, metadata and tag,
-even when the extractor commit, manifest or coverage report differs. New run
-provenance stays in its logs/artifacts. Retrying identical input creates no revision.
+Identical catalog, resource, discovery, localization, and PNG bytes keep the
+existing commit, metadata and tag. Only metadata and coverage are excluded from
+payload equality. Unowned text or resource changes therefore create a snapshot;
+source-only edits with unchanged output do not. New run provenance stays in its
+logs/artifacts. Retrying identical input creates no revision.
 
 Before activation, initialize and validate the data branch, transfer ownership
 from the old publisher, and resolve importer overlap/ordering. No scheduled or

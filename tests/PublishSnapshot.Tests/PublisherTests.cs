@@ -2,11 +2,12 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Security.Cryptography;
 using System.Text;
+using System.IO.Compression;
 using SkiaSharp;
 
 namespace PublishSnapshot.Tests;
 
-public sealed class PublisherTests : IDisposable
+public sealed partial class PublisherTests : IDisposable
 {
     private const string InitialExtractor = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private const string NextExtractor = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
@@ -49,7 +50,7 @@ public sealed class PublisherTests : IDisposable
         Assert.Equal("arc-456-" + result.Commit[..12], result.Tag);
         Assert.Equal(result.Commit, RemoteRef("refs/tags/" + result.Tag));
         Assert.Equal("commit", remoteGit.Run("cat-file", "-t", "refs/tags/" + result.Tag).Trim());
-        Assert.Equal(new[] { "assets.json", "coverage.json", Image, "metadata.json" }.Order(),
+        Assert.Equal(SnapshotFiles.Required.Append(Image).Append("metadata.json").Order(),
             remoteGit.Run("ls-tree", "-r", "--name-only", result.Commit).Split('\n', StringSplitOptions.RemoveEmptyEntries).Order());
         using var metadata = JsonDocument.Parse(remoteGit.Run("show", result.Commit + ":metadata.json"));
         Assert.Equal(1, metadata.RootElement.GetProperty("formatVersion").GetInt32());
@@ -61,7 +62,7 @@ public sealed class PublisherTests : IDisposable
     public void IdenticalPayloadKeepsOldCommitTagAndMetadataDespiteNewProvenance()
     {
         WritePreview(preview, "Initial name");
-        ChangeJson("coverage.json", node => node["registeredAssets"] = 2);
+        ChangeJson("coverage.json", node => node["discovery"]!["mappingSha256"] = new string('c', 64));
         var references = remoteGit.Run("show-ref");
 
         var result = Publisher.Publish(preview, remote, NextExtractor, "18446744073709551615");
@@ -221,13 +222,60 @@ public sealed class PublisherTests : IDisposable
             definitions = new[] { new { name = "DA_Test", @class = "PersistenceDataAsset", path = "/Game/DA_Test.DA_Test" } },
             metadata = Array.Empty<object>(),
             text = new[] { new { locale = "en", displayName = name, description = "Description" } },
-            images = new[] { new { field = "Icon", source = "/Game/DA_Test.DA_Test", texture = Texture, status = "exported", file = Image, width = 2, height = 1 } }
+            images = new[] { new { field = "Icon", source = "/Game/DA_Test.DA_Test", texture = Texture, status = "exported", file = Image, width = 2, height = 1 } },
+            presentation = new
+            {
+                name = new { @namespace = "", key = "", source = name, cultureInvariant = true },
+                description = new { @namespace = "", key = "", source = "Description", cultureInvariant = true },
+                candidates = new[]
+                {
+                    new { role = "display-name", sourceKind = "definition", sourcePath = "/Game/DA_Test.DA_Test", sourceClass = "PersistenceDataAsset", field = "ItemName", definedAt = "/Game/DA_Test.DA_Test", reference = new { @namespace = "", key = "", source = name, cultureInvariant = true } },
+                    new { role = "description", sourceKind = "definition", sourcePath = "/Game/DA_Test.DA_Test", sourceClass = "PersistenceDataAsset", field = "Description", definedAt = "/Game/DA_Test.DA_Test", reference = new { @namespace = "", key = "", source = "Description", cultureInvariant = true } }
+                },
+                containers = Array.Empty<object>()
+            }
         };
         File.WriteAllBytes(Path.Combine(directory, "assets.json"), JsonSerializer.SerializeToUtf8Bytes(new[] { asset }, Preview.Json));
         File.WriteAllBytes(Path.Combine(directory, "coverage.json"), JsonSerializer.SerializeToUtf8Bytes(new
         {
-            status = "succeeded", registeredAssets = 1, candidates = 1, loaded = 1, assetIds = 1, englishNames = 1, descriptions = 1, images = 1, issues = Array.Empty<object>()
+            status = "succeeded",
+            registeredAssets = 1,
+            candidates = 1,
+            loaded = 1,
+            assetIds = 1,
+            englishNames = 1,
+            descriptions = 1,
+            images = 1,
+            issues = Array.Empty<object>(),
+            notices = Array.Empty<object>(),
+            discovery = new { nativeScope = "Tagged fields", mappingSha256 = new string('a', 64), objects = 2, textures = 1 }
         }, Preview.Json));
+        File.WriteAllBytes(Path.Combine(directory, "resources.json"), JsonSerializer.SerializeToUtf8Bytes(new[]
+        {
+            new { path = Texture, status = "exported", file = Image, width = 2, height = 1 }
+        }, Preview.Json));
+        WriteLines(directory, "discovery/objects.jsonl.gz", new[] { "/Game/DA_Test.DA_Test", Texture }.Select(path => new
+        {
+            path,
+            @class = path == Texture ? "Texture2D" : "PersistenceDataAsset",
+            references = Array.Empty<object>(),
+            texts = Array.Empty<object>(),
+            values = Array.Empty<object>(),
+            tableEntries = Array.Empty<object>(),
+            issues = Array.Empty<object>()
+        }));
+        WriteLines(directory, "discovery/registry.jsonl.gz", new[] { new { path = "/Game/DA_Test.DA_Test", package = "/Game/DA_Test", @class = "PersistenceDataAsset", tags = new { } } });
+        WriteLines(directory, "discovery/packages.jsonl.gz", new[] { new { path = "Game/DA_Test.uasset", reason = "definition", status = "loaded", exports = 2, loaded = 2 } });
+        WriteLines(directory, "localization/en.jsonl.gz", new[] { new { @namespace = "Shared", key = "UNCHANGED", value = "Unowned text" } });
+    }
+
+    private static void WriteLines<T>(string directory, string file, IEnumerable<T> rows)
+    {
+        var path = Path.Combine(directory, file);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        using var gzip = new GZipStream(File.Create(path), CompressionLevel.SmallestSize);
+        using var writer = new StreamWriter(gzip);
+        foreach (var row in rows) writer.WriteLine(JsonSerializer.Serialize(row));
     }
 
     private string InstallHook(string content)
