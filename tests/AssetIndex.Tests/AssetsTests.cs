@@ -59,12 +59,14 @@ public sealed class AssetsTests
         Assert.Equal("asset", Assert.Single(issues).Stage);
     }
 
-    [Fact]
-    public void ItemOverrideWinsWithoutLoadingUnusedPersistenceReference()
+    [Theory]
+    [InlineData("bOverrideItemAssetId", "OverrideItemAssetId")]
+    [InlineData("boverrideitemassetid", "overrideitemassetid")]
+    public void ItemOverrideWinsWithoutLoadingUnusedPersistenceReference(string enabledField, string idField)
     {
         var item = Object("Item", "ItemDataAsset",
-            ("bOverrideItemAssetId", new BoolProperty(true)),
-            ("OverrideItemAssetId", new Int64Property(-2144213258)),
+            (enabledField, new BoolProperty(true)),
+            (idField, new Int64Property(-2144213258)),
             ("PersistenceDataAsset", new ObjectProperty(new FPackageIndex((IPackage)null!, 1))));
         var issues = new List<ExtractionIssue>();
 

@@ -12,15 +12,18 @@ namespace AssetIndex.Tests;
 
 public sealed class TextTests
 {
-    [Fact]
-    public void ReadsNamespaceKeyAndSourceInsteadOfThePreviouslyLoadedTranslation()
+    [Theory]
+    [InlineData("ItemName")]
+    [InlineData("itemname")]
+    public void ReadsNamespaceKeyAndSourceInsteadOfThePreviouslyLoadedTranslation(string field)
     {
-        var metadata = WithText("ItemName", new FText("items", "name", "Source name", "Cached French"));
+        var metadata = WithText(field, new FText("items", "name", "Source name", "Cached French"));
         var issues = new List<ExtractionIssue>();
 
         var text = Text.Read(Asset(metadata), issues);
 
         Assert.Equal(new TextReference("items", "name", "Source name"), text.Name);
+        Assert.Equal(field, Assert.Single(text.Candidates).Field);
         Assert.Empty(issues);
     }
 
@@ -56,7 +59,7 @@ public sealed class TextTests
     [Fact]
     public void ExplicitlyEmptyNameDoesNotRestoreTheParentName()
     {
-        var child = WithText("ItemName", new FText(string.Empty));
+        var child = WithText("itemname", new FText(string.Empty));
         child.Template = new ResolvedLoadedObject(WithText("ItemName", new FText("Parent name")));
 
         Assert.Null(Text.Read(Asset(child), []).Name);

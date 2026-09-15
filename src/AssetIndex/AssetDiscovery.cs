@@ -7,7 +7,7 @@ namespace AssetIndex;
 
 internal sealed record PackageRead(string Path, string Reason, string Status, int Exports, int Loaded);
 internal sealed record DiscoveryResult(IReadOnlyList<CatalogAsset> Assets, IReadOnlyList<UObject> Objects,
-    IReadOnlyList<RegisteredObject> Registry, IReadOnlyList<PackageRead> Packages,
+    IReadOnlyList<RegisteredObject> Registry, IReadOnlyList<PackageFile> Files, IReadOnlyList<PackageRead> Packages,
     IReadOnlyList<ExtractionIssue> Issues)
 {
     public int RegisteredAssets => Registry.Count;
@@ -37,19 +37,20 @@ internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvi
     private readonly HashSet<string> visited = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, UObject> objects = new(StringComparer.Ordinal);
     private readonly List<PackageRead> packages = [];
+    private readonly ReferenceClosure references = new();
     private Dictionary<string, RegisteredObject[]> registeredPackages = new(StringComparer.OrdinalIgnoreCase);
 
     public DiscoveryResult Read()
     {
         var registry = Registry.Read(provider, issues);
-        registeredPackages = registry.GroupBy(asset => asset.Package).ToDictionary(group => group.Key,
+        var files = PackageInventory.Read(provider, registry, issues);
+        registeredPackages = registry.GroupBy(asset => asset.Package, StringComparer.OrdinalIgnoreCase).ToDictionary(group => group.Key,
             group => group.ToArray(), StringComparer.OrdinalIgnoreCase);
-        var indexed = registry.Select(asset => Normalize(asset.Package)).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var asset in registry)
             if (Registry.SelectClass(mappings, asset.Class) || Registry.IsUiTexture(asset))
                 Enqueue(asset.Package, Registry.IsUiTexture(asset) ? "ui-texture" : "definition");
-        foreach (var file in provider.Files.Values.Where(file => file.IsUePackage))
-            if (!indexed.Contains(Normalize(file.Path))) Enqueue(file.Path, "unindexed");
+        foreach (var file in files)
+            if (file.RegistryPackages.Count == 0) Enqueue(file.Path, "unindexed");
 
         while (pending.Count > 0)
         {
@@ -62,15 +63,17 @@ internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvi
                 var stages = string.Join(", ", issues.GroupBy(issue => issue.Stage).OrderBy(group => group.Key)
                     .Select(group => $"{group.Key}={group.Count():N0}"));
                 using var process = Process.GetCurrentProcess();
+                var storage = provider is PackageProvider cache
+                    ? $"package bytes {cache.CachedPackageBytes / (1024 * 1024):N0} MiB cached, {cache.SpooledPackageBytes / (1024 * 1024):N0} MiB spooled; "
+                    : "";
                 Console.Error.WriteLine($"Read {packages.Count:N0} packages; {pending.Count:N0} pending, {objects.Count:N0} objects, {issues.Count:N0} issues ({stages}); " +
-                    $"memory {process.WorkingSet64 / (1024 * 1024):N0} MiB resident, {GC.GetTotalMemory(false) / (1024 * 1024):N0} MiB managed; last {path}.");
+                    $"memory {process.WorkingSet64 / (1024 * 1024):N0} MiB resident, {GC.GetTotalMemory(false) / (1024 * 1024):N0} MiB managed; {storage}last {path}.");
             }
         }
+        foreach (var issue in references.Check(objects.Keys)) AddIssue(issue, "reference:missing-target");
         var allObjects = objects.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => pair.Value).ToArray();
-        return new(Assets.Collect(allObjects, mappings, issues), allObjects, registry, packages, issues);
+        return new(Assets.Collect(allObjects, mappings, issues), allObjects, registry, files, packages, issues);
     }
-
-    private string Normalize(string path) => Path.ChangeExtension(provider.FixPath(GameFiles.ResolvePackagePath(provider, path)), null);
 
     private void Enqueue(string path, string reason)
     {
@@ -125,6 +128,7 @@ internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvi
             if (!packagePath.StartsWith('/')) continue;
             if (registeredPackages.TryGetValue(packagePath, out var entries) &&
                 !entries.Any(asset => Registry.FollowClass(mappings, asset.Class))) continue;
+            references.Require(evidence.Path + reference.Pointer, target);
             Enqueue(packagePath, "reference");
         }
     }

@@ -43,9 +43,10 @@ public sealed class ImagesTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void ExportPreservesResolvedTexturePathEvenWhenDecodingFails(bool missingMip)
+    [InlineData(false, "Icon")]
+    [InlineData(false, "icon")]
+    [InlineData(true, "Icon")]
+    public void ExportPreservesResolvedTexturePathEvenWhenDecodingFails(bool missingMip, string field)
     {
         TextureDecoder.UseAssetRipperTextureDecoder = true;
         var texture = new CompressedTexture { Name = "KnownTexture" };
@@ -53,7 +54,7 @@ public sealed class ImagesTests
         var package = new TexturePackage(texture);
         var definition = new UObject([new FPropertyTag
         {
-            Name = "Icon", Tag = new ObjectProperty(new FPackageIndex(package, 1))
+            Name = field, Tag = new ObjectProperty(new FPackageIndex(package, 1))
         }])
         { Name = "KnownDefinition" };
         var output = Path.Combine(Path.GetTempPath(), "asset-index-image-test-" + Guid.NewGuid().ToString("N"));
@@ -64,7 +65,7 @@ public sealed class ImagesTests
             var image = Assert.Single(Images.Export(new CatalogAsset(42, [definition], []), resources, issues));
             Assert.Equal(image.Resource, Assert.Single(resources.Entries).Path);
             Assert.Equal(texture.GetPathName(), image.Resource);
-            Assert.Equal("Icon", image.Field);
+            Assert.Equal(field, image.Field);
             Assert.Equal(definition.GetPathName(), image.Source);
             if (missingMip)
             {

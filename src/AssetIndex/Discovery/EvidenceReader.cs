@@ -8,6 +8,7 @@ using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Assets.Objects;
 using CUE4Parse.UE4.Assets.Objects.Properties;
 using CUE4Parse.UE4.Objects.Core.i18N;
+using CUE4Parse.UE4.Objects.Engine;
 using CUE4Parse.UE4.Objects.UObject;
 
 namespace AssetIndex.Discovery;
@@ -115,6 +116,9 @@ internal sealed partial class EvidenceReader
             case FScriptDelegate or FMulticastScriptDelegate or FFieldPath or FScriptInterface or FUniqueObjectGuid:
                 ReadNativeFields(value, pointer, depth);
                 return;
+            // Upstream FSpline accepts only the disabled, zero-payload form;
+            // enabled forms throw during deserialization before reaching us.
+            case FSpline: values.Add(new(pointer, type, "empty-struct", null)); return;
             case IUStruct structure: ReadNativeFields(structure, pointer, depth); return;
             default: issues.Add(new(pointer, type, $"Unsupported compound value: {value.GetType().FullName}.")); return;
         }

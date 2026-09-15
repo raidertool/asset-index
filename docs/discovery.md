@@ -8,7 +8,11 @@ every string, texture, UI object or API node.
 `Discovery/Registry.cs` inventories every registry entry. The crawler decodes
 data assets, UI metadata, tables, blueprints, unknown classes, unindexed packages,
 and UI textures selected by their registry group. Typed references also bring in
-texture/material dependencies. Other binary media remain inventoried.
+texture/material dependencies. Other registered classes remain inventoried.
+
+IoStore package bytes use a 256 MiB memory cache and a temporary disk spool,
+deleted when the provider closes. Lazy readers can revisit evicted bytes;
+decoded objects and image pixels use separate memory.
 
 `EvidenceReader` visits CUE4Parse property tags, arrays, sets, map keys/values,
 structs and text histories directly. Small native adapters cover data/curve/string
@@ -19,6 +23,10 @@ string as an object reference or uses CUE4Parse's JSON export as a parsing layer
 
 `discovery/objects.jsonl.gz` retains unassociated fields and strings;
 `registry.jsonl.gz` and `packages.jsonl.gz` show selection and decode coverage.
+`files.jsonl.gz` inventories effective mounted UE package paths and their resolved
+`registryPackages`. Empty lists identify unindexed inputs; each must have an
+attempt in `packages.jsonl.gz`. The crosswalk uses the provider's mount resolution,
+including package IDs, and excludes older shadowed archive versions and payloads.
 `localization/` retains the game's merged translation dictionaries. `resources.json`
 indexes UI/referenced textures and supported material images independently of catalog ownership.
 
@@ -28,7 +36,8 @@ gzip -dc .work/preview/discovery/objects.jsonl.gz | rg 'ResearchPoints'
 
 Binary native payloads and composite-curve evaluation are outside field discovery.
 Unsupported compound fields and failed reads are explicit diagnostics. A loaded
-package does not mean every export or every native payload was decoded.
+package does not mean every export or every native payload was decoded. Selected
+object references must match a decoded export and its complete outer chain.
 
 ## Assign presentation
 

@@ -89,10 +89,12 @@ internal static class Text
         var path = $"{source.GetPathName()}.{field.Name}";
         try
         {
-            if (!Properties.TryGet<FText>(source, field.Name, out var text, out var definedAt)) return;
+            if (Properties.Find(source, field.Name, out var definedAt) is not { } property) return;
+            if (property.Tag?.GetValue(typeof(FText)) is not FText text)
+                throw new InvalidDataException($"Cannot read {path} as FText.");
             var reference = ReadReference(text, source.Owner?.Provider, path, issues);
             if (reference is not null)
-                candidates.Add(new(field.Role, kind, source.GetPathName(), source.ExportType, field.Name,
+                candidates.Add(new(field.Role, kind, source.GetPathName(), source.ExportType, property.Name.Text,
                     definedAt!.GetPathName(), reference));
         }
         catch (Exception error) { issues.Add(new("text", path, error.Message)); }

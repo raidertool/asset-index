@@ -12,10 +12,13 @@ internal static class Registry
     public static IReadOnlyList<RegisteredObject> Read(TheiaFileProvider provider, ICollection<ExtractionIssue> issues)
     {
         var objects = new SortedDictionary<string, RegisteredObject>(StringComparer.Ordinal);
-        foreach (var file in provider.Files.Values
-            .Where(file => Path.GetFileName(file.Path).Equals("AssetRegistry.bin", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(file => file.Path, StringComparer.Ordinal))
+        // Enumerating mounted files includes shadowed archive versions. Parse only
+        // the current file at each registry path, using normal mount precedence.
+        foreach (var path in provider.Files.Keys
+            .Where(path => Path.GetFileName(path).Equals("AssetRegistry.bin", StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.Ordinal))
         {
+            var file = provider[path];
             try
             {
                 using var reader = file.CreateReader();

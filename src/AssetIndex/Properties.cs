@@ -19,7 +19,7 @@ internal static class Properties
             if (!visited.Add(current))
                 throw new InvalidDataException($"Template cycle while reading {source.GetPathName()}.{name}.");
 
-            var property = current.Properties.Find(property => property.Name.Text == name);
+            var property = current.Properties.Find(property => property.Name.Text.Equals(name, StringComparison.OrdinalIgnoreCase));
             if (property is not null)
             {
                 definedAt = current;

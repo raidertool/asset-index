@@ -61,6 +61,7 @@ internal static class Program
             discovery = AssetDiscovery.Read(provider, evidence.Write);
             evidence.Complete();
             issues.AddRange(discovery.Issues);
+            Snapshot.WriteLines(options.OutputDirectory, "discovery/files.jsonl.gz", discovery.Files);
             Snapshot.WriteLines(options.OutputDirectory, "discovery/registry.jsonl.gz", discovery.Registry);
             Snapshot.WriteLines(options.OutputDirectory, "discovery/packages.jsonl.gz", discovery.Packages);
             var materials = new MaterialIcons(provider,

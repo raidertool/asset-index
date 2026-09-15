@@ -11,7 +11,9 @@ using CUE4Parse.UE4.Assets.Objects;
 using CUE4Parse.UE4.Assets.Objects.Properties;
 using CUE4Parse.UE4.Objects.Core.i18N;
 using CUE4Parse.UE4.Objects.Core.Misc;
+using CUE4Parse.UE4.Objects.Engine;
 using CUE4Parse.UE4.Objects.UObject;
+using CUE4Parse.UE4.Readers;
 
 namespace AssetIndex.Tests;
 
@@ -473,6 +475,29 @@ public sealed class EvidenceTests
 
         Assert.Contains(evidence.Issues, issue => issue.Type == "object-path" && issue.Message.Contains("128"));
         Assert.Contains(evidence.References, reference => reference.Role == "outer" && reference.Error!.Contains("128"));
+    }
+
+    [Fact]
+    public void DisabledSplineHasNoFieldsRatherThanAnUnreadPayload()
+    {
+        using var archive = new FByteArchive("Disabled spline", [0]);
+        var spline = new FSpline(archive);
+
+        var evidence = EvidenceReader.Read(Object("Spline", Property("Spline", new ValueProperty(spline))));
+
+        Assert.Equal(1, archive.Position);
+        Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/Spline" && value.Kind == "empty-struct");
+        Assert.Empty(evidence.Issues);
+    }
+
+    [Theory]
+    [InlineData((byte)1)]
+    [InlineData((byte)2)]
+    public void EnabledSplineFailsBeforeEvidenceCanClaimItIsEmpty(byte enabled)
+    {
+        using var archive = new FByteArchive("Enabled spline", [enabled]);
+
+        Assert.Throws<NotSupportedException>(() => new FSpline(archive));
     }
 
     private static UObject Object(string name, params FPropertyTag[] properties) => new(properties.ToList()) { Name = name };

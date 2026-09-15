@@ -21,13 +21,15 @@ internal static class Images
         var images = new List<AssetImage>();
         foreach (var source in asset.Definitions.Concat(asset.Metadata))
         {
-            foreach (var field in Fields)
+            foreach (var requestedField in Fields)
             {
+                var field = requestedField;
                 var path = source.GetPathName();
                 string? resourcePath = null;
                 try
                 {
-                    if (Properties.Find(source, field) is null) continue;
+                    if (Properties.Find(source, field) is not { } property) continue;
+                    field = property.Name.Text;
                     var reference = Properties.Reference(source, field);
                     if (reference is null)
                     {
