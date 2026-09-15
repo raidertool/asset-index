@@ -1,6 +1,7 @@
 using AssetIndex.Discovery;
 using System.Diagnostics;
 using CUE4Parse.GameTypes.Theia.FileProvider;
+using CUE4Parse.FileProvider.Objects;
 using CUE4Parse.UE4.Assets;
 using CUE4Parse.UE4.Assets.Exports;
 
@@ -70,6 +71,7 @@ internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvi
                 RequestPackage(asset.Package, Registry.IsUiTexture(asset) ? "ui-texture" : "definition");
         foreach (var file in files)
             RequestPackage(file.Path, file.RegistryPackages.Count == 0 ? "unindexed" : "inventory");
+        OrderPackageReads();
 
         while (pendingPackages.Count > 0 || pendingExports.Count > 0)
         {
@@ -95,10 +97,25 @@ internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvi
     {
         var physical = GameFiles.ResolvePackagePath(provider, path);
         if (packages.TryGetValue(physical, out var existing)) return existing;
-        var package = new PackageWork(physical, reason);
+        provider.TryGetGameFile(physical, out var file);
+        var package = new PackageWork(physical, reason, file);
         packages.Add(physical, package);
         pendingPackages.Enqueue(package);
         return package;
+    }
+
+    private void OrderPackageReads()
+    {
+        var ordered = pendingPackages.Select(work => (Work: work, Position: PackageReadOrder.Position(work.File)))
+            .OrderBy(item => item.Position is null ? 0 : 1)
+            .ThenBy(item => item.Position?.Container, StringComparer.Ordinal)
+            .ThenBy(item => item.Position?.Partition)
+            .ThenBy(item => item.Position?.Offset)
+            .ThenBy(item => item.Position?.LogicalOffset)
+            .ThenBy(item => item.Work.Path, StringComparer.Ordinal)
+            .Select(item => item.Work).ToArray();
+        pendingPackages.Clear();
+        foreach (var work in ordered) pendingPackages.Enqueue(work);
     }
 
     private void Inspect(PackageWork work)
@@ -106,7 +123,7 @@ internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvi
         progress?.Set("load-package", work.Path);
         try
         {
-            work.Package = provider.LoadPackage(work.Path);
+            work.Package = work.File is null ? provider.LoadPackage(work.Path) : provider.LoadPackage(work.File);
             progress?.Set("read-export-headers", work.Path);
             work.Headers = ExportInventory.Read(work.Package, work.Path, mappings);
             if (work.Headers.Count != work.Package.ExportMapLength || work.Headers.Count != work.Package.ExportsLazy.Length)
@@ -245,10 +262,11 @@ internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvi
         diagnostics.Write(issue, category);
     }
 
-    private sealed class PackageWork(string path, string reason)
+    private sealed class PackageWork(string path, string reason, GameFile? file)
     {
         public string Path { get; } = path;
         public string Reason { get; } = reason;
+        public GameFile? File { get; } = file;
         public IPackage? Package { get; set; }
         public IReadOnlyList<ExportHeader>? Headers { get; set; }
         public string? Failure { get; set; }

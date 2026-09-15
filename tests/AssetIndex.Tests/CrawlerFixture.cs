@@ -86,6 +86,7 @@ internal sealed class CrawlerProvider : TheiaFileProvider
     private readonly Dictionary<string, CrawlerPackage> packages;
     public Action<CrawlerPackage>? BeforeLoad { get; set; }
     public List<string> PackageReads { get; } = [];
+    public List<GameFile> PackageFiles { get; } = [];
 
     public CrawlerProvider(params CrawlerPackage[] inputs) : base(Path.GetTempPath(), SearchOption.TopDirectoryOnly,
         new VersionContainer(EGame.GAME_ArcRaiders), StringComparer.OrdinalIgnoreCase)
@@ -98,6 +99,7 @@ internal sealed class CrawlerProvider : TheiaFileProvider
     public override IPackage LoadPackage(GameFile file)
     {
         PackageReads.Add(file.Path);
+        PackageFiles.Add(file);
         var package = packages[file.Path];
         BeforeLoad?.Invoke(package);
         return package;
