@@ -27,6 +27,7 @@ internal static class Images
             foreach (var field in Fields)
             {
                 var path = source.GetPathName();
+                string? texturePath = null;
                 try
                 {
                     if (Properties.Find(source, field) is null) continue;
@@ -42,7 +43,7 @@ internal static class Images
                         images.Add(new(field, path, reference.GetPathName(), "unsupported"));
                         continue;
                     }
-                    var texturePath = texture.GetPathName();
+                    texturePath = texture.GetPathName();
                     var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(texturePath)));
                     var file = $"images/{hash}.png";
                     var decoded = texture.Decode()
@@ -54,7 +55,7 @@ internal static class Images
                 catch (Exception error)
                 {
                     issues.Add(new("image", $"{path}.{field}", error.Message));
-                    images.Add(new(field, path, null, "failed"));
+                    images.Add(new(field, path, texturePath, "failed"));
                 }
             }
         }

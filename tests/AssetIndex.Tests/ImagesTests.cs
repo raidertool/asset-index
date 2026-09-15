@@ -1,5 +1,9 @@
+using CUE4Parse.UE4.Assets;
+using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Assets.Exports.Texture;
 using CUE4Parse.UE4.Assets.Objects;
+using CUE4Parse.UE4.Assets.Objects.Properties;
+using CUE4Parse.UE4.Objects.UObject;
 using CUE4Parse_Conversion.Textures;
 using SkiaSharp;
 
@@ -36,6 +40,59 @@ public sealed class ImagesTests
     {
         var texture = new CTexture(0, 0, EPixelFormat.PF_R8G8B8A8, []);
         Assert.Throws<InvalidDataException>(() => Images.Encode(texture));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ExportPreservesResolvedTexturePathEvenWhenDecodingFails(bool missingMip)
+    {
+        TextureDecoder.UseAssetRipperTextureDecoder = true;
+        var texture = new CompressedTexture { Name = "KnownTexture" };
+        if (missingMip) texture.PlatformData.Mips = [];
+        var package = new TexturePackage(texture);
+        var definition = new UObject([new FPropertyTag
+        {
+            Name = "Icon", Tag = new ObjectProperty(new FPackageIndex(package, 1))
+        }]) { Name = "KnownDefinition" };
+        var output = Path.Combine(Path.GetTempPath(), "asset-index-image-test-" + Guid.NewGuid().ToString("N"));
+        var issues = new List<ExtractionIssue>();
+        try
+        {
+            var image = Assert.Single(Images.Export(new CatalogAsset(42, [definition], []), output, issues));
+            Assert.Equal(texture.GetPathName(), image.Texture);
+            Assert.Equal("Icon", image.Field);
+            Assert.Equal(definition.GetPathName(), image.Source);
+            if (missingMip)
+            {
+                Assert.Equal("failed", image.Status);
+                Assert.Null(image.File);
+                Assert.Equal("Texture has no decodable mip.", Assert.Single(issues).Message);
+            }
+            else
+            {
+                Assert.Equal("exported", image.Status);
+                Assert.Empty(issues);
+                using var bitmap = SKBitmap.Decode(Path.Combine(output, image.File!));
+                Assert.Equal(SKColors.Red, bitmap.GetPixel(3, 3));
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(output)) Directory.Delete(output, recursive: true);
+        }
+    }
+
+    private sealed class TexturePackage(UObject texture) : AbstractUePackage("Fixture", null)
+    {
+        public override FPackageFileSummary Summary => throw new NotSupportedException();
+        public override FNameEntrySerialized[] NameMap => [];
+        public override int ImportMapLength => 0;
+        public override int ExportMapLength => 1;
+        public override int GetExportIndex(string name, StringComparison comparisonType = StringComparison.Ordinal) => 0;
+        public override ResolvedObject? ResolvePackageIndex(FPackageIndex? index) => index is { Index: 1 }
+            ? new ResolvedLoadedObject(texture)
+            : null;
     }
 
     private sealed class CompressedTexture : UTexture2D
