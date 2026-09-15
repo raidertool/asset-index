@@ -30,7 +30,7 @@ internal static class AssetDiscovery
         {
             try
             {
-                var package = provider.LoadPackage(path);
+                var package = provider.LoadPackage(GameFiles.ResolvePackagePath(provider, path));
                 foreach (var export in package.ExportsLazy)
                 {
                     try
@@ -117,7 +117,7 @@ internal static class AssetDiscovery
     private static void ReportUnindexedPackages(
         TheiaFileProvider provider, IReadOnlyList<FAssetData> registry, List<ExtractionIssue> issues)
     {
-        var indexed = registry.Select(asset => Path.ChangeExtension(provider.FixPath(asset.PackageName.Text), null))
+        var indexed = registry.Select(asset => Path.ChangeExtension(provider.FixPath(GameFiles.ResolvePackagePath(provider, asset.PackageName.Text)), null))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var unindexed = provider.Files.Values
             .Where(file => file.IsUePackage && !indexed.Contains(Path.ChangeExtension(provider.FixPath(file.Path), null)))

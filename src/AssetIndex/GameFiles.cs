@@ -2,6 +2,7 @@ using CUE4Parse.Encryption.Aes;
 using CUE4Parse.GameTypes.Theia.FileProvider;
 using CUE4Parse.MappingsProvider;
 using CUE4Parse.MappingsProvider.Usmap;
+using CUE4Parse.UE4.IO.Objects;
 using CUE4Parse.UE4.Objects.Core.Misc;
 using CUE4Parse.UE4.Versions;
 
@@ -38,6 +39,13 @@ internal static class GameFiles
             provider.Dispose();
             throw;
         }
+    }
+
+    internal static string ResolvePackagePath(TheiaFileProvider provider, string path)
+    {
+        // Keep normal mount precedence; use the IoStore identity for unmapped virtual roots.
+        if (provider.TryGetGameFile(path, out var file)) return file.Path;
+        return provider.FilesById.TryGetValue(FPackageId.FromName(path), out file) ? file.Path : path;
     }
 
     internal static void AddArcMappingsAlias(TypeMappings mappings)
