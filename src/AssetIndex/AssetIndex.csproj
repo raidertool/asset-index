@@ -7,8 +7,8 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../vendor/CUE4Parse/CUE4Parse/CUE4Parse.csproj" AdditionalProperties="CUE4PARSE_SKIP_NATIVE=true" />
-    <ProjectReference Include="../../vendor/CUE4Parse/CUE4Parse-Conversion/CUE4Parse-Conversion.csproj" AdditionalProperties="CUE4PARSE_SKIP_NATIVE=true" />
+    <ProjectReference Include="../../vendor/CUE4Parse/CUE4Parse/CUE4Parse.csproj" />
+    <ProjectReference Include="../../vendor/CUE4Parse/CUE4Parse-Conversion/CUE4Parse-Conversion.csproj" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="2.88.9" />
     <PackageReference Include="Microsoft.Bcl.Memory" Version="10.0.4" />
     <InternalsVisibleTo Include="AssetIndex.Tests" />
