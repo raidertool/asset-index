@@ -1,98 +1,85 @@
 # ARC Raiders Asset Index
 
-Extract ARC Raiders game asset IDs, names, descriptions, and images using
+Extract game asset IDs, localized text, and images with
 [upstream CUE4Parse](https://github.com/FabianFG/CUE4Parse).
 
-**Preview:** the new extractor and its output format are under review. Coverage
-is incomplete, and compatibility is not guaranteed yet. Runs produce local
-artifacts; they do not publish data or update a database.
-
-The existing root [CSV](asset_index.csv), [localizations](asset_localizations.csv),
-[images](images/), and [schema](schema.json) belong to the previous published
-dataset. They are separate from the new preview output.
+**Preview:** coverage and the JSON format are still under review. Runs write
+local files; publication and database import are not enabled.
+The root CSVs, [images](images/), [metadata](metadata.json), and
+[schema](schema.json) describe the existing published dataset.
 
 ## Run locally
 
-Install the .NET SDK version in [global.json](global.json), currently 10.0.302,
-then initialize the pinned dependency:
+Install the .NET SDK specified in [global.json](global.json). From this checkout:
 
 ```sh
 git submodule update --init --recursive
-```
-
-Point the extractor at your installed game's `PioneerGame/Content/Paks` directory.
-Use a new or empty output directory:
-
-```sh
 CUE4PARSE_SKIP_NATIVE=true dotnet run --project src/AssetIndex -c Release -- \
   --game-dir "/path/to/ARC Raiders/PioneerGame/Content/Paks" \
   --output .work/preview
 ```
 
-The bundled [usmap](mappings/ArcRaiders.usmap) describes game property layouts.
-It must match your game files. Use `--usmap /path/to/new.usmap` to try another
-mapping. Removing this dependency is future work.
+Use a new or empty output directory. The bundled [usmap](mappings/ArcRaiders.usmap)
+must match your game files; `--usmap /path/to/new.usmap` selects another.
+`ARC_AES_KEY` overrides the default decryption key.
 
-The default game-content decryption key is
-[public](https://github.com/ARC-Data-Raiders/DataRaiders/blob/main/aes.txt).
-Set `ARC_AES_KEY` locally to override it for a newer build.
-
-To read Steam depot files without a full installation, mount them with
+To avoid a full installation, mount the depot with
 [SteamDepotFS](https://github.com/raidertool/SteamDepotFS#usage) using your own
-local Steam credentials, then pass the mounted `PioneerGame/Content/Paks`
-directory as `--game-dir`. Follow SteamDepotFS's platform and authentication
-instructions; this extractor does not manage Steam accounts.
+Steam credentials. Pass its mounted `PioneerGame/Content/Paks` as `--game-dir`.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for tests and mapping updates.
 
-## Manual preview job
-
-The [Extract preview](.github/workflows/extract.yml) workflow runs only when
-manually requested. Maintainer review of the workflow and its pinned
-[SteamDepotFS authentication change](https://github.com/raidertool/SteamDepotFS/pull/3)
-is pending; complete that review before configuring credentials or running it.
-
-After review, configure repository Actions secrets `STEAM_USERNAME` and
-`STEAM_PASSWORD`, or use `STEAM_USERNAME` with `STEAM_ACCESS_TOKEN` instead.
-The account must have game-file access and authenticate without an interactive
-Steam Guard prompt. Choose **Actions → Extract preview → Run workflow** on the
-reviewed branch. No credentials are needed for PR tests.
-
-Download `asset-index-preview-<run ID>` from the run. It contains only
-`assets.json`, `coverage.json`, and `images/`, retained for seven days. Partial
-outputs are uploaded when extraction fails; review coverage before using them.
-Steam session logs and depot caches stay out of the artifact.
-
-## Preview output
+## Output
 
 | Path | Contents |
 | --- | --- |
-| `assets.json` | Discovered IDs, asset paths/classes, localized text, and image references/statuses |
-| `images/` | Decoded images |
-| `coverage.json` | Extraction counts and unresolved or failed extraction details |
+| `assets.json` | IDs, definitions, UI metadata, localized text, and image references |
+| `images/` | Decoded PNGs |
+| `coverage.json` | Counts and extraction diagnostics |
 
-IDs are decimal strings so JavaScript can preserve every signed 64-bit value.
-Each ID retains all associated definitions and UI metadata; it can have multiple
-image references. Unsupported image sources are reported in coverage.
+IDs are decimal strings to preserve signed 64-bit values in JavaScript. Each ID
+can have multiple definitions and images. Unsupported material icons remain
+explicitly marked; missing text is not filled from an older snapshot.
 
-Review coverage before using a preview. A successful run does not prove every
-game asset was found. Missing data may need a mapping update or an extractor fix.
-Local output under `.work/` is ignored by Git.
+Exit codes: `0` succeeded, `1` incomplete, `2` invalid input. Inspect coverage
+and affected images even after success: success does not prove completeness.
+Partial output is diagnostic evidence. Retry into a new directory under `.work/`.
+
+## Manual preview
+
+The [Extract preview](.github/workflows/extract.yml) workflow is manual and uses
+an [unreleased SteamDepotFS auth change](https://github.com/raidertool/SteamDepotFS/pull/3).
+Maintainer review is pending; complete it before configuring credentials or running it.
+
+After review, set Actions secrets `STEAM_USERNAME` plus `STEAM_PASSWORD` or
+`STEAM_ACCESS_TOKEN` (a Steam client refresh token). Authentication must work
+without an interactive Guard prompt. Use **Actions → Extract preview → Run workflow**
+on the reviewed branch. PR tests need no Steam credentials.
+
+Download `asset-index-preview-<run ID>` from the run; artifacts last seven days.
+Failed runs also upload available output. Credentials, Steam logs, and depot
+caches are excluded. Keep the run URL: its summary records the extractor commit
+and depot manifest; the downloaded JSON does not yet record them.
+
+## Versioning
+
+| What | Current identity |
+| --- | --- |
+| Published dataset | `metadata.json`: Steam build/manifest and `arc-<build>-exfil-v<version>` tag |
+| Published dataset format | `schema.json` version 4; does not describe preview JSON |
+| Preview code and bundled mapping | Repository commit; no extractor release or stable JSON version yet |
+| Dependencies | CUE4Parse submodule commit, SDK in `global.json`, SteamDepotFS commit in the workflow |
+
+For publication, the proposed layout is source on `main` and snapshots on `data`.
+A snapshot needs its extractor commit, depot manifest, and JSON format version.
+The importer should use the snapshot commit so source-only edits create no data
+version. This is pending: the current importer still follows `main`. Its private
+normalization version is separate from the public file format.
 
 ## Layout
 
 ```text
-src/AssetIndex/          Extractor; focused files by responsibility
+src/AssetIndex/          Extractor
 tests/AssetIndex.Tests/  Offline tests
-mappings/               Current game property mapping
-vendor/CUE4Parse/        Pinned upstream Git submodule
+mappings/               Game property mapping
+vendor/CUE4Parse/        Pinned upstream dependency
 ```
-
-## Contribute
-
-Run the offline tests:
-
-```sh
-CUE4PARSE_SKIP_NATIVE=true dotnet test tests/AssetIndex.Tests/AssetIndex.Tests.csproj -c Release
-```
-
-PR CI runs these tests without Steam credentials or game files. See
-[CONTRIBUTING.md](CONTRIBUTING.md) for coverage fixes and mapping updates.

@@ -1,46 +1,42 @@
 # Contributing
 
-Keep changes small and easy to review. One extractor and one test project are
-enough; add abstractions when a concrete feature needs them.
+Keep patches small. The extractor has one executable and one test project;
+add abstractions when a concrete feature needs them.
 
-## Fix missing assets
+## Test
 
-1. Link the relevant issue and identify the asset ID, name, or game path.
-2. Trace the value in the game files. Avoid guessing names or image associations.
-3. Add an offline regression test with a small synthetic input where practical.
-4. Run the tests from [README.md](README.md#contribute).
-5. If you can test with game files, include the game build and relevant coverage
-   results in your PR. Say clearly when you could not run that check.
+Initialize submodules as shown in the [README](README.md#run-locally), then run:
 
-Coverage checks include XP imagery, missing localized names, shared Scrappy imagery,
-and IDs reported in [issues](https://github.com/raidertool/asset-index/issues).
-Existing data is useful evidence, but matching it is not proof of completeness.
+```sh
+CUE4PARSE_SKIP_NATIVE=true dotnet test tests/AssetIndex.Tests/AssetIndex.Tests.csproj -c Release
+```
 
-## Update the mapping
+PR CI runs offline without game files or credentials. For live checks, use your
+installed game or SteamDepotFS with your own local Steam credentials. Keep
+credentials, game files, depot caches, and generated previews out of Git and issues.
 
-Replace `mappings/ArcRaiders.usmap` and open a PR. Include where it came from and
-the game build you tested, or say compatibility is untested. No custom mapping
-diff or metadata file is required.
+## Fix coverage
 
-## Test with Steam files
+1. Identify the issue, asset ID, or game path.
+2. Trace the value in game files; avoid guessed names and image associations.
+3. Add a small synthetic regression test where practical.
+4. Include the extractor commit, game build/depot manifest, and relevant coverage
+   results. State when live testing was unavailable.
 
-Use an installed game directory or mount SteamDepotFS with your own credentials
-as described in the [README](README.md#run-locally). Keep credentials in your
-local environment; do not put them in commands committed to the repository,
-issues, fixtures, or test output. Keep game files and depot caches outside Git.
+Inspect `coverage.json`, the affected JSON rows, and decoded images. Known cases
+include XP, Scrappy, and IDs in the [issues](https://github.com/raidertool/asset-index/issues).
+Matching the old dataset does not establish completeness.
 
-PR CI runs offline. The public repository also defines a manual
-[preview workflow](README.md#manual-preview-job) for reviewed maintainer runs.
-Complete maintainer review of the workflow and dependency pin before configuring
-credentials or dispatching it. Contributors can test locally with their own
-credentials; no maintainer secrets are shared.
+## Update mappings or dependencies
 
-## Review the output
+Replace `mappings/ArcRaiders.usmap` in a PR. State its source and tested game
+build, or mark compatibility untested. Git records mapping revisions; no extra
+mapping metadata or schema-diff report is needed.
 
-Use a new directory under `.work/` for each preview. Inspect `coverage.json` and
-the affected rows in `assets.json`; check image references against decoded files.
-Report extraction failures instead of filling gaps from an older snapshot.
+Keep CUE4Parse pinned to an upstream commit. For any dependency update, run the
+offline tests and report relevant live coverage changes when available.
 
-Submit source, tests, or mapping changes. Leave generated preview files out of
-the PR. Publication and database import are separate work; this preview does
-not establish the final consumer schema.
+Submit source, tests, docs, or mappings. Preview output is not a publication.
+See the README for [manual runs](README.md#manual-preview) and the proposed
+[versioning](README.md#versioning). Cutover must transfer ownership from the old
+publisher, which still updates the root metadata, schema, and README.
