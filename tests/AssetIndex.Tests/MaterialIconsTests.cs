@@ -130,12 +130,16 @@ public sealed class MaterialIconsTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void OnlyEnabledBaseOverridesChangeTheGraph(bool enabled)
+    [InlineData("bOverride_BlendMode", false)]
+    [InlineData("bOverride_BlendMode", true)]
+    [InlineData("boverride_blendmode", false)]
+    [InlineData("boverride_blendmode", true)]
+    [InlineData("BOVERRIDE_BLENDMODE", false)]
+    [InlineData("BOVERRIDE_BLENDMODE", true)]
+    public void OnlyEnabledBaseOverridesChangeTheGraph(string flag, bool enabled)
     {
         var material = new UMaterialInstanceConstant();
-        material.Properties.Add(Tag("BasePropertyOverrides", new FStructFallback([Tag("bOverride_BlendMode", enabled)])));
+        material.Properties.Add(Tag("BasePropertyOverrides", new FStructFallback([Tag(flag, enabled)])));
         if (enabled) Assert.Throws<NotSupportedException>(() => MaterialIcons.ReadParameters(material));
         else Assert.NotNull(MaterialIcons.ReadParameters(material));
     }

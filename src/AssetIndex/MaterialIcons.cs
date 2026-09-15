@@ -70,7 +70,7 @@ internal sealed class MaterialIcons(TheiaFileProvider provider, MaterialSampling
         if (material.bHasStaticPermutationResource || material.StaticParameters is not null || material.TextureParameterValues.Length != 0)
             throw new NotSupportedException("Color icon material contains a static or texture override.");
         if (Properties.TryGet<FStructFallback>(material, "BasePropertyOverrides", out var overrides) &&
-            overrides.Properties.Any(property => property.Name.Text.StartsWith("bOverride", StringComparison.Ordinal) && property.Tag?.GenericValue is not false))
+            overrides.Properties.Any(property => property.Name.Text.StartsWith("bOverride", StringComparison.OrdinalIgnoreCase) && property.Tag?.GenericValue is not false))
             throw new NotSupportedException("Color icon material enables a base property override.");
         var scalars = new Dictionary<string, float>(StringComparer.Ordinal)
         {
