@@ -1,10 +1,11 @@
 # ARC Raiders mapping
 
-Tested with Steam build `25163933`, manifest `4625131891870974441`.
+Target: Steam build `25163933`, manifest `4625131891870974441`.
 
-The supplied mapping conflated a class and struct named `AISensingStatusTransition`.
-The struct now uses CUE4Parse's `AISensingStatusTransitionStruct` alias; its single
-mapped reference was updated. The class has three fields and its correct parent,
-verified from this build's script cache. Decode tests cover both layouts.
+The supplied `AISensingStatusTransition` struct uses CUE4Parse's explicit
+`AISensingStatusTransitionStruct` alias; its mapped reference was updated.
+The same-named native class has no verified layout. Its unsupported replacement
+schema was removed; class discovery reports a blocking missing-schema error.
+Tests cover struct decoding and explicit class failure.
 
 Submit mapping updates by PR and run the [offline tests](../CONTRIBUTING.md#test).
