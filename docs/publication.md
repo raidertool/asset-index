@@ -28,8 +28,8 @@ and registry UI textures cannot remain header-only; UI textures also need PNGs.
 Unknown or conflicting metadata blocks publication.
 
 Every non-native reference needs an inspected package. Named targets must match
-the complete object/outer path, case-insensitively; relevant classes also need
-decoded evidence. Known unrelated classes can remain header-only. Registry aliases
+the complete object/outer path, case-insensitively; relevant classes and referenced
+class/struct declarations also need decoded evidence. Known unrelated classes can remain header-only. Registry aliases
 prove package inspection, without rewriting object paths.
 
 Property headers require unique, contiguous ordinal slots and valid array metadata.

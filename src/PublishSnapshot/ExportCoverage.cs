@@ -11,7 +11,8 @@ internal sealed class ExportCoverage
     private sealed record Header(string Path, string Class, string? SuperPath, string[] Ancestry)
     {
         public bool Candidate => Roots.Any(root => Ancestry.Contains(root, StringComparer.OrdinalIgnoreCase));
-        public bool Follow => Candidate || Ancestry.Contains("Texture", StringComparer.OrdinalIgnoreCase) ||
+        public bool Follow => Candidate || Ancestry.Contains("Struct", StringComparer.OrdinalIgnoreCase) ||
+            Ancestry.Contains("Texture", StringComparer.OrdinalIgnoreCase) ||
             Ancestry.Contains("MaterialInterface", StringComparer.OrdinalIgnoreCase);
     }
     private sealed record Package(string Name, int Exports, HashSet<int> Selected);

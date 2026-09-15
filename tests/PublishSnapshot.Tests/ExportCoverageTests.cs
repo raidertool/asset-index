@@ -86,15 +86,25 @@ public sealed partial class PublisherTests
     [InlineData("UIMetaDataItem", "Object", "Required export was not selected")]
     [InlineData("Texture2D", "Texture", "Referenced export was not decoded")]
     [InlineData("Material", "MaterialInterface", "Referenced export was not decoded")]
+    [InlineData("Class", "Struct", "Referenced export was not decoded")]
+    [InlineData("UserDefinedStruct", "Struct", "Referenced export was not decoded")]
     public void RelevantSiblingCannotBeHiddenInHeaderOnlyInventory(string type, string parent, string expected)
     {
         var target = AddHeaderSibling(type, parent == "Object" ? [parent] : [parent, "Object"]);
-        if (type is "Texture2D" or "Material") AddTarget(target);
+        if (type is "Texture2D" or "Material" or "Class" or "UserDefinedStruct") AddTarget(target);
 
         var error = Assert.Throws<InvalidDataException>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
 
         Assert.Contains(expected, error.Message);
         Assert.Equal(initialCommit, RemoteRef("refs/heads/data"));
+    }
+
+    [Fact]
+    public void UnreferencedSchemaCanRemainHeaderOnly()
+    {
+        AddHeaderSibling("UserDefinedStruct", ["Struct", "Field", "Object"]);
+
+        Assert.True(Publisher.Publish(preview, remote, NextExtractor, "456").Changed);
     }
 
     [Fact]
