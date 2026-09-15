@@ -29,12 +29,19 @@ public sealed class TextTests
     {
         var parent = WithText("ItemName", new FText("items", "name", "Parent name"));
         var child = WithText("Description", new FText("items", "description", "Child description"));
+        parent.Name = "Template";
+        child.Name = "Instance";
         child.Template = new ResolvedLoadedObject(parent);
 
         var text = Text.Read(Asset(child), []);
 
         Assert.Equal("Parent name", text.Name?.Source);
         Assert.Equal("Child description", text.Description?.Source);
+        var name = Assert.Single(text.Candidates, candidate => candidate.Field == "ItemName");
+        Assert.Equal(child.GetPathName(), name.SourcePath);
+        Assert.Equal(parent.GetPathName(), name.DefinedAt);
+        Assert.Equal(child.GetPathName(), Assert.Single(text.Candidates,
+            candidate => candidate.Field == "Description").DefinedAt);
     }
 
     [Fact]
@@ -58,7 +65,7 @@ public sealed class TextTests
     [Fact]
     public void CurrencyLongNameIsNotExportedAsADescription()
     {
-        var metadata = WithText("LongName", new FText("Experience points"));
+        var metadata = WithText("LongName", new FText("Experience points"), "UICurrencyMetaDataItem");
 
         var text = Text.Read(Asset(metadata), []);
 
@@ -70,7 +77,7 @@ public sealed class TextTests
     public void EmptySlotTooltipProvidesADescriptionWithoutInventingAName()
     {
         var metadata = WithText("EmptySlotTooltipText",
-            new FText("ST_WeaponMods", "ID_WEAPONMODS_EMPTY_SLOT_FOR_AN_UNDERBARREL_MOD", "Empty slot for an underbarrel mod."));
+            new FText("ST_WeaponMods", "ID_WEAPONMODS_EMPTY_SLOT_FOR_AN_UNDERBARREL_MOD", "Empty slot for an underbarrel mod."), "UIInventorySlotMetaDataItem");
         var issues = new List<ExtractionIssue>();
 
         var text = Text.Read(Asset(metadata), issues);
@@ -87,8 +94,9 @@ public sealed class TextTests
     [InlineData("ScoreDescription")]
     public void ExistingDescriptionFieldsTakePriorityOverTheSlotTooltip(string field)
     {
-        var tooltip = WithText("EmptySlotTooltipText", new FText("Fallback tooltip"));
-        var description = WithText(field, new FText("Preferred description"));
+        var tooltip = WithText("EmptySlotTooltipText", new FText("Fallback tooltip"), "UIInventorySlotMetaDataItem");
+        var type = field switch { "UnlockDescription" => "UIUnlockMetaDataItem", "ScoreDescription" => "UIScoreMetaDataItem", _ => "UIGameplayItemMetaDataItem" };
+        var description = WithText(field, new FText("Preferred description"), type);
         var issues = new List<ExtractionIssue>();
 
         var text = Text.Read(new CatalogAsset(42, [], [tooltip, description]), issues);
@@ -147,7 +155,7 @@ public sealed class TextTests
     [Fact]
     public void QuestDefinitionTitleDoesNotRequireItemMetadata()
     {
-        var definition = WithText("Title", new FText("quests", "title", "A new quest"));
+        var definition = WithText("Title", new FText("quests", "title", "A new quest"), "QuestDefinition");
         var asset = new CatalogAsset(42, [definition], []);
         Assert.Equal("A new quest", Text.Read(asset, []).Name?.Source);
     }
@@ -165,11 +173,10 @@ public sealed class TextTests
 
         var text = Text.Read(new CatalogAsset(42, [first, second], []), issues);
 
-        Assert.Equal(new TextReference("items", "first", "Shared source"),
-            field == "ItemName" ? text.Name : text.Description);
+        Assert.Null(field == "ItemName" ? text.Name : text.Description);
+        Assert.Equal(2, text.Candidates.Count);
         var issue = Assert.Single(issues);
         Assert.Equal("text", issue.Stage);
-        Assert.Equal($"{second.GetPathName()}.{field}", issue.Path);
         Assert.Contains($"{first.GetPathName()}.{field}", issue.Message);
         Assert.Contains($"{second.GetPathName()}.{field}", issue.Message);
     }
@@ -190,15 +197,56 @@ public sealed class TextTests
     }
 
     [Fact]
-    public void ShortNameKeepsPriorityOverLongNameWithoutAConflict()
+    public void CurrencyFullNameIsPrimaryAndItsShortNameRemainsAnAlias()
     {
-        var shortName = WithText("ShortName", new FText("XP"));
-        var longName = WithText("LongName", new FText("Experience points"));
+        var shortName = WithText("ShortName", new FText("XP"), "UICurrencyMetaDataItem");
+        var longName = WithText("LongName", new FText("Experience points"), "UICurrencyMetaDataItem");
         var issues = new List<ExtractionIssue>();
 
         var text = Text.Read(new CatalogAsset(42, [], [longName, shortName]), issues);
 
-        Assert.Equal("XP", text.Name?.Source);
+        Assert.Equal("Experience points", text.Name?.Source);
+        Assert.Contains(text.Candidates, candidate => candidate.Role == "short-name" && candidate.Reference.Source == "XP");
+        Assert.Empty(issues);
+    }
+
+    [Theory]
+    [InlineData("Text")]
+    [InlineData("Title")]
+    public void GenericFieldsWithoutAProvenClassRoleAreNotNames(string field)
+    {
+        var source = WithText(field, new FText("Unrelated widget label"));
+        Assert.Null(Text.Read(Asset(source), []).Name);
+    }
+
+    [Fact]
+    public void EmoteTextHasAnExplicitNameRole()
+    {
+        var source = WithText("Text", new FText("Angry"), "UIEmoteMetaDataItem");
+        Assert.Equal("Angry", Text.Read(Asset(source), []).Name?.Source);
+    }
+
+    [Fact]
+    public void NpcLocationLabelDoesNotBecomeTheNpcName()
+    {
+        var source = WithText("LocationName", new FText("Grenades & Gadgets"), "UINPCMetaDataItem");
+        var text = Text.Read(Asset(source), []);
+        Assert.Null(text.Name);
+        Assert.Equal("location-name", Assert.Single(text.Candidates).Role);
+    }
+
+    [Fact]
+    public void UiModifierDescriptionWinsAndDefinitionTextKeepsItsProvenance()
+    {
+        var definition = WithText("Description", new FText("Definition description"), "SessionModifierDataAsset");
+        definition.Name = "Definition";
+        var metadata = WithText("Description", new FText("UI description"), "UISessionModifierMetaDataItem");
+        var issues = new List<ExtractionIssue>();
+        var text = Text.Read(new CatalogAsset(42, [definition], [metadata]), issues);
+
+        Assert.Equal("UI description", text.Description?.Source);
+        Assert.Contains(text.Candidates, candidate => candidate.SourceKind == "definition"
+            && candidate.SourcePath == definition.GetPathName() && candidate.Reference.Source == "Definition description");
         Assert.Empty(issues);
     }
 
@@ -254,9 +302,9 @@ public sealed class TextTests
     private static CatalogAsset Asset(UObject metadata) =>
         new(1, [new UObject { Name = "DA_Test" }], [metadata]);
 
-    private static UObject WithText(string field, FText text)
+    private static UObject WithText(string field, FText text, string type = "UIGameplayItemMetaDataItem")
     {
-        var value = new UObject { Name = "UI_Test" };
+        var value = new UObject { Name = "UI_Test", Class = new ResolvedLoadedObject(new UObject { Name = type }) };
         value.Properties.Add(new FPropertyTag(new FName("TextProperty"), new TextProperty(text))
         {
             Name = new FName(field)

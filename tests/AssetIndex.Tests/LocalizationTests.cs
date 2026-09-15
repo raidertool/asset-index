@@ -98,6 +98,32 @@ public sealed class LocalizationTests : IDisposable
         Assert.Empty(issues);
     }
 
+    [Fact]
+    public void ObserverSeesEveryValidCultureEvenWithoutCatalogAssets()
+    {
+        WriteTranslation("en", "Unowned English string");
+        WriteTranslation("fr", "Unowned French string");
+        using var provider = OpenProvider(["en", "fr", "de"]);
+        var observed = new Dictionary<string, string>();
+        var issues = new List<ExtractionIssue>();
+
+        Assert.Empty(Text.Localize(provider, [], issues,
+            (locale, entries) => observed.Add(locale, entries["items"]["name"])));
+
+        Assert.Equal("Unowned English string", observed["en"]);
+        Assert.Equal("Unowned French string", observed["fr"]);
+        Assert.Equal(2, observed.Count);
+        Assert.Equal("de", Assert.Single(issues).Path);
+    }
+
+    [Fact]
+    public void ObserverWriteFailureIsNotSilentlySkipped()
+    {
+        WriteTranslation("en", "English name");
+        using var provider = OpenProvider(["en"]);
+        Assert.Throws<IOException>(() => Text.Localize(provider, [], [], (_, _) => throw new IOException("Output failed")));
+    }
+
     private DefaultFileProvider OpenProvider(string[] cultures, string extraConfig = "")
     {
         var config = Path.Combine(directory, "Config");

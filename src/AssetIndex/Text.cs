@@ -1,4 +1,5 @@
 using CUE4Parse.FileProvider;
+using CUE4Parse.MappingsProvider;
 using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Assets.Exports.Internationalization;
 using CUE4Parse.UE4.Objects.Core.i18N;
@@ -6,30 +7,35 @@ using CUE4Parse.UE4.Objects.Core.i18N;
 namespace AssetIndex;
 
 internal sealed record TextReference(string Namespace, string Key, string Source, bool CultureInvariant = false);
-internal sealed record AssetText(long AssetId, TextReference? Name, TextReference? Description);
+internal sealed record TextCandidate(string Role, string SourceKind, string SourcePath, string SourceClass,
+    string Field, string DefinedAt, TextReference Reference);
+internal sealed record AssetText(long AssetId, TextReference? Name, TextReference? Description)
+{
+    public IReadOnlyList<TextCandidate> Candidates { get; init; } = [];
+}
 internal sealed record LocalizedText(long AssetId, string Locale, string DisplayName, string Description);
 
 internal static class Text
 {
-    // UI fields verified against the committed ARC mappings. LongName is a name, not a description.
-    private static readonly string[] NameFields =
-    [
-        "ItemName", "DisplayName", "ShortName", "LongName", "Text", "OfferTitle", "EnemyName",
-        "Title", "LocationName", "PlayerStatsRaiderTargetAllegiance", "InteractName", "PoiName", "XPEventCategoryName",
-        "BattlepassName", "BucketName", "ViewName", "UnlockTitle"
-    ];
-    private static readonly string[] DescriptionFields =
-        ["Description", "OfferDescription", "LocationDescription", "InteractDescription", "PoiDescription", "UnlockDescription", "ScoreDescription", "EmptySlotTooltipText"];
-
-    public static AssetText Read(CatalogAsset asset, ICollection<ExtractionIssue> issues)
+    public static AssetText Read(CatalogAsset asset, ICollection<ExtractionIssue> issues, TypeMappings? mappings = null)
     {
-        var sources = asset.Definitions.Concat(asset.Metadata).ToArray();
-        return new AssetText(asset.Id, ReadField(sources, NameFields, issues),
-            ReadField(sources, DescriptionFields, issues));
+        var candidates = new List<TextCandidate>();
+        foreach (var (sources, kind) in new[] { (asset.Metadata, "metadata"), (asset.Definitions, "definition") })
+            foreach (var source in sources)
+                foreach (var field in TextRoles.For(source, mappings ?? source.Owner?.Mappings))
+                    ReadCandidate(source, field, kind, candidates, issues);
+        foreach (var presentation in asset.PresentationNames)
+            ReadCandidate(presentation.Metadata, new("ContainerName", "display-name"), "container", candidates, issues);
+
+        var distinct = candidates.Distinct().OrderBy(candidate => candidate.SourcePath, StringComparer.Ordinal)
+            .ThenBy(candidate => candidate.Field, StringComparer.Ordinal).ToArray();
+        return new AssetText(asset.Id, Select(distinct, ["display-name", "title", "short-name"], issues),
+            Select(distinct, ["description", "tooltip"], issues)) { Candidates = distinct };
     }
 
     public static IReadOnlyList<LocalizedText> Localize(IFileProvider provider, IReadOnlyList<AssetText> assets,
-        ICollection<ExtractionIssue> issues)
+        ICollection<ExtractionIssue> issues,
+        Action<string, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>>? observe = null)
     {
         var rows = new List<LocalizedText>();
         var cultures = provider.Internationalization.AvailableCultures
@@ -53,6 +59,7 @@ internal static class Text
                 continue;
             }
 
+            observe?.Invoke(locale, provider.Internationalization);
             foreach (var asset in assets)
             {
                 var name = Resolve(asset.Name, provider.Internationalization, locale);
@@ -75,39 +82,37 @@ internal static class Text
         return locale == "en" ? text.Source : string.Empty;
     }
 
-    private static TextReference? ReadField(IReadOnlyList<UObject> sources, string[] fields,
+    private static void ReadCandidate(UObject source, TextField field, string kind,
+        ICollection<TextCandidate> candidates, ICollection<ExtractionIssue> issues)
+    {
+        var path = $"{source.GetPathName()}.{field.Name}";
+        try
+        {
+            if (!Properties.TryGet<FText>(source, field.Name, out var text, out var definedAt)) return;
+            var reference = ReadReference(text, source.Owner?.Provider, path, issues);
+            if (reference is not null)
+                candidates.Add(new(field.Role, kind, source.GetPathName(), source.ExportType, field.Name,
+                    definedAt!.GetPathName(), reference));
+        }
+        catch (Exception error) { issues.Add(new("text", path, error.Message)); }
+    }
+
+    private static TextReference? Select(IReadOnlyList<TextCandidate> candidates, string[] roles,
         ICollection<ExtractionIssue> issues)
     {
-        foreach (var field in fields)
+        // UI presentation owns its labels. Definition text and contextual container labels
+        // remain candidates with provenance even when the UI supplies the primary value.
+        foreach (var kind in new[] { "metadata", "definition", "container" })
+        foreach (var role in roles)
         {
-            TextReference? selected = null;
-            string? selectedPath = null;
-            foreach (var source in sources)
-            {
-                var path = $"{source.GetPathName()}.{field}";
-                try
-                {
-                    if (!Properties.TryGet<FText>(source, field, out var text)) continue;
-                    var reference = ReadReference(text, source.Owner?.Provider, path, issues);
-                    if (reference is null || (reference.Key.Length == 0 && reference.Source.Length == 0))
-                        continue;
-                    if (selected is null)
-                    {
-                        selected = reference;
-                        selectedPath = path;
-                    }
-                    else if (reference != selected)
-                    {
-                        issues.Add(new ExtractionIssue("text", path,
-                            $"Conflicting {field} text references at {selectedPath} and {path}; retaining the first reference."));
-                    }
-                }
-                catch (Exception error)
-                {
-                    issues.Add(new ExtractionIssue("text", path, error.Message));
-                }
-            }
-            if (selected is not null) return selected;
+            var peers = candidates.Where(candidate => candidate.SourceKind == kind && candidate.Role == role).ToArray();
+            if (peers.Length == 0) continue;
+            var references = peers.Select(candidate => candidate.Reference).Distinct().ToArray();
+            if (references.Length == 1)
+                return references[0].Key.Length == 0 && references[0].Source.Length == 0 ? null : references[0];
+            var paths = string.Join(", ", peers.Select(candidate => $"{candidate.SourcePath}.{candidate.Field}"));
+            issues.Add(new("text", paths, $"Conflicting {role} references; no primary value selected. Candidates: {paths}."));
+            return null;
         }
         return null;
     }

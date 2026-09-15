@@ -4,7 +4,10 @@ using CUE4Parse.UE4.Objects.UObject;
 
 namespace AssetIndex;
 
-internal sealed record CatalogAsset(long Id, IReadOnlyList<UObject> Definitions, IReadOnlyList<UObject> Metadata);
+internal sealed record CatalogAsset(long Id, IReadOnlyList<UObject> Definitions, IReadOnlyList<UObject> Metadata)
+{
+    public IReadOnlyList<PresentationName> PresentationNames { get; init; } = [];
+}
 
 internal static class Assets
 {
@@ -20,9 +23,10 @@ internal static class Assets
     public static IReadOnlyList<CatalogAsset> Collect(
         IEnumerable<UObject> objects, TypeMappings mappings, List<ExtractionIssue> issues)
     {
+        var sourceObjects = objects.ToArray();
         var definitions = new Dictionary<long, Dictionary<string, UObject>>();
         var metadata = new Dictionary<long, Dictionary<string, UObject>>();
-        foreach (var source in objects)
+        foreach (var source in sourceObjects)
         {
             if (source.Flags.HasFlag(EObjectFlags.RF_ClassDefaultObject))
                 continue;
@@ -47,7 +51,9 @@ internal static class Assets
             }
         }
 
-        return BuildCatalog(definitions, metadata, issues);
+        var presentation = Presentation.Read(sourceObjects, mappings, issues).ToLookup(name => name.AssetId);
+        return BuildCatalog(definitions, metadata, issues)
+            .Select(asset => asset with { PresentationNames = presentation[asset.Id].ToArray() }).ToArray();
     }
 
     private static void AssociateMetadata(UObject source, TypeMappings mappings,
@@ -99,7 +105,7 @@ internal static class Assets
         return RequireId(id);
     }
 
-    private static long? DefinitionId(UObject source, TypeMappings mappings, out UObject? persistence)
+    internal static long? DefinitionId(UObject source, TypeMappings mappings, out UObject? persistence)
     {
         persistence = null;
         if (IsA(mappings, source.ExportType, "PersistenceDataAsset") == true ||

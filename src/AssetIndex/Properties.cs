@@ -7,8 +7,11 @@ namespace AssetIndex;
 
 internal static class Properties
 {
-    public static FPropertyTag? Find(UObject source, string name)
+    public static FPropertyTag? Find(UObject source, string name) => Find(source, name, out _);
+
+    public static FPropertyTag? Find(UObject source, string name, out UObject? definedAt)
     {
+        definedAt = null;
         var visited = new HashSet<UObject>(ReferenceEqualityComparer.Instance);
         for (UObject? current = source; current is not null; current = current.Template?.Object?.Value)
         {
@@ -17,15 +20,22 @@ internal static class Properties
 
             var property = current.Properties.Find(property => property.Name.Text == name);
             if (property is not null)
+            {
+                definedAt = current;
                 return property;
+            }
         }
 
         return null;
     }
 
-    public static bool TryGet<T>(UObject source, string name, [MaybeNullWhen(false)] out T value)
+    public static bool TryGet<T>(UObject source, string name, [MaybeNullWhen(false)] out T value) =>
+        TryGet(source, name, out value, out _);
+
+    public static bool TryGet<T>(UObject source, string name, [MaybeNullWhen(false)] out T value,
+        out UObject? definedAt)
     {
-        var property = Find(source, name);
+        var property = Find(source, name, out definedAt);
         if (property is null)
         {
             value = default;
