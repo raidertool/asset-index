@@ -49,6 +49,19 @@ public sealed partial class PublisherTests
         Assert.Equal(inputs, HashFiles(preview));
     }
 
+    [Theory]
+    [InlineData("/Script/CoreUObject.Object", true)]
+    [InlineData("/Game/DA_Test.MissingParent", false)]
+    [InlineData("/Game/DA_Test", false)]
+    [InlineData("UnqualifiedParent", false)]
+    public void HeaderSuperclassRequiresAnExactReference(string parent, bool accepted)
+    {
+        ChangeLines("discovery/exports.jsonl.gz", rows => rows[0]!["superPath"] = parent);
+
+        if (accepted) Assert.True(Publisher.Publish(preview, remote, NextExtractor, "456").Changed);
+        else AssertRejected();
+    }
+
     [Fact]
     public void ExportClassNamesUseUnrealCaseInsensitiveIdentity()
     {

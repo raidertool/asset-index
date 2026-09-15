@@ -8,7 +8,7 @@ namespace PublishSnapshot;
 internal sealed class ExportCoverage
 {
     private static readonly string[] Roots = ["DataAsset", "UIMetaDataItem", "DataTable", "CurveTable", "StringTable", "Blueprint", "BlueprintGeneratedClass"];
-    private sealed record Header(string Path, string Class, string[] Ancestry)
+    private sealed record Header(string Path, string Class, string? SuperPath, string[] Ancestry)
     {
         public bool Candidate => Roots.Any(root => Ancestry.Contains(root, StringComparer.OrdinalIgnoreCase));
         public bool Follow => Candidate || Ancestry.Contains("Texture", StringComparer.OrdinalIgnoreCase) ||
@@ -31,7 +31,7 @@ internal sealed class ExportCoverage
         Require(inputs.Paths.SetEquals(coverage.packages.Keys), "A mounted package was not inspected.");
         coverage.ReadHeaders(files["discovery/exports.jsonl.gz"]);
         coverage.CheckObjects(objects, uiTextures);
-        coverage.CheckReferences(targets, inputs);
+        coverage.CheckReferences(targets.Concat(coverage.paths.Values.Select(header => header.SuperPath).OfType<string>()), inputs);
     }
 
     private void ReadPackages(SnapshotFile file, MountedInputs inputs) => JsonLines.Read(file, row =>
@@ -54,7 +54,7 @@ internal sealed class ExportCoverage
 
     private void ReadHeaders(SnapshotFile file) => JsonLines.Read(file, row =>
     {
-        Fields(row, "package", "index", "path", "class", "classPath", "ancestry", "ancestryComplete", "error");
+        Fields(row, "package", "index", "path", "class", "classPath", "superPath", "ancestry", "ancestryComplete", "error");
         var package = String(row, "package");
         Require(packages.TryGetValue(package, out var owner), "Export header lacks an inspected package.");
         var index = row.GetProperty("index").GetInt32();
@@ -65,6 +65,9 @@ internal sealed class ExportCoverage
         Require(path.Contains('.') && PackageName(path).Equals(owner!.Name, StringComparison.OrdinalIgnoreCase), "Export header has the wrong package name.");
         var type = String(row, "class");
         ResourceEvidence.ObjectPath(row, "classPath");
+        var superPath = row.GetProperty("superPath").ValueKind == JsonValueKind.Null
+            ? null : ResourceEvidence.ObjectPath(row, "superPath");
+        Require(superPath is null || superPath.Contains('.'), "Superclass header must name an object.");
         var ancestry = row.GetProperty("ancestry").EnumerateArray().Select(value =>
         {
             Require(value.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(value.GetString()), "Invalid export ancestry.");
@@ -72,7 +75,7 @@ internal sealed class ExportCoverage
         }).ToArray();
         Require(ancestry.Length is > 0 and <= 128 && ancestry[0].Equals(type, StringComparison.OrdinalIgnoreCase) &&
             ancestry[^1].Equals("Object", StringComparison.OrdinalIgnoreCase), "Incomplete export ancestry.");
-        var header = new Header(path, type, ancestry);
+        var header = new Header(path, type, superPath, ancestry);
         Require(headers[package].TryAdd(index, header), "Duplicate export header index.");
         Require(paths.TryAdd(path, header), "Ambiguous export header paths differ only by case or repeat.");
     });

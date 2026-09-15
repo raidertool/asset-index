@@ -311,6 +311,7 @@ public sealed partial class PublisherTests : IDisposable
         ["path"] = path,
         ["class"] = type,
         ["classPath"] = "/Script/Fixture." + type,
+        ["superPath"] = null,
         ["ancestry"] = new JsonArray(ancestors.Prepend(type).Select(value => (JsonNode?)JsonValue.Create(value)).ToArray()),
         ["ancestryComplete"] = true,
         ["error"] = null

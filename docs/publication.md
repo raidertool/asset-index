@@ -21,7 +21,8 @@ PNG decoding checks. Every catalog source and image resource must have object ev
 every PNG must belong to the resource inventory. Image filenames hash their
 declared resource paths, not their PNG bytes.
 
-Every mounted package needs a complete export-header inventory. Each selected
+Every mounted package needs a complete export-header inventory, including exact
+superclass references. Each selected
 index needs a decoded object with the same full path and class. Candidate classes
 and registry UI textures cannot remain header-only; UI textures also need PNGs.
 Unknown or conflicting metadata blocks publication.
