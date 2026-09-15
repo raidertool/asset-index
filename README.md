@@ -81,9 +81,11 @@ The planned source/data split is not active:
 | Metadata | Extractor commit, Steam app/depot/manifest, JSON format version |
 | Database import | Data commit; private normalization version tracked separately |
 
-Publish the data commit and tag atomically. Identical output creates no snapshot
-or database version. Historical tags stay unchanged. The importer still follows
-`main`; no data branch or extractor release has been created.
+Publish the data commit and tag atomically. Once the importer follows `data`,
+identical output creates no snapshot or database version. Historical tags stay
+unchanged. Today the importer follows `main` and versions by commit: pin it to a
+reviewed data commit before merging source changes. No data branch or extractor
+release has been created.
 
 ## Layout
 
