@@ -19,7 +19,7 @@ internal static class Text
         "BattlepassName", "BucketName", "ViewName", "UnlockTitle"
     ];
     private static readonly string[] DescriptionFields =
-        ["Description", "OfferDescription", "LocationDescription", "InteractDescription", "PoiDescription", "UnlockDescription", "ScoreDescription"];
+        ["Description", "OfferDescription", "LocationDescription", "InteractDescription", "PoiDescription", "UnlockDescription", "ScoreDescription", "EmptySlotTooltipText"];
 
     public static AssetText Read(CatalogAsset asset, ICollection<ExtractionIssue> issues)
     {

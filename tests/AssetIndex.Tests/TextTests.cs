@@ -67,6 +67,37 @@ public sealed class TextTests
     }
 
     [Fact]
+    public void EmptySlotTooltipProvidesADescriptionWithoutInventingAName()
+    {
+        var metadata = WithText("EmptySlotTooltipText",
+            new FText("ST_WeaponMods", "ID_WEAPONMODS_EMPTY_SLOT_FOR_AN_UNDERBARREL_MOD", "Empty slot for an underbarrel mod."));
+        var issues = new List<ExtractionIssue>();
+
+        var text = Text.Read(Asset(metadata), issues);
+
+        Assert.Null(text.Name);
+        Assert.Equal(new TextReference("ST_WeaponMods", "ID_WEAPONMODS_EMPTY_SLOT_FOR_AN_UNDERBARREL_MOD",
+            "Empty slot for an underbarrel mod."), text.Description);
+        Assert.Empty(issues);
+    }
+
+    [Theory]
+    [InlineData("Description")]
+    [InlineData("UnlockDescription")]
+    [InlineData("ScoreDescription")]
+    public void ExistingDescriptionFieldsTakePriorityOverTheSlotTooltip(string field)
+    {
+        var tooltip = WithText("EmptySlotTooltipText", new FText("Fallback tooltip"));
+        var description = WithText(field, new FText("Preferred description"));
+        var issues = new List<ExtractionIssue>();
+
+        var text = Text.Read(new CatalogAsset(42, [], [tooltip, description]), issues);
+
+        Assert.Equal("Preferred description", text.Description?.Source);
+        Assert.Empty(issues);
+    }
+
+    [Fact]
     public void MissingTranslationUsesSourceOnlyForEnglish()
     {
         var reference = new TextReference("items", "name", "Source name");
