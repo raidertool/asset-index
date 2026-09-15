@@ -19,7 +19,14 @@ internal static class Properties
             if (!visited.Add(current))
                 throw new InvalidDataException($"Template cycle while reading {source.GetPathName()}.{name}.");
 
-            var property = current.Properties.Find(property => property.Name.Text.Equals(name, StringComparison.OrdinalIgnoreCase));
+            FPropertyTag? property = null;
+            foreach (var candidate in current.Properties)
+            {
+                if (!candidate.Name.Text.Equals(name, StringComparison.OrdinalIgnoreCase)) continue;
+                if (property is not null)
+                    throw new InvalidDataException($"Ambiguous property {current.GetPathName()}.{name}.");
+                property = candidate;
+            }
             if (property is not null)
             {
                 definedAt = current;

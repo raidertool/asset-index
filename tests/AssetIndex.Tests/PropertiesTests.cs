@@ -1,10 +1,61 @@
 using CUE4Parse.UE4.Assets;
 using CUE4Parse.UE4.Assets.Exports;
+using CUE4Parse.UE4.Assets.Objects;
+using CUE4Parse.UE4.Assets.Objects.Properties;
 
 namespace AssetIndex.Tests;
 
 public class PropertiesTests
 {
+    [Theory]
+    [InlineData("Value", 7)]
+    [InlineData("value", 7)]
+    [InlineData("VALUE", 9)]
+    public void RepeatedDirectFieldsAreAmbiguousEvenWhenTheirValuesMatch(string duplicateName, int duplicateValue)
+    {
+        var source = new UObject { Name = "Source" };
+        source.Properties.Add(Integer("Value", 7));
+        source.Properties.Add(Integer(duplicateName, duplicateValue));
+
+        var error = Assert.Throws<InvalidDataException>(() => Properties.Find(source, "value"));
+
+        Assert.Contains("Ambiguous property Source.value", error.Message);
+        Assert.Throws<InvalidDataException>(() => Properties.TryGet<int>(source, "Value", out _));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UniqueFieldsKeepTheirActualNameAndDefiningObject(bool inherited)
+    {
+        var source = new UObject { Name = "Source" };
+        var owner = inherited ? new UObject { Name = "Template" } : source;
+        if (inherited) source.Template = new ResolvedLoadedObject(owner);
+        var field = Integer("vAlUe", 7);
+        owner.Properties.Add(field);
+        owner.Properties.Add(Integer("Other", 1));
+        owner.Properties.Add(Integer("OTHER", 2));
+
+        var found = Properties.Find(source, "VALUE", out var definedAt);
+
+        Assert.Same(field, found);
+        Assert.Equal("vAlUe", found!.Name.Text);
+        Assert.Same(owner, definedAt);
+    }
+
+    [Fact]
+    public void DirectFieldOverridesATemplateFieldWithoutBecomingAmbiguous()
+    {
+        var template = new UObject { Name = "Template" };
+        template.Properties.Add(Integer("Value", 7));
+        var source = new UObject { Name = "Source", Template = new ResolvedLoadedObject(template) };
+        source.Properties.Add(Integer("value", 0));
+
+        Assert.True(Properties.TryGet<int>(source, "VALUE", out var value, out var definedAt));
+        Assert.Equal(0, value);
+        Assert.Same(source, definedAt);
+    }
+
     [Fact]
     public void SoftSubobjectsFollowTheDeclaredOuterAtEveryLevel()
     {
@@ -39,4 +90,7 @@ public class PropertiesTests
 
         Assert.Contains("Ambiguous", Assert.Throws<InvalidDataException>(() => Properties.ResolveSubobject(parent, "Child")).Message);
     }
+
+    private static FPropertyTag Integer(string name, int value) =>
+        new("IntProperty", new IntProperty(value)) { Name = name };
 }
