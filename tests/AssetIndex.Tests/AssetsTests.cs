@@ -18,6 +18,7 @@ public sealed class AssetsTests
     [InlineData("PlayerStatsRaiderTargetDataAsset")]
     [InlineData("WorldQuestDataAsset")]
     [InlineData("XPEventCategoryDataAsset")]
+    [InlineData("OptionalPersistenceDataAsset")]
     public void DiscoversNonItemPersistenceTypesFromMappings(string type)
     {
         var source = Object("Target", type, ("AssetId", new Int64Property(995408715)));
@@ -27,6 +28,35 @@ public sealed class AssetsTests
 
         Assert.Equal(995408715, asset.Id);
         Assert.Empty(issues);
+    }
+
+    [Fact]
+    public void MapConditionMetadataUsesOptionalPersistenceIdentity()
+    {
+        var persistence = Object("Condition", "OptionalPersistenceDataAsset", ("AssetId", new Int64Property(-42)));
+        var metadata = Object("ConditionUI", "UIMapConditionMetaDataItem",
+            ("PersistenceDataAsset", new ObjectProperty(new FPackageIndex(new TestPackage(persistence), 1))));
+        var issues = new List<ExtractionIssue>();
+
+        var asset = Assert.Single(Assets.Collect([persistence, metadata], Mappings.Value, issues));
+
+        Assert.Equal(-42, asset.Id);
+        Assert.Same(persistence, Assert.Single(asset.Definitions));
+        Assert.Same(metadata, Assert.Single(asset.Metadata));
+        Assert.Empty(issues);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OptionalPersistenceWithoutAValidIdIsReported(bool hasZero)
+    {
+        var source = Object("Invalid", "OptionalPersistenceDataAsset");
+        if (hasZero) source.Properties.Add(new FPropertyTag { Name = "AssetId", Tag = new Int64Property(0) });
+        var issues = new List<ExtractionIssue>();
+
+        Assert.Empty(Assets.Collect([source], Mappings.Value, issues));
+        Assert.Equal("asset", Assert.Single(issues).Stage);
     }
 
     [Fact]
@@ -178,11 +208,13 @@ public sealed class AssetsTests
         var second = Object("Second", "QuestDefinition");
         first.Properties.Add(new FPropertyTag
         {
-            Name = "PersistenceDataAsset", Tag = new ObjectProperty(new FPackageIndex(new TestPackage(second), 1))
+            Name = "PersistenceDataAsset",
+            Tag = new ObjectProperty(new FPackageIndex(new TestPackage(second), 1))
         });
         second.Properties.Add(new FPropertyTag
         {
-            Name = "PersistenceDataAsset", Tag = new ObjectProperty(new FPackageIndex(new TestPackage(first), 1))
+            Name = "PersistenceDataAsset",
+            Tag = new ObjectProperty(new FPackageIndex(new TestPackage(first), 1))
         });
         var issues = new List<ExtractionIssue>();
 

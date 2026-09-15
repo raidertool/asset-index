@@ -102,7 +102,8 @@ internal static class Assets
     private static long? DefinitionId(UObject source, TypeMappings mappings, out UObject? persistence)
     {
         persistence = null;
-        if (IsA(mappings, source.ExportType, "PersistenceDataAsset") == true)
+        if (IsA(mappings, source.ExportType, "PersistenceDataAsset") == true ||
+            IsA(mappings, source.ExportType, "OptionalPersistenceDataAsset") == true)
             return ReadId(source) ?? throw new InvalidDataException("Persistence asset has no AssetId.");
         if (IsA(mappings, source.ExportType, "ItemDataAssetBase") == true)
         {
