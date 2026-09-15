@@ -1,8 +1,8 @@
 # Snapshot publication
 
-Activation is pending. The publisher requires an existing initialized `data`
-branch containing the complete generated snapshot below and `metadata.json`.
-It does not create the initial branch.
+Activation is pending. The publisher requires an existing `data` branch with
+the complete generated snapshot below, `metadata.json`, and its matching
+lightweight tag. It does not create the initial branch or tag.
 
 - `assets.json`: catalog rows and presentation provenance.
 - `resources.json` and `images/`: every exported image resource, including unowned UI images.
@@ -62,8 +62,9 @@ payload equality. Unowned text or resource changes therefore create a snapshot;
 source-only edits with unchanged output do not. New run provenance stays in its
 logs/artifacts. Retrying identical input creates no revision.
 
-Before merging source changes, upgrade the importer, pin it to a reviewed legacy
-data commit, and drain older runs. Then transfer ownership from the old publisher,
-initialize and validate `data`, and switch the importer to it. Verify the first
-import before scheduling publication. No scheduled or production publishing
-workflow is enabled by this draft.
+Before merging source changes, upgrade and pin the importer to a reviewed legacy
+data commit and drain older importer runs. Retire the old publisher and drain its
+queued/running writes too. After merging, atomically initialize `data` and its
+exact lightweight tag, then validate an identical retry before switching the
+importer. Verify the first import before scheduling publication. No scheduled
+or production publishing workflow is enabled by this draft.
