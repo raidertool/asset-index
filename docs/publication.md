@@ -27,6 +27,10 @@ Named references within packages represented by object evidence must match the
 full path, including outer objects, case-insensitively. Native, package-only, and
 unobserved-package references remain outside this publisher check.
 
+Property headers require unique, contiguous ordinal slots and valid array metadata.
+Field pointers must resolve within declared property containers; native fields
+retain their own paths.
+
 Validation reads a private copy on disk. Later changes to the input directory
 cannot change the validated payload; large images and evidence streams are not
 held together in memory. Field-level text provenance, UI label choice, and

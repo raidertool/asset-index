@@ -67,14 +67,15 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, HashSet<str
         var targets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         JsonLines.Read(file, row =>
         {
-            Fields(row, "path", "class", "references", "texts", "values", "tableEntries", "issues");
+            Fields(row, "path", "class", "properties", "references", "texts", "values", "tableEntries", "issues");
             Require(objects.Add(ObjectPath(row, "path")), "Duplicate discovered object.");
             String(row, "class");
             Require(row.GetProperty("issues").GetArrayLength() == 0, "Object evidence contains diagnostics.");
+            var properties = PropertyHeaders.Read(row.GetProperty("properties"));
             foreach (var reference in row.GetProperty("references").EnumerateArray())
             {
                 Fields(reference, "pointer", "kind", "role", "targetPath", "isNull", "package", "packageIndex", "exportIndex", "error");
-                Pointer(reference); String(reference, "kind"); String(reference, "role");
+                properties.ValidatePointer(String(reference, "pointer")); String(reference, "kind"); String(reference, "role");
                 Require(reference.GetProperty("error").ValueKind == JsonValueKind.Null, "Object reference failed to resolve.");
                 var isNull = reference.GetProperty("isNull").GetBoolean();
                 Require(isNull == (reference.GetProperty("targetPath").ValueKind == JsonValueKind.Null), "Inconsistent null reference.");
@@ -86,18 +87,18 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, HashSet<str
             foreach (var text in row.GetProperty("texts").EnumerateArray())
             {
                 Fields(text, "pointer", "flags", "history", "namespace", "key", "source", "tableId");
-                Pointer(text); text.GetProperty("flags").GetUInt32(); String(text, "history");
+                properties.ValidatePointer(String(text, "pointer")); text.GetProperty("flags").GetUInt32(); String(text, "history");
                 foreach (var field in new[] { "namespace", "key", "source", "tableId" }) NullableString(text, field);
             }
             foreach (var value in row.GetProperty("values").EnumerateArray())
             {
                 Fields(value, "pointer", "type", "kind", "value");
-                Pointer(value); String(value, "type"); String(value, "kind"); NullableString(value, "value");
+                properties.ValidatePointer(String(value, "pointer")); String(value, "type"); String(value, "kind"); NullableString(value, "value");
             }
             foreach (var entry in row.GetProperty("tableEntries").EnumerateArray())
             {
                 Fields(entry, "pointer", "namespace", "key", "source");
-                Pointer(entry);
+                properties.ValidatePointer(String(entry, "pointer"));
                 foreach (var field in new[] { "namespace", "key", "source" }) String(entry, field, allowEmpty: true);
             }
         });
@@ -166,7 +167,6 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, HashSet<str
         return path;
     }
 
-    private static void Pointer(JsonElement value) => Require(String(value, "pointer").StartsWith('/'), "Invalid field pointer.");
     private static void NullableString(JsonElement value, string field)
     {
         if (value.GetProperty(field).ValueKind != JsonValueKind.Null) String(value, field, allowEmpty: true);

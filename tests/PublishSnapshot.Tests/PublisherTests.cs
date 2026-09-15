@@ -254,9 +254,30 @@ public sealed partial class PublisherTests : IDisposable
         {
             path,
             @class = path == Texture ? "Texture2D" : "PersistenceDataAsset",
-            references = Array.Empty<object>(),
-            texts = Array.Empty<object>(),
-            values = Array.Empty<object>(),
+            properties = path == Texture ? [] : new[]
+            {
+                PropertyHeader("/Properties/0", "AssetId", "Int64Property"),
+                PropertyHeader("/Properties/1", "ItemName", "TextProperty"),
+                PropertyHeader("/Properties/2", "Description", "TextProperty"),
+                PropertyHeader("/Properties/3", "Icon", "SoftObjectProperty")
+            },
+            references = path == Texture ? Array.Empty<object>() : new object[]
+            {
+                new { pointer = "/Properties/3", kind = "soft", role = "property", targetPath = Texture,
+                    isNull = false, package = (string?)null, packageIndex = (int?)null, exportIndex = (int?)null, error = (string?)null }
+            },
+            texts = path == Texture ? Array.Empty<object>() : new object[]
+            {
+                new { pointer = "/Properties/1", flags = 2, history = "None", @namespace = (string?)null, key = (string?)null, source = name, tableId = (string?)null },
+                new { pointer = "/Properties/2", flags = 2, history = "None", @namespace = (string?)null, key = (string?)null, source = "Description", tableId = (string?)null }
+            },
+            values = path == Texture ? new object[]
+            {
+                new { pointer = "/Properties", type = "properties", kind = "empty-struct", value = (string?)null }
+            } : new object[]
+            {
+                new { pointer = "/Properties/0", type = "Int64Property", kind = "integer", value = "42" }
+            },
             tableEntries = Array.Empty<object>(),
             issues = Array.Empty<object>()
         }));
@@ -277,6 +298,17 @@ public sealed partial class PublisherTests : IDisposable
         });
         WriteLines(directory, "localization/en.jsonl.gz", new[] { new { @namespace = "Shared", key = "UNCHANGED", value = "Unowned text" } });
     }
+
+    private static JsonObject PropertyHeader(string pointer, string name = "Field", string type = "Int64Property",
+        int? arrayIndex = null, int? arraySize = null, string serializeType = "Property") => new()
+        {
+            ["pointer"] = pointer,
+            ["name"] = name,
+            ["type"] = type,
+            ["arrayIndex"] = arrayIndex,
+            ["arraySize"] = arraySize,
+            ["serializeType"] = serializeType
+        };
 
     private static void WriteLines<T>(string directory, string file, IEnumerable<T> rows)
     {

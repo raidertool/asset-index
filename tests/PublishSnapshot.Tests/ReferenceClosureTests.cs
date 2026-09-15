@@ -70,9 +70,10 @@ public sealed partial class PublisherTests
                 child["path"] = path;
                 rows.Add(child);
             }
+            rows[0]!["properties"]!.AsArray().Add(PropertyHeader("/Properties/4", "RelatedAsset", "SoftObjectProperty"));
             rows[0]!["references"]!.AsArray().Add(new JsonObject
             {
-                ["pointer"] = "/Properties/RelatedAsset",
+                ["pointer"] = "/Properties/4",
                 ["kind"] = "soft",
                 ["role"] = "property",
                 ["targetPath"] = target,

@@ -90,8 +90,12 @@ public sealed partial class PublisherTests
         {
             case "localization": ChangeLines("localization/en.jsonl.gz", rows => rows[0]!["value"] = "Changed unowned text"); break;
             case "object":
-                ChangeLines("discovery/objects.jsonl.gz", rows => rows[0]!["values"]!.AsArray().Add(new JsonObject
-                { ["pointer"] = "/Properties/Ids/0", ["type"] = "Int64Property", ["kind"] = "integer", ["value"] = "-9223372036854775808" })); break;
+                ChangeLines("discovery/objects.jsonl.gz", rows =>
+                {
+                    rows[0]!["properties"]!.AsArray().Add(PropertyHeader("/Properties/4", "Ids", "ArrayProperty"));
+                    rows[0]!["values"]!.AsArray().Add(new JsonObject
+                    { ["pointer"] = "/Properties/4/0", ["type"] = "Int64Property", ["kind"] = "integer", ["value"] = "-9223372036854775808" });
+                }); break;
             case "registry": ChangeLines("discovery/registry.jsonl.gz", rows => rows[0]!["tags"]!["NewTag"] = "New evidence"); break;
         }
         var result = Publisher.Publish(preview, remote, NextExtractor, "456");
