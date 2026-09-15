@@ -73,7 +73,7 @@ For publication, use `main` for source and `data` for snapshots. This split is
 pending; the current importer still follows `main`.
 
 - Extractor releases: `vX.Y.Z` tags in **this repository**. The old `exfil-v…`
-  component identifies the retired producer, not this extractor.
+  component identifies the legacy producer, not this extractor.
 - Snapshots: the immutable `data` commit; optional `arc-<build>-<dataShortSha>`
   tags for browsing. Existing historical tags stay unchanged.
 - Snapshot metadata: extractor commit, Steam app/depot/manifest, and JSON format
@@ -82,7 +82,7 @@ pending; the current importer still follows `main`.
   Its private normalization version stays separate from the public file format.
 
 These are publication conventions; no extractor release or data branch has
-been created. A run that leaves the dataset unchanged should create no snapshot.
+been created. Source-only changes with identical output should create no snapshot.
 
 ## Layout
 
