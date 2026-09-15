@@ -57,6 +57,10 @@ internal static class Program
             Console.WriteLine("Mounting game containers...");
             using var provider = GameFiles.Open(options);
             Console.WriteLine($"Mounted {provider.Files.Count:N0} files. Reading typed object fields and references...");
+            var storage = PackageStorage.Read(provider.Files.Values);
+            Console.WriteLine($"Mounted IoStore packages including shadowed versions: {storage.Packages:N0} distinct entries, {storage.Bytes:N0} raw bytes.");
+            if (provider is PackageProvider packages)
+                Console.WriteLine($"Package spool volume: {packages.PackageSpoolAvailableBytes:N0} bytes currently available.");
             using (var evidence = new JsonLinesFile<Discovery.ObjectEvidence>(options.OutputDirectory, "discovery/objects.jsonl.gz"))
             using (var headers = new JsonLinesFile<Discovery.ExportHeader>(options.OutputDirectory, "discovery/exports.jsonl.gz"))
             using (var progress = new ExtractionProgress(Console.Error))

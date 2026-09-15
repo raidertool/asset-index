@@ -18,6 +18,7 @@ internal class PackageProvider(string directory) : TheiaFileProvider(directory, 
     private readonly PackageArchiveStore archives = new();
     internal long CachedPackageBytes => archives.CachedBytes;
     internal long SpooledPackageBytes => archives.SpooledBytes;
+    internal long PackageSpoolAvailableBytes => new DriveInfo(archives.DirectoryPath).AvailableFreeSpace;
 
     public override IPackage LoadPackage(GameFile file) =>
         packages.GetOrAdd(file, source => new Lazy<IPackage>(() => ReadPackage(source))).Value;
