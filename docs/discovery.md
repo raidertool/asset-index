@@ -21,6 +21,18 @@ It preserves property pointers, reference kinds,
 nulls, empty overrides and exact numeric strings. It never interprets an ordinary
 string as an object reference or uses CUE4Parse's JSON export as a parsing layer.
 
+Property headers retain each tag's exact name/type, nullable static-array index/size
+and serialization mode. Values use ordinal paths such as `/Properties/0`; nested
+tagged structs add their own `/Properties/0`. Repeated scalar names remain separate
+records; catalog lookup still rejects ambiguity. Ordinals describe decoded order,
+not declaration or schema slots.
+
+The pinned decoder cannot safely expand static arrays in unversioned runtime
+class layouts. Those layouts and runtime ancestors produce diagnostics; tagged
+packages and native usmap arrays use different decoders. Repeated indexed elements also remain unresolved. Nested struct
+layout identity is not always retained upstream, so this check does not certify
+every nested layout or recover fields skipped by the decoder.
+
 `discovery/objects.jsonl.gz` retains unassociated fields and strings;
 `registry.jsonl.gz` and `packages.jsonl.gz` show selection and decode coverage.
 `files.jsonl.gz` inventories effective mounted UE package paths and their resolved
@@ -48,9 +60,10 @@ object references must match a decoded export and its complete outer chain.
   peers unresolved. `presentation` records chosen keys and defining objects.
 - `Presentation.cs` joins loadout container types and slot references to the
   corresponding UI container label; its full join path remains in each row.
-- `Images.cs` associates declared image fields. `MaterialIcons.cs` renders one
-  verified color-scheme graph under [defined conditions](materials.md). Other
-  material inputs remain evidence; an ingredient alone is not a rendered icon.
+- `Images.cs` associates declared image fields. `MaterialIcons.cs` renders the
+  verified color-scheme and Close Scrutiny graphs under
+  [defined conditions](materials.md). Other material inputs remain evidence;
+  an ingredient alone is not a rendered icon.
 
 Historical output only finds changes. Do not restore a name or image without a
 current identity/presentation relationship. Add a small fixture for that exact

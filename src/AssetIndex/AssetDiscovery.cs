@@ -35,7 +35,7 @@ internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvi
     private readonly DiagnosticSamples diagnostics = new(Console.Error);
     private readonly SortedDictionary<string, string> pending = new(StringComparer.Ordinal);
     private readonly HashSet<string> visited = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, UObject> objects = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (UObject Source, string Origin)> objects = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<PackageRead> packages = [];
     private readonly ReferenceClosure references = new();
     private Dictionary<string, RegisteredObject[]> registeredPackages = new(StringComparer.OrdinalIgnoreCase);
@@ -71,7 +71,7 @@ internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvi
             }
         }
         foreach (var issue in references.Check(objects.Keys)) AddIssue(issue, "reference:missing-target");
-        var allObjects = objects.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => pair.Value).ToArray();
+        var allObjects = objects.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => pair.Value.Source).ToArray();
         return new(Assets.Collect(allObjects, mappings, issues), allObjects, registry, files, packages, issues);
     }
 
@@ -109,7 +109,12 @@ internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvi
                 ReadEvidence(evidence);
                 continue;
             }
-            if (objects.TryAdd(evidence.Path, source)) ReadEvidence(evidence);
+            var origin = $"{path}#export/{index}";
+            if (!objects.TryAdd(evidence.Path, (source, origin)))
+                AddIssue(new("decode", origin,
+                    $"Duplicate object path {evidence.Path}; first decoded at {objects[evidence.Path].Origin}; repeated at {origin}."),
+                    "decode:duplicate-object-path");
+            ReadEvidence(evidence);
         }
         packages.Add(new(path, reason, loaded == package.ExportsLazy.Length ? "loaded" : "partial", package.ExportsLazy.Length, loaded));
     }
