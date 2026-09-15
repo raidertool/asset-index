@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using CUE4Parse.FileProvider;
 using CUE4Parse.UE4.Assets.Exports.Texture;
+using CUE4Parse.UE4.Objects.Engine;
 using CUE4Parse_Conversion.Textures;
 using Serilog;
 using Serilog.Core;
@@ -50,7 +51,7 @@ internal static class Program
         var issues = new List<ExtractionIssue>();
         DiscoveryResult? discovery = null;
         var records = new List<AssetRecord>();
-        var textureCount = 0;
+        var resourceCount = 0;
         try
         {
             Console.WriteLine("Mounting game containers...");
@@ -62,12 +63,15 @@ internal static class Program
             issues.AddRange(discovery.Issues);
             Snapshot.WriteLines(options.OutputDirectory, "discovery/registry.jsonl.gz", discovery.Registry);
             Snapshot.WriteLines(options.OutputDirectory, "discovery/packages.jsonl.gz", discovery.Packages);
-            var resources = new TextureResources(options.OutputDirectory, issues);
+            var materials = new MaterialIcons(provider,
+                new(TextureAddress.TA_Wrap, TextureAddress.TA_Wrap, TextureFilter.TF_Bilinear),
+                new(TextureAddress.TA_Clamp, TextureAddress.TA_Clamp, TextureFilter.TF_Bilinear));
+            var resources = new ImageResources(options.OutputDirectory, issues, materials);
             Console.WriteLine("Exporting UI and referenced textures...");
             foreach (var texture in discovery.Objects.OfType<UTexture2D>()) resources.Export(texture);
             records = ExportAssets(discovery.Assets, provider, options.OutputDirectory, resources, issues);
             Snapshot.Write(options.OutputDirectory, "resources.json", resources.Entries);
-            textureCount = resources.Entries.Count;
+            resourceCount = resources.Entries.Count;
             if (records.Count == 0)
                 issues.Add(new("validation", "assets", "No asset IDs were extracted."));
         }
@@ -82,7 +86,7 @@ internal static class Program
             records.Count(asset => asset.Text.Any(text => text.Locale == "en" && text.Description.Length > 0)),
             records.Count(asset => asset.Images.Any(image => image.Status == "exported")), issues,
             diagnostics.Notices.Distinct().ToArray(), new(Discovery.EvidenceReader.NativeScope,
-                Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(options.Usmap))), discovery?.Objects.Count ?? 0, textureCount));
+                Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(options.Usmap))), discovery?.Objects.Count ?? 0, resourceCount));
         Snapshot.Write(options.OutputDirectory, "assets.json", records);
         Snapshot.Write(options.OutputDirectory, "coverage.json", report);
         Console.WriteLine($"{report.Status}: {report.AssetIds:N0} IDs, {report.EnglishNames:N0} English names, {report.Images:N0} assets with images, {issues.Count:N0} issues.");
@@ -90,7 +94,7 @@ internal static class Program
     }
 
     private static List<AssetRecord> ExportAssets(IReadOnlyList<CatalogAsset> assets, IFileProvider provider,
-        string output, TextureResources resources, List<ExtractionIssue> issues)
+        string output, ImageResources resources, List<ExtractionIssue> issues)
     {
         Console.WriteLine($"Found {assets.Count:N0} IDs. Reading text...");
         var texts = assets.Select(asset => Text.Read(asset, issues)).ToArray();
@@ -122,6 +126,7 @@ internal static class Program
 
     internal sealed class ParserDiagnostics : ILogEventSink
     {
+        private readonly DiagnosticSamples diagnostics = new(Console.Error);
         public ConcurrentQueue<ExtractionIssue> Issues { get; } = new();
         public ConcurrentQueue<ExtractionIssue> Notices { get; } = new();
         public void Emit(LogEvent logEvent)
@@ -135,7 +140,10 @@ internal static class Program
                 logEvent.Properties.GetValueOrDefault("MountPoint") is ScalarValue { Value: "/" })
                 Notices.Enqueue(issue);
             else
+            {
                 Issues.Enqueue(issue);
+                diagnostics.Write(issue, logEvent.MessageTemplate.Text);
+            }
         }
     }
 }

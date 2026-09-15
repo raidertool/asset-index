@@ -30,7 +30,8 @@ internal static class Text
         var distinct = candidates.Distinct().OrderBy(candidate => candidate.SourcePath, StringComparer.Ordinal)
             .ThenBy(candidate => candidate.Field, StringComparer.Ordinal).ToArray();
         return new AssetText(asset.Id, Select(distinct, ["display-name", "title", "short-name"], issues),
-            Select(distinct, ["description", "tooltip"], issues)) { Candidates = distinct };
+            Select(distinct, ["description", "tooltip"], issues))
+        { Candidates = distinct };
     }
 
     public static IReadOnlyList<LocalizedText> Localize(IFileProvider provider, IReadOnlyList<AssetText> assets,
@@ -103,17 +104,17 @@ internal static class Text
         // UI presentation owns its labels. Definition text and contextual container labels
         // remain candidates with provenance even when the UI supplies the primary value.
         foreach (var kind in new[] { "metadata", "definition", "container" })
-        foreach (var role in roles)
-        {
-            var peers = candidates.Where(candidate => candidate.SourceKind == kind && candidate.Role == role).ToArray();
-            if (peers.Length == 0) continue;
-            var references = peers.Select(candidate => candidate.Reference).Distinct().ToArray();
-            if (references.Length == 1)
-                return references[0].Key.Length == 0 && references[0].Source.Length == 0 ? null : references[0];
-            var paths = string.Join(", ", peers.Select(candidate => $"{candidate.SourcePath}.{candidate.Field}"));
-            issues.Add(new("text", paths, $"Conflicting {role} references; no primary value selected. Candidates: {paths}."));
-            return null;
-        }
+            foreach (var role in roles)
+            {
+                var peers = candidates.Where(candidate => candidate.SourceKind == kind && candidate.Role == role).ToArray();
+                if (peers.Length == 0) continue;
+                var references = peers.Select(candidate => candidate.Reference).Distinct().ToArray();
+                if (references.Length == 1)
+                    return references[0].Key.Length == 0 && references[0].Source.Length == 0 ? null : references[0];
+                var paths = string.Join(", ", peers.Select(candidate => $"{candidate.SourcePath}.{candidate.Field}"));
+                issues.Add(new("text", paths, $"Conflicting {role} references; no primary value selected. Candidates: {paths}."));
+                return null;
+            }
         return null;
     }
 

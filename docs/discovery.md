@@ -12,14 +12,15 @@ texture/material dependencies. Other binary media remain inventoried.
 
 `EvidenceReader` visits CUE4Parse property tags, arrays, sets, map keys/values,
 structs and text histories directly. Small native adapters cover data/curve/string
-tables and class references. It preserves property pointers, reference kinds,
+tables, class references, field declarations, delegates, and cached material fields.
+It preserves property pointers, reference kinds,
 nulls, empty overrides and exact numeric strings. It never interprets an ordinary
 string as an object reference or uses CUE4Parse's JSON export as a parsing layer.
 
 `discovery/objects.jsonl.gz` retains unassociated fields and strings;
 `registry.jsonl.gz` and `packages.jsonl.gz` show selection and decode coverage.
 `localization/` retains the game's merged translation dictionaries. `resources.json`
-indexes decoded UI/referenced textures independently of catalog ownership.
+indexes UI/referenced textures and supported material images independently of catalog ownership.
 
 ```sh
 gzip -dc .work/preview/discovery/objects.jsonl.gz | rg 'ResearchPoints'
@@ -38,8 +39,9 @@ package does not mean every export or every native payload was decoded.
   peers unresolved. `presentation` records chosen keys and defining objects.
 - `Presentation.cs` joins loadout container types and slot references to the
   corresponding UI container label; its full join path remains in each row.
-- `Images.cs` associates declared image fields. Material inputs are evidence;
-  an ingredient texture alone does not establish the rendered icon.
+- `Images.cs` associates declared image fields. `MaterialIcons.cs` renders one
+  verified color-scheme graph under [defined conditions](materials.md). Other
+  material inputs remain evidence; an ingredient alone is not a rendered icon.
 
 Historical output only finds changes. Do not restore a name or image without a
 current identity/presentation relationship. Add a small fixture for that exact

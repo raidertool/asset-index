@@ -3,6 +3,7 @@ using CUE4Parse.UE4.Assets;
 using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Assets.Exports.Engine;
 using CUE4Parse.UE4.Assets.Exports.Internationalization;
+using CUE4Parse.UE4.Assets.Exports.Material;
 using CUE4Parse.UE4.Objects.UObject;
 
 namespace AssetIndex.Discovery;
@@ -22,6 +23,9 @@ internal sealed partial class EvidenceReader
         if (source is UDataTable table) ReadDataTable(table);
         if (source is UCurveTable curves) ReadCurveTable(curves);
         if (source is UStringTable strings) ReadStringTable(strings);
+        if (source is UMaterialInterface material)
+            Visit(material.CachedExpressionData, "/Native/CachedExpressionData");
+        if (source is UMaterial parent) ReadMaterialDependencies(parent);
         if (source is UField field)
         {
             ReadHardReference(field.SuperField, "/Native/SuperField", "super");
@@ -31,8 +35,21 @@ internal sealed partial class EvidenceReader
         {
             ReadHardReference(structure.SuperStruct, "/Native/SuperStruct", "super");
             Visit(structure.Children, "/Native/Children");
+            Visit(structure.ChildProperties, "/Native/ChildProperties");
         }
         if (source is UClass type) ReadClassReferences(type);
+    }
+
+    private void ReadMaterialDependencies(UMaterial material)
+    {
+        // CUE combines serialized texture references with package-import dependencies.
+        // Keep these distinct from cached property bindings; they are not rendered icons.
+        for (var index = 0; index < material.ReferencedTextures.Count; index++)
+        {
+            var texture = material.ReferencedTextures[index];
+            ReadResolvedReference(texture is null ? null : new ResolvedLoadedObject(texture),
+                $"/Native/ReferencedTextures/{index}", "material-texture-dependency", "object");
+        }
     }
 
     private void ReadClassReferences(UClass type)

@@ -4,13 +4,14 @@ using CUE4Parse.UE4.Objects.UObject;
 
 namespace AssetIndex.Tests;
 
-internal sealed class FixturePackage(UObject export) : AbstractUePackage("Fixture", null)
+internal sealed class FixturePackage(params UObject[] exports) : AbstractUePackage("Fixture", null)
 {
     public override FPackageFileSummary Summary => throw new NotSupportedException();
     public override FNameEntrySerialized[] NameMap => [];
     public override int ImportMapLength => 0;
-    public override int ExportMapLength => 1;
-    public override int GetExportIndex(string name, StringComparison comparisonType = StringComparison.Ordinal) => 0;
-    public override ResolvedObject? ResolvePackageIndex(FPackageIndex? index) => index is { Index: 1 }
-        ? new ResolvedLoadedObject(export) : null;
+    public override int ExportMapLength => exports.Length;
+    public override int GetExportIndex(string name, StringComparison comparisonType = StringComparison.Ordinal) =>
+        Array.FindIndex(exports, export => export.Name.Equals(name, comparisonType));
+    public override ResolvedObject? ResolvePackageIndex(FPackageIndex? index) => index is { Index: > 0 } && index.Index <= exports.Length
+        ? new ResolvedLoadedObject(exports[index.Index - 1]) : null;
 }

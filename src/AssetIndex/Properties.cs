@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using CUE4Parse.UE4.Assets;
 using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Assets.Objects;
 using CUE4Parse.UE4.Objects.UObject;
@@ -74,9 +75,27 @@ internal static class Properties
         if (string.IsNullOrEmpty(reference.SubPathString))
             return target;
 
-        foreach (var name in reference.SubPathString.Split('.'))
-            target = target.Owner?.GetExport(name)
-                ?? throw new InvalidDataException($"Cannot resolve subobject {reference}.");
+        return ResolveSubobject(target, reference.SubPathString);
+    }
+
+    internal static UObject ResolveSubobject(UObject target, string subpath)
+    {
+        foreach (var name in subpath.Split('.'))
+        {
+            var package = target.Owner ?? throw new InvalidDataException("Subobject has no owning package.");
+            ResolvedObject? match = null;
+            for (var index = 0; index < package.ExportMapLength; index++)
+            {
+                var candidate = package.ResolvePackageIndex(new FPackageIndex(package, index + 1));
+                // Export names are only unique within an outer. A package-wide name
+                // lookup can silently return another asset's identically named child.
+                if (candidate is null || !candidate.Name.Text.Equals(name, StringComparison.OrdinalIgnoreCase)
+                    || !ReferenceEquals(candidate.Outer?.Object?.Value, target)) continue;
+                if (match is not null) throw new InvalidDataException($"Ambiguous subobject {subpath}.");
+                match = candidate;
+            }
+            target = match?.Object?.Value ?? throw new InvalidDataException($"Cannot resolve subobject {subpath}.");
+        }
         return target;
     }
 }

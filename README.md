@@ -33,15 +33,17 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for tests and mapping updates.
 | Path | Contents |
 | --- | --- |
 | `assets.json` | IDs, definitions, UI metadata, localized text, and image references |
-| `resources.json`, `images/` | UI/referenced textures, including those without catalog IDs |
+| `resources.json`, `images/` | UI/referenced textures and supported material icons, including unowned resources |
 | `discovery/` | Compressed object fields, registry inventory and package coverage |
 | `localization/` | Compressed translation dictionaries |
 | `coverage.json` | Counts and extraction diagnostics |
 
 IDs are decimal strings to preserve signed 64-bit values in JavaScript. Each ID
 can have multiple definitions and images. Its `presentation` explains selected
-text and alternative source fields. Unsupported material icons remain
-explicitly marked; missing text is not filled from an older snapshot.
+text and alternative source fields. Each image's `resource` names its texture or
+material. [Material rendering](docs/materials.md) uses explicit standalone image
+conditions. Unsupported materials remain marked; missing text is not filled
+from an older snapshot.
 See [discovery rules](docs/discovery.md) before adding new associations.
 
 Exit codes: `0` succeeded, `1` incomplete, `2` invalid input. Inspect coverage

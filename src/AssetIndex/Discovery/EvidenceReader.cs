@@ -14,9 +14,9 @@ namespace AssetIndex.Discovery;
 
 internal sealed partial class EvidenceReader
 {
-    // Native adapters cover tables and class links. Shader, mesh, audio and other
+    // Native adapters cover tables, declarations, class links and material fields. Shader, mesh, audio and other
     // opaque export payloads are outside field evidence; their resource still exists.
-    public const string NativeScope = "Tagged and sparse properties; data/curve/string tables; class references. Binary payloads and composite curve evaluation are not decoded.";
+    public const string NativeScope = "Tagged and sparse properties; data/curve/string tables; class references and field declarations; cached material fields and texture dependencies. Binary payloads and composite curve evaluation are not decoded.";
     private readonly List<ReferenceEvidence> references = [];
     private readonly List<TextEvidence> texts = [];
     private readonly List<ValueEvidence> values = [];
@@ -108,6 +108,13 @@ internal sealed partial class EvidenceReader
             case byte[] bytes: values.Add(new(pointer, type, "binary", bytes.Length.ToString(CultureInfo.InvariantCulture))); return;
             case IDictionary map: ReadMap(map, pointer, type, depth); return;
             case IList sequence: ReadSequence(sequence, pointer, type, "array", depth); return;
+            case FField field:
+                values.Add(new(pointer, field.GetType().Name, "field-declaration", null));
+                ReadNativeFields(field, pointer, depth);
+                return;
+            case FScriptDelegate or FMulticastScriptDelegate or FFieldPath or FScriptInterface or FUniqueObjectGuid:
+                ReadNativeFields(value, pointer, depth);
+                return;
             case IUStruct structure: ReadNativeFields(structure, pointer, depth); return;
             default: issues.Add(new(pointer, type, $"Unsupported compound value: {value.GetType().FullName}.")); return;
         }
@@ -132,7 +139,10 @@ internal sealed partial class EvidenceReader
         }
     }
 
-    private void ReadNativeFields(IUStruct value, string pointer, int depth)
+    // The visitor calls this only for CUE's typed structs and reflected FField
+    // declarations and explicit property wrappers. UObject values stay reference edges;
+    // getters are never evaluated.
+    private void ReadNativeFields(object value, string pointer, int depth)
     {
         var fields = value.GetType().GetFields(BindingFlags.Public | BindingFlags.Instance)
             .OrderBy(field => field.Name, StringComparer.Ordinal).ToArray();

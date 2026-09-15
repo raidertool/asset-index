@@ -1,10 +1,9 @@
-using CUE4Parse.UE4.Assets.Exports.Texture;
 using CUE4Parse_Conversion.Options;
 using CUE4Parse_Conversion.Textures;
 
 namespace AssetIndex;
 
-internal sealed record AssetImage(string Field, string Source, string? Texture, string Status,
+internal sealed record AssetImage(string Field, string Source, string? Resource, string Status,
     string? File = null, int? Width = null, int? Height = null);
 
 internal static class Images
@@ -17,7 +16,7 @@ internal static class Images
         "Portrait", "ImageAsset", "UnlockImage", "PreviewImage", "IconMaterial", "EmptySlotImage"
     ];
 
-    public static IReadOnlyList<AssetImage> Export(CatalogAsset asset, TextureResources resources, ICollection<ExtractionIssue> issues)
+    public static IReadOnlyList<AssetImage> Export(CatalogAsset asset, ImageResources resources, ICollection<ExtractionIssue> issues)
     {
         var images = new List<AssetImage>();
         foreach (var source in asset.Definitions.Concat(asset.Metadata))
@@ -25,7 +24,7 @@ internal static class Images
             foreach (var field in Fields)
             {
                 var path = source.GetPathName();
-                string? texturePath = null;
+                string? resourcePath = null;
                 try
                 {
                     if (Properties.Find(source, field) is null) continue;
@@ -35,20 +34,14 @@ internal static class Images
                         images.Add(new(field, path, null, "absent"));
                         continue;
                     }
-                    if (reference is not UTexture2D texture)
-                    {
-                        issues.Add(new("image", $"{path}.{field}", $"Unsupported image source: {reference.ExportType}."));
-                        images.Add(new(field, path, reference.GetPathName(), "unsupported"));
-                        continue;
-                    }
-                    texturePath = texture.GetPathName();
-                    var resource = resources.Export(texture);
-                    images.Add(new(field, path, texturePath, resource.Status, resource.File, resource.Width, resource.Height));
+                    resourcePath = reference.GetPathName();
+                    var resource = resources.Export(reference);
+                    images.Add(new(field, path, resourcePath, resource.Status, resource.File, resource.Width, resource.Height));
                 }
                 catch (Exception error)
                 {
                     issues.Add(new("image", $"{path}.{field}", error.Message));
-                    images.Add(new(field, path, texturePath, "failed"));
+                    images.Add(new(field, path, resourcePath, "failed"));
                 }
             }
         }

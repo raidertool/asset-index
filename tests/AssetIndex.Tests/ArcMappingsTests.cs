@@ -1,11 +1,9 @@
 using CUE4Parse.GameTypes.Theia.FileProvider;
-using CUE4Parse.MappingsProvider;
 using CUE4Parse.MappingsProvider.Usmap;
 using CUE4Parse.UE4.Assets;
 using CUE4Parse.UE4.Assets.Objects;
 using CUE4Parse.UE4.Assets.Objects.Properties;
 using CUE4Parse.UE4.Assets.Readers;
-using CUE4Parse.UE4.Exceptions;
 using CUE4Parse.UE4.Objects.UObject;
 using CUE4Parse.UE4.Readers;
 using CUE4Parse.UE4.Versions;
@@ -17,27 +15,24 @@ public sealed class ArcMappingsTests
     private const string Original = "AISensingStatusTransition";
     private const string Alias = "AISensingStatusTransitionStruct";
 
-    [Fact]
-    public void AliasDecodesTheRealArcStructWithNestedValues()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void BothStructRoutesDecodeNestedValues(bool useMappedReference)
     {
-        using var provider = new TheiaFileProvider(AppContext.BaseDirectory, SearchOption.TopDirectoryOnly,
-            new VersionContainer(EGame.GAME_ArcRaiders));
-        provider.MappingsContainer = new FileUsmapTypeMappingsProvider(
-            Path.Combine(AppContext.BaseDirectory, "mappings", "ArcRaiders.usmap"));
+        using var provider = CreateProvider();
         var mappings = provider.MappingsForGame!;
-        // Two populated properties: filter byte, one-element array; nested sense byte and float 3.25.
+        var type = useMappedReference
+            ? mappings.Types["AITemplateDataAsset"].Properties[24].MappingType.StructType
+            : Original;
+        if (useMappedReference) Assert.Equal(Alias, type);
+        // Filter byte, one-element array; nested sense byte and float threshold 3.25.
         byte[] bytes = [0x00, 0x05, 1, 1, 0, 0, 0, 0x00, 0x05, 2, 0x00, 0x00, 0x50, 0x40];
-        using var archive = new FAssetArchive(new FByteArchive("arc-transition", bytes, provider.Versions),
+        using var archive = new FAssetArchive(new FByteArchive("arc-transition-struct", bytes, provider.Versions),
             new FixturePackage(provider));
-        var missing = Assert.Throws<ParserException>(() => new FScriptStruct(archive, Original, null, ReadType.NORMAL));
-        Assert.Contains("Missing prop mappings for type " + Alias, missing.Message);
 
-        GameFiles.AddArcMappingsAlias(mappings);
-        archive.Position = 0;
-        var decoded = Assert.IsType<FStructFallback>(new FScriptStruct(archive, Original, null, ReadType.NORMAL).StructType);
+        var decoded = Assert.IsType<FStructFallback>(new FScriptStruct(archive, type, null, ReadType.NORMAL).StructType);
 
-        Assert.Same(mappings.Types[Original], mappings.Types[Alias]);
-        Assert.Equal(Original, mappings.Types[Original].Name);
         Assert.Equal("EAISensingStatusFilter::" + mappings.Enums["EAISensingStatusFilter"][1],
             decoded.GetOrDefault<FName>("Filter").Text);
         var values = Assert.IsType<UScriptArray>(decoded.GetOrDefault<UScriptArray>("Values"));
@@ -48,65 +43,65 @@ public sealed class ArcMappingsTests
         Assert.Equal(archive.Length, archive.Position);
     }
 
-    [Theory]
-    [InlineData("parent")]
-    [InlineData("count")]
-    [InlineData("filter-name")]
-    [InlineData("filter-width")]
-    [InlineData("filter-enum")]
-    [InlineData("fixed-array")]
-    [InlineData("value-struct")]
-    [InlineData("slot")]
-    public void IncompatibleLayoutsAreRejectedWithoutChangingMappings(string difference)
+    [Fact]
+    public void ClassFieldsAndInheritedPriorityDecodeThroughTheOriginalName()
     {
-        var mappings = LoadMappings();
-        var source = mappings.Types[Original];
-        var count = mappings.Types.Count;
-        switch (difference)
-        {
-            case "parent": source.SuperType = "Object"; break;
-            case "count": source.PropertyCount = 3; break;
-            case "filter-name": source.Properties[0].Name = "Other"; break;
-            case "filter-width": source.Properties[0].MappingType.InnerType!.Type = "IntProperty"; break;
-            case "filter-enum": source.Properties[0].MappingType.EnumName = "OtherEnum"; break;
-            case "fixed-array": source.Properties[1].ArraySize = 2; break;
-            case "value-struct": source.Properties[1].MappingType.InnerType!.StructType = "OtherValue"; break;
-            case "slot": source.Properties[2] = source.Properties[1]; source.Properties.Remove(1); break;
-            default: throw new ArgumentOutOfRangeException(nameof(difference));
-        }
+        using var provider = CreateProvider();
+        // Class bool + two byte enums, then inherited PriorityOrder int.
+        byte[] bytes = [0x00, 0x09, 1, 1, 2, 42, 0, 0, 0];
+        using var archive = new FAssetArchive(new FByteArchive("arc-transition-class", bytes, provider.Versions),
+            new FixturePackage(provider));
 
-        var error = Assert.Throws<InvalidDataException>(() => GameFiles.AddArcMappingsAlias(mappings));
+        var decoded = new FStructFallback(archive, new UScriptClass(Original));
 
-        Assert.Contains("differs from the verified Filter/Values layout", error.Message);
-        Assert.False(mappings.Types.ContainsKey(Alias));
-        Assert.Equal(count, mappings.Types.Count);
+        Assert.True(decoded.GetOrDefault<bool>("bAbortCurrentTask"));
+        Assert.Equal("ETargetIdentificationOperation::EqualOrHigher", decoded.GetOrDefault<FName>("TransitionCriteria").Text);
+        Assert.Equal("ETargetIdentification::Identified", decoded.GetOrDefault<FName>("TransitionWhenTargetIs").Text);
+        Assert.Equal(42, decoded.GetOrDefault<int>("PriorityOrder"));
+        Assert.Equal(archive.Length, archive.Position);
     }
 
     [Fact]
-    public void AnExistingAliasIsPreservedEvenWhenTheOriginalNamesAClass()
+    public void ClassDecodesTheSlotMissingFromTheFormerStructLayout()
     {
-        var mappings = LoadMappings();
-        var existing = new Struct(mappings, Alias, null, [], 0);
-        mappings.Types.Add(Alias, existing);
-        mappings.Types[Original].SuperType = "Object";
+        using var provider = CreateProvider();
+        // Only property index 2 is populated, matching the prior unknown-property failure.
+        using var archive = new FAssetArchive(new FByteArchive("arc-transition-slot", [0x02, 0x03, 2], provider.Versions),
+            new FixturePackage(provider));
 
-        GameFiles.AddArcMappingsAlias(mappings);
+        var decoded = new FStructFallback(archive, new UScriptClass(Original));
 
-        Assert.Same(existing, mappings.Types[Alias]);
+        Assert.Equal("ETargetIdentification::Identified", decoded.GetOrDefault<FName>("TransitionWhenTargetIs").Text);
+        Assert.Equal(archive.Length, archive.Position);
     }
 
     [Fact]
-    public void MissingOriginalDoesNotCreateAnInventedSchema()
+    public void MappingKeepsTheVerifiedClassAndStructLayoutsSeparate()
     {
-        var mappings = new TypeMappings();
+        using var provider = CreateProvider();
+        var mappings = provider.MappingsForGame!;
+        var transition = mappings.Types[Original];
+        var condition = mappings.Types[Alias];
 
-        GameFiles.AddArcMappingsAlias(mappings);
-
-        Assert.Empty(mappings.Types);
+        Assert.Equal("AIBSMTransitionInstance_Base", transition.SuperType);
+        Assert.Equal(3, transition.PropertyCount);
+        Assert.Equal(["bAbortCurrentTask", "TransitionCriteria", "TransitionWhenTargetIs"],
+            transition.Properties.OrderBy(pair => pair.Key).Select(pair => pair.Value.Name));
+        Assert.Equal(0, mappings.Types["AIBSMTransitionInstance_Base"].PropertyCount);
+        Assert.Null(condition.SuperType);
+        Assert.Equal(2, condition.PropertyCount);
+        Assert.Equal(["Filter", "Values"], condition.Properties.OrderBy(pair => pair.Key).Select(pair => pair.Value.Name));
+        Assert.Equal(Alias, mappings.Types["AITemplateDataAsset"].Properties[24].MappingType.StructType);
     }
 
-    private static TypeMappings LoadMappings() => new FileUsmapTypeMappingsProvider(
-        Path.Combine(AppContext.BaseDirectory, "mappings", "ArcRaiders.usmap")).MappingsForGame!;
+    private static TheiaFileProvider CreateProvider()
+    {
+        var provider = new TheiaFileProvider(AppContext.BaseDirectory, SearchOption.TopDirectoryOnly,
+            new VersionContainer(EGame.GAME_ArcRaiders));
+        provider.MappingsContainer = new FileUsmapTypeMappingsProvider(
+            Path.Combine(AppContext.BaseDirectory, "mappings", "ArcRaiders.usmap"));
+        return provider;
+    }
 
     private sealed class FixturePackage(TheiaFileProvider provider) : AbstractUePackage("Fixture", provider)
     {

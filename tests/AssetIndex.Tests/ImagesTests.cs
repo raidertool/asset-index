@@ -54,15 +54,16 @@ public sealed class ImagesTests
         var definition = new UObject([new FPropertyTag
         {
             Name = "Icon", Tag = new ObjectProperty(new FPackageIndex(package, 1))
-        }]) { Name = "KnownDefinition" };
+        }])
+        { Name = "KnownDefinition" };
         var output = Path.Combine(Path.GetTempPath(), "asset-index-image-test-" + Guid.NewGuid().ToString("N"));
         var issues = new List<ExtractionIssue>();
         try
         {
-            var resources = new TextureResources(output, issues);
+            var resources = new ImageResources(output, issues);
             var image = Assert.Single(Images.Export(new CatalogAsset(42, [definition], []), resources, issues));
-            Assert.Equal(image.Texture, Assert.Single(resources.Entries).Path);
-            Assert.Equal(texture.GetPathName(), image.Texture);
+            Assert.Equal(image.Resource, Assert.Single(resources.Entries).Path);
+            Assert.Equal(texture.GetPathName(), image.Resource);
             Assert.Equal("Icon", image.Field);
             Assert.Equal(definition.GetPathName(), image.Source);
             if (missingMip)

@@ -15,4 +15,4 @@ internal sealed record RunReport(
     IReadOnlyList<ExtractionIssue> Notices,
     DiscoveryCoverage Discovery);
 
-internal sealed record DiscoveryCoverage(string NativeScope, string MappingSha256, int Objects, int Textures);
+internal sealed record DiscoveryCoverage(string NativeScope, string MappingSha256, int Objects, int Resources);

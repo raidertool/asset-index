@@ -1,4 +1,5 @@
 using AssetIndex.Discovery;
+using System.Diagnostics;
 using CUE4Parse.GameTypes.Theia.FileProvider;
 using CUE4Parse.UE4.Assets.Exports;
 
@@ -31,6 +32,7 @@ internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvi
     private readonly CUE4Parse.MappingsProvider.TypeMappings mappings = provider.MappingsForGame
         ?? throw new InvalidDataException("Asset discovery requires type mappings.");
     private readonly List<ExtractionIssue> issues = [];
+    private readonly DiagnosticSamples diagnostics = new(Console.Error);
     private readonly SortedDictionary<string, string> pending = new(StringComparer.Ordinal);
     private readonly HashSet<string> visited = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, UObject> objects = new(StringComparer.Ordinal);
@@ -56,7 +58,13 @@ internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvi
             if (!visited.Add(path)) continue;
             ReadPackage(path, reason);
             if (packages.Count % 250 == 0 || pending.Count == 0)
-                Console.Error.WriteLine($"Read {packages.Count:N0} packages; {pending.Count:N0} pending, {objects.Count:N0} objects, {issues.Count:N0} issues.");
+            {
+                var stages = string.Join(", ", issues.GroupBy(issue => issue.Stage).OrderBy(group => group.Key)
+                    .Select(group => $"{group.Key}={group.Count():N0}"));
+                using var process = Process.GetCurrentProcess();
+                Console.Error.WriteLine($"Read {packages.Count:N0} packages; {pending.Count:N0} pending, {objects.Count:N0} objects, {issues.Count:N0} issues ({stages}); " +
+                    $"memory {process.WorkingSet64 / (1024 * 1024):N0} MiB resident, {GC.GetTotalMemory(false) / (1024 * 1024):N0} MiB managed; last {path}.");
+            }
         }
         var allObjects = objects.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => pair.Value).ToArray();
         return new(Assets.Collect(allObjects, mappings, issues), allObjects, registry, packages, issues);
@@ -76,7 +84,7 @@ internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvi
         try { package = provider.LoadPackage(path); }
         catch (Exception error)
         {
-            issues.Add(new("package", path, AssetDiscovery.DescribeError(error)));
+            AddIssue(new("package", path, AssetDiscovery.DescribeError(error)), "package:" + error.GetBaseException().GetType().Name);
             packages.Add(new(path, reason, "failed", 0, 0));
             return;
         }
@@ -88,7 +96,7 @@ internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvi
             try { source = package.ExportsLazy[index].Value; }
             catch (Exception error)
             {
-                issues.Add(new("decode", $"{path}#export/{index}", AssetDiscovery.DescribeError(error)));
+                AddIssue(new("decode", $"{path}#export/{index}", AssetDiscovery.DescribeError(error)), "decode:" + error.GetBaseException().GetType().Name);
                 continue;
             }
             loaded++;
@@ -107,11 +115,11 @@ internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvi
     {
         writeEvidence(evidence);
         foreach (var issue in evidence.Issues)
-            issues.Add(new("evidence", evidence.Path + issue.Pointer, issue.Message));
+            AddIssue(new("evidence", evidence.Path + issue.Pointer, issue.Message), "evidence:" + issue.Type + ":" + issue.Message);
         foreach (var reference in evidence.References)
         {
             if (reference.Error is not null)
-                issues.Add(new("reference", evidence.Path + reference.Pointer, reference.Error));
+                AddIssue(new("reference", evidence.Path + reference.Pointer, reference.Error), "reference:" + reference.Kind + ":" + reference.Error);
             if (reference.IsNull || reference.TargetPath is not { } target || target.StartsWith("/Script/", StringComparison.Ordinal)) continue;
             var packagePath = target.Split('.', 2)[0];
             if (!packagePath.StartsWith('/')) continue;
@@ -119,5 +127,11 @@ internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvi
                 !entries.Any(asset => Registry.FollowClass(mappings, asset.Class))) continue;
             Enqueue(packagePath, "reference");
         }
+    }
+
+    private void AddIssue(ExtractionIssue issue, string category)
+    {
+        issues.Add(issue);
+        diagnostics.Write(issue, category);
     }
 }
