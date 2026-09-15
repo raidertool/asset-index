@@ -13,7 +13,8 @@ fi
 
 # Unused preinstalled SDKs only. Keep .NET and the rest of the tool cache.
 sudo rm -rf -- /usr/local/lib/android /usr/local/.ghcup \
-  /opt/hostedtoolcache/CodeQL /usr/share/swift /usr/lib/jvm
+  /opt/hostedtoolcache/CodeQL /usr/share/swift /usr/lib/jvm \
+  /opt/az /etc/skel/.rustup /home/runner/.rustup
 
 # Current build: ~19 GiB raw packages + 8 GiB Steam cache + guard/output space.
 available_kib="$(df -Pk -- "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')"

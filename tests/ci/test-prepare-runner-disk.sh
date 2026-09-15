@@ -51,6 +51,9 @@ rm
 /opt/hostedtoolcache/CodeQL
 /usr/share/swift
 /usr/lib/jvm
+/opt/az
+/etc/skel/.rustup
+/home/runner/.rustup
 EXPECTED
 diff -u "$test_dir/expected" "$DISK_TEST_LOG"
 echo "Runner disk preparation: 10 mocked cases passed."
