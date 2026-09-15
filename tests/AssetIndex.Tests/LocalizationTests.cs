@@ -76,6 +76,28 @@ public sealed class LocalizationTests : IDisposable
         Assert.Contains("No localization entries loaded for fr", Assert.Single(issues).Message);
     }
 
+    [Fact]
+    public void InvariantNamesSurviveEveryCultureWithoutFillingMissingTranslations()
+    {
+        WriteTranslation("en", "An unrelated name");
+        WriteTranslation("fr", "An unrelated name");
+        using var provider = OpenProvider(["en", "fr"]);
+        AssetText[] assets =
+        [
+            new(1, new("", "", "XP", CultureInvariant: true), null),
+            new(2, new("items", "missing", "English source"), null)
+        ];
+        var issues = new List<ExtractionIssue>();
+
+        var rows = Text.Localize(provider, assets, issues);
+
+        Assert.Equal(3, rows.Count);
+        Assert.Contains(new LocalizedText(1, "en", "XP", ""), rows);
+        Assert.Contains(new LocalizedText(1, "fr", "XP", ""), rows);
+        Assert.Contains(new LocalizedText(2, "en", "English source", ""), rows);
+        Assert.Empty(issues);
+    }
+
     private DefaultFileProvider OpenProvider(string[] cultures, string extraConfig = "")
     {
         var config = Path.Combine(directory, "Config");

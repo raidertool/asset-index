@@ -2,8 +2,11 @@ using CUE4Parse.UE4.Assets;
 using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Assets.Objects;
 using CUE4Parse.UE4.Assets.Objects.Properties;
+using CUE4Parse.UE4.Assets.Readers;
 using CUE4Parse.UE4.Objects.Core.i18N;
 using CUE4Parse.UE4.Objects.UObject;
+using CUE4Parse.UE4.Readers;
+using CUE4Parse.UE4.Versions;
 
 namespace AssetIndex.Tests;
 
@@ -166,6 +169,55 @@ public sealed class TextTests
 
         Assert.Equal("XP", text.Name?.Source);
         Assert.Empty(issues);
+    }
+
+    [Fact]
+    public void SerializedNoneHistoryKeepsItsInvariantStringInEveryLocale()
+    {
+        // Flags=0, history=None, present=true, FString="XP".
+        byte[] bytes = [0, 0, 0, 0, 255, 1, 0, 0, 0, 3, 0, 0, 0, 88, 80, 0];
+        using var archive = new FAssetArchive(new FByteArchive("invariant-text", bytes,
+            new VersionContainer(EGame.GAME_ArcRaiders)), null);
+        var metadata = WithText("ItemName", new FText(archive));
+        var issues = new List<ExtractionIssue>();
+
+        var reference = Text.Read(Asset(metadata), issues).Name;
+
+        Assert.Equal(new TextReference("", "", "XP", CultureInvariant: true), reference);
+        Assert.Equal("XP", Text.Resolve(reference, new Dictionary<string, IReadOnlyDictionary<string, string>>(), "fr"));
+        Assert.Empty(issues);
+    }
+
+    [Fact]
+    public void ExplicitInvariantFlagIgnoresLocalizationAndCachedText()
+    {
+        var metadata = WithText("ItemName", new FText((uint)ETextFlag.CultureInvariant, ETextHistoryType.Base,
+            new FTextHistory.Base("items", "name", "XP", "Cached text")));
+        var translations = new Dictionary<string, IReadOnlyDictionary<string, string>>
+        {
+            ["items"] = new Dictionary<string, string> { ["name"] = "Wrong translation" }
+        };
+
+        var reference = Text.Read(Asset(metadata), []).Name;
+
+        Assert.Equal(new TextReference("items", "name", "XP", CultureInvariant: true), reference);
+        Assert.Equal("XP", Text.Resolve(reference, translations, "fr"));
+    }
+
+    [Theory]
+    [InlineData((ETextFlag)0)]
+    [InlineData(ETextFlag.InitializedFromString)]
+    public void KeylessBaseHistoryIsNotAssumedToBeInvariant(ETextFlag flags)
+    {
+        var metadata = WithText("ItemName", new FText((uint)flags, ETextHistoryType.Base,
+            new FTextHistory.Base("", "", "Source name")));
+        var translations = new Dictionary<string, IReadOnlyDictionary<string, string>>();
+
+        var reference = Text.Read(Asset(metadata), []).Name;
+
+        Assert.Equal(new TextReference("", "", "Source name"), reference);
+        Assert.Equal("Source name", Text.Resolve(reference, translations, "en"));
+        Assert.Equal(string.Empty, Text.Resolve(reference, translations, "fr"));
     }
 
     private static CatalogAsset Asset(UObject metadata) =>
