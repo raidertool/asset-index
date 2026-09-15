@@ -6,7 +6,7 @@ It does not create the initial branch.
 
 - `assets.json`: catalog rows and presentation provenance.
 - `resources.json` and `images/`: every exported image resource, including unowned UI images.
-- `discovery/{objects,registry,packages}.jsonl.gz`: typed source evidence and coverage.
+- `discovery/{objects,files,registry,packages}.jsonl.gz`: typed source evidence and coverage.
 - `localization/<locale>.jsonl.gz`: merged localization dictionaries, including English.
 - `coverage.json`: extraction counts, errors, notices, mapping hash, and discovery scope.
 
@@ -21,10 +21,16 @@ PNG decoding checks. Every catalog source and image resource must have object ev
 every PNG must belong to the resource inventory. Image filenames hash their
 declared resource paths, not their PNG bytes.
 
+Every registry package must map to a mounted input. Every unindexed input must
+have a completed read; completed export totals must match the object count.
+Named references within packages represented by object evidence must match the
+full path, including outer objects, case-insensitively. Native, package-only, and
+unobserved-package references remain outside this publisher check.
+
 Validation reads a private copy on disk. Later changes to the input directory
 cannot change the validated payload; large images and evidence streams are not
-held together in memory. These checks verify structure and consistency, not
-whether the extractor found every game object or chose the intended UI label.
+held together in memory. Field-level text provenance, UI label choice, and
+complete game/API coverage require separate audits.
 
 `metadata.json` records:
 
@@ -48,5 +54,5 @@ source-only edits with unchanged output do not. New run provenance stays in its
 logs/artifacts. Retrying identical input creates no revision.
 
 Before activation, initialize and validate the data branch, transfer ownership
-from the old publisher, and resolve importer overlap/ordering. No scheduled or
+from the old publisher, and configure the importer to follow `data`. No scheduled or
 production publishing workflow is enabled by this draft.
