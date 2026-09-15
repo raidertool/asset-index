@@ -45,8 +45,11 @@ internal sealed partial class EvidenceReader
     {
         try
         {
-            var seen = new HashSet<UStruct>(ReferenceEqualityComparer.Instance);
             var current = source.Class?.Object?.Value as UStruct;
+            if (current is null or UScriptClass) return;
+            // Tagged properties carry their own layout and do not use SerializedStruct.
+            if (source.Owner is { } owner && !owner.HasFlags(EPackageFlags.PKG_UnversionedProperties)) return;
+            var seen = new HashSet<UStruct>(ReferenceEqualityComparer.Instance);
             // The pinned CUE runtime declaration mapper cannot safely expand static arrays.
             // Native UScriptClass layouts use usmap's separate, correct array expansion.
             while (current is not null && current is not UScriptClass)

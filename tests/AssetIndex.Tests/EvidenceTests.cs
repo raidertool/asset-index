@@ -589,11 +589,38 @@ public sealed class EvidenceTests
         var child = new UStruct { Name = "RuntimeChild", ChildProperties = [], SuperStruct = new FPackageIndex(package, 1) };
         var source = Object("Instance", Property("Value", new IntProperty(3)));
         source.Class = new ResolvedLoadedObject(child);
+        Assert.Null(source.Owner);
 
         var evidence = EvidenceReader.Read(source);
 
         Assert.Contains(evidence.Issues, issue => issue.Type == "runtime-schema" && issue.Message.Contains("RuntimeParent.Values") && issue.Message.Contains("ArrayDim 2"));
         Assert.Contains(evidence.Values, value => value.Value == "3");
+    }
+
+    [Theory]
+    [InlineData(EPackageFlags.PKG_None, 0)]
+    [InlineData(EPackageFlags.PKG_UnversionedProperties, 1)]
+    public void RuntimeArrayGuardMatchesOwningPackageSerialization(EPackageFlags flags, int expectedIssues)
+    {
+        var runtime = new UStruct { Name = "Runtime", ChildProperties = [new FIntProperty { Name = "Values", ArrayDim = 2 }] };
+        var package = new TestPackage(new ResolvedLoadedObject(runtime), flags);
+        var first = Property("Values", new IntProperty(42));
+        first.PropertyTagFlags = EPropertyTagFlags.HasArrayIndex;
+        first.ArraySize = 2;
+        var second = Property("Values", new IntProperty(43));
+        second.PropertyTagFlags = EPropertyTagFlags.HasArrayIndex;
+        second.ArrayIndex = 1;
+        second.ArraySize = 2;
+        var source = Object("Instance", first, second);
+        source.Class = new ResolvedLoadedObject(runtime);
+        source.Outer = new ResolvedPackageObject(package);
+
+        var evidence = EvidenceReader.Read(source);
+
+        Assert.Equal(expectedIssues, evidence.Issues.Count);
+        Assert.All(evidence.Issues, issue => Assert.Equal("runtime-schema", issue.Type));
+        Assert.Equal(["42", "43"], evidence.Values.Select(value => value.Value));
+        Assert.Equal<int?>([0, 1], evidence.Properties.Select(property => property.ArrayIndex));
     }
 
     [Fact]
@@ -644,9 +671,9 @@ public sealed class EvidenceTests
         public override FName Name => "Loop";
         public override ResolvedObject Outer => new FreshOuterReference();
     }
-    private sealed class TestPackage(ResolvedObject target) : AbstractUePackage("/Game/Fixture", null)
+    private sealed class TestPackage(ResolvedObject target, EPackageFlags flags = EPackageFlags.PKG_None) : AbstractUePackage("/Game/Fixture", null)
     {
-        public override FPackageFileSummary Summary => throw new NotSupportedException();
+        public override FPackageFileSummary Summary { get; } = new() { PackageFlags = flags };
         public override FNameEntrySerialized[] NameMap => [];
         public override int ImportMapLength => 0;
         public override int ExportMapLength => 1;
