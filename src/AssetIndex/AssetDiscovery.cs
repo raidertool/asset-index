@@ -111,10 +111,10 @@ internal static class AssetDiscovery
     private static void ReportUnindexedPackages(
         TheiaFileProvider provider, IReadOnlyList<FAssetData> registry, List<ExtractionIssue> issues)
     {
-        var indexed = registry.Select(asset => provider.FixPath(asset.PackageName.Text))
+        var indexed = registry.Select(asset => Path.ChangeExtension(provider.FixPath(asset.PackageName.Text), null))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var unindexed = provider.Files.Values
-            .Where(file => file.IsUePackage && !indexed.Contains(provider.FixPath(file.Path)))
+            .Where(file => file.IsUePackage && !indexed.Contains(Path.ChangeExtension(provider.FixPath(file.Path), null)))
             .Select(file => file.Path).Order(StringComparer.Ordinal).ToArray();
         if (unindexed.Length > 0)
             issues.Add(new("coverage", "AssetRegistry.bin", $"{unindexed.Length} packages are absent from the registry; their classes and IDs remain unaudited. Examples: {string.Join(", ", unindexed.Take(5))}"));

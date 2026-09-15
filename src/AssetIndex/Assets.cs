@@ -55,7 +55,8 @@ internal static class Assets
     {
         var referenceName = MetadataReferences.FirstOrDefault(pair =>
             IsA(mappings, source.ExportType, pair.Key) == true).Value ?? "PersistenceDataAsset";
-        if (!HasProperty(mappings, source.ExportType, referenceName))
+        if (!HasProperty(mappings, source.ExportType, referenceName) &&
+            !HasProperty(mappings, source.ExportType, "OverrideAssetId"))
             return; // UI labels and filters without game identities are not catalog rows.
 
         var id = OverrideId(source, "bOverrideAssetId", "OverrideAssetId");
