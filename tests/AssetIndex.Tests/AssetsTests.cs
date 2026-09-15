@@ -35,7 +35,7 @@ public sealed class AssetsTests
     {
         var persistence = Object("Condition", "OptionalPersistenceDataAsset", ("AssetId", new Int64Property(-42)));
         var metadata = Object("ConditionUI", "UIMapConditionMetaDataItem",
-            ("PersistenceDataAsset", new ObjectProperty(new FPackageIndex(new TestPackage(persistence), 1))));
+            ("PersistenceDataAsset", new ObjectProperty(new FPackageIndex(new FixturePackage(persistence), 1))));
         var issues = new List<ExtractionIssue>();
 
         var asset = Assert.Single(Assets.Collect([persistence, metadata], Mappings.Value, issues));
@@ -78,7 +78,7 @@ public sealed class AssetsTests
     public void DisabledOverrideUsesReferencedIdAndPreservesBothDefinitions()
     {
         var persistence = Object("Persistence", "PersistenceDataAsset", ("AssetId", new Int64Property(42)));
-        var package = new TestPackage(persistence);
+        var package = new FixturePackage(persistence);
         var item = Object("ReadableItem", "ItemDataAsset",
             ("bOverrideItemAssetId", new BoolProperty(false)),
             ("OverrideItemAssetId", new Int64Property(99)),
@@ -96,7 +96,7 @@ public sealed class AssetsTests
     public void StatsMetadataUsesItsNamedReference()
     {
         var target = Object("Raider", "PlayerStatsRaiderTargetDataAsset", ("AssetId", new Int64Property(995408715)));
-        var package = new TestPackage(target);
+        var package = new FixturePackage(target);
         var metadata = Object("TargetUI", "UIPlayerStatsRaiderTargetMetaDataItem",
             ("PlayerStatsRaiderTargetDataAsset", new ObjectProperty(new FPackageIndex(package, 1))));
         var issues = new List<ExtractionIssue>();
@@ -138,7 +138,7 @@ public sealed class AssetsTests
     public void GenericDataAssetUsesExactPersistenceLink(string type)
     {
         var persistence = Object("Identity", "PersistenceDataAsset", ("AssetId", new Int64Property(42)));
-        var package = new TestPackage(persistence);
+        var package = new FixturePackage(persistence);
         var definition = Object("Definition", type,
             ("PersistenceDataAsset", new ObjectProperty(new FPackageIndex(package, 1))));
         var issues = new List<ExtractionIssue>();
@@ -154,10 +154,10 @@ public sealed class AssetsTests
     public void MetadataCanReferToGenericQuestDefinition()
     {
         var persistence = Object("Identity", "PersistenceDataAsset", ("AssetId", new Int64Property(42)));
-        var persistencePackage = new TestPackage(persistence);
+        var persistencePackage = new FixturePackage(persistence);
         var quest = Object("Quest", "QuestDefinition",
             ("PersistenceDataAsset", new ObjectProperty(new FPackageIndex(persistencePackage, 1))));
-        var questPackage = new TestPackage(quest);
+        var questPackage = new FixturePackage(quest);
         var metadata = Object("QuestUI", "UIQuestObjectiveParameterMetaDataItem",
             ("Asset", new ObjectProperty(new FPackageIndex(questPackage, 1))));
         var issues = new List<ExtractionIssue>();
@@ -193,7 +193,7 @@ public sealed class AssetsTests
     public void RuntimeAndRewardReferencesDoNotCreateDefinitions(string type, string field)
     {
         var target = Object("Identity", "PersistenceDataAsset", ("AssetId", new Int64Property(99)));
-        var package = new TestPackage(target);
+        var package = new FixturePackage(target);
         var payload = Object("Payload", type, (field, new ObjectProperty(new FPackageIndex(package, 1))));
         var issues = new List<ExtractionIssue>();
 
@@ -209,12 +209,12 @@ public sealed class AssetsTests
         first.Properties.Add(new FPropertyTag
         {
             Name = "PersistenceDataAsset",
-            Tag = new ObjectProperty(new FPackageIndex(new TestPackage(second), 1))
+            Tag = new ObjectProperty(new FPackageIndex(new FixturePackage(second), 1))
         });
         second.Properties.Add(new FPropertyTag
         {
             Name = "PersistenceDataAsset",
-            Tag = new ObjectProperty(new FPackageIndex(new TestPackage(first), 1))
+            Tag = new ObjectProperty(new FPackageIndex(new FixturePackage(first), 1))
         });
         var issues = new List<ExtractionIssue>();
 
@@ -250,7 +250,8 @@ public sealed class AssetsTests
         var source = Object("LocalModifier", "SessionModifierDataAsset");
         if (explicitNull) source.Properties.Add(new FPropertyTag
         {
-            Name = "PersistenceDataAsset", Tag = new ObjectProperty(new FPackageIndex((IPackage)null!, 0))
+            Name = "PersistenceDataAsset",
+            Tag = new ObjectProperty(new FPackageIndex((IPackage)null!, 0))
         });
         var issues = new List<ExtractionIssue>();
         Assert.Empty(Assets.Collect([source], Mappings.Value, issues));
@@ -314,15 +315,4 @@ public sealed class AssetsTests
         };
     }
 
-    private sealed class TestPackage(UObject export) : AbstractUePackage("Fixture", null)
-    {
-        public override FPackageFileSummary Summary => throw new NotSupportedException();
-        public override FNameEntrySerialized[] NameMap => [];
-        public override int ImportMapLength => 0;
-        public override int ExportMapLength => 1;
-        public override int GetExportIndex(string name, StringComparison comparisonType = StringComparison.Ordinal) => 0;
-        public override ResolvedObject? ResolvePackageIndex(FPackageIndex? index) => index is { Index: 1 }
-            ? new ResolvedLoadedObject(export)
-            : null;
-    }
 }

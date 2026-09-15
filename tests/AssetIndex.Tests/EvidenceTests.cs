@@ -155,14 +155,33 @@ public sealed class EvidenceTests
     }
 
     [Fact]
+    public void NativeCurveRowsAreEvidenceEvenWithoutCatalogIds()
+    {
+        var table = new UCurveTable { Name = "Weather" };
+        table.RowMap.Add("Wind/Intensity", new FStructFallback([Property("DefaultValue", new FloatProperty(0.75f))]));
+        var evidence = EvidenceReader.Read(table);
+        Assert.Contains(evidence.Values, value => value.Pointer == "/Rows/Wind~1Intensity/DefaultValue" && value.Value == "0.75");
+        Assert.Empty(evidence.Issues);
+    }
+
+    [Fact]
+    public void CompositeCurveEvaluationIsExplicitlyUnresolved()
+    {
+        var evidence = EvidenceReader.Read(new UCompositeCurveTable { Name = "Composite" });
+        Assert.Contains(evidence.Issues, issue => issue.Pointer == "/Rows" && issue.Message.Contains("parent-table"));
+    }
+
+    [Fact]
     public void NativeClassReferencesAreReadWithoutLoadingOrWalkingBytecode()
     {
         var target = new NeverLoadedReference("Default");
         var package = new TestPackage(target);
         var source = new UClass
         {
-            Name = "Class", ClassDefaultObject = new FPackageIndex(package, 1),
-            ClassGeneratedBy = new FPackageIndex(package, 1), Children = [new FPackageIndex(package, 1)],
+            Name = "Class",
+            ClassDefaultObject = new FPackageIndex(package, 1),
+            ClassGeneratedBy = new FPackageIndex(package, 1),
+            Children = [new FPackageIndex(package, 1)],
             FuncMap = new() { ["Function"] = new FPackageIndex(package, 1) }
         };
 

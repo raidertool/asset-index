@@ -58,7 +58,7 @@ internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvi
             if (packages.Count % 250 == 0 || pending.Count == 0)
                 Console.Error.WriteLine($"Read {packages.Count:N0} packages; {pending.Count:N0} pending, {objects.Count:N0} objects, {issues.Count:N0} issues.");
         }
-        var allObjects = objects.Values.OrderBy(source => source.GetPathName(), StringComparer.Ordinal).ToArray();
+        var allObjects = objects.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => pair.Value).ToArray();
         return new(Assets.Collect(allObjects, mappings, issues), allObjects, registry, packages, issues);
     }
 
@@ -92,14 +92,19 @@ internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvi
                 continue;
             }
             loaded++;
-            if (objects.TryAdd(source.GetPathName(), source)) ReadEvidence(source);
+            var evidence = EvidenceReader.Read(source);
+            if (evidence.Path.Length == 0)
+            {
+                ReadEvidence(evidence);
+                continue;
+            }
+            if (objects.TryAdd(evidence.Path, source)) ReadEvidence(evidence);
         }
         packages.Add(new(path, reason, loaded == package.ExportsLazy.Length ? "loaded" : "partial", package.ExportsLazy.Length, loaded));
     }
 
-    private void ReadEvidence(UObject source)
+    private void ReadEvidence(ObjectEvidence evidence)
     {
-        var evidence = EvidenceReader.Read(source);
         writeEvidence(evidence);
         foreach (var issue in evidence.Issues)
             issues.Add(new("evidence", evidence.Path + issue.Pointer, issue.Message));

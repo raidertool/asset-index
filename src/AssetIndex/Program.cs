@@ -65,7 +65,7 @@ internal static class Program
             var resources = new TextureResources(options.OutputDirectory, issues);
             Console.WriteLine("Exporting UI and referenced textures...");
             foreach (var texture in discovery.Objects.OfType<UTexture2D>()) resources.Export(texture);
-            records = ExportAssets(discovery.Assets, provider, resources, issues);
+            records = ExportAssets(discovery.Assets, provider, options.OutputDirectory, resources, issues);
             Snapshot.Write(options.OutputDirectory, "resources.json", resources.Entries);
             textureCount = resources.Entries.Count;
             if (records.Count == 0)
@@ -90,11 +90,16 @@ internal static class Program
     }
 
     private static List<AssetRecord> ExportAssets(IReadOnlyList<CatalogAsset> assets, IFileProvider provider,
-        TextureResources resources, List<ExtractionIssue> issues)
+        string output, TextureResources resources, List<ExtractionIssue> issues)
     {
         Console.WriteLine($"Found {assets.Count:N0} IDs. Reading text...");
         var texts = assets.Select(asset => Text.Read(asset, issues)).ToArray();
-        var localized = Text.Localize(provider, texts, issues).ToLookup(row => row.AssetId);
+        var textById = texts.ToDictionary(text => text.AssetId);
+        var localized = Text.Localize(provider, texts, issues, (locale, entries) =>
+            Snapshot.WriteLines(output, $"localization/{locale}.jsonl.gz", entries
+                .OrderBy(space => space.Key, StringComparer.Ordinal)
+                .SelectMany(space => space.Value.OrderBy(entry => entry.Key, StringComparer.Ordinal)
+                    .Select(entry => new { Namespace = space.Key, entry.Key, Value = entry.Value })))).ToLookup(row => row.AssetId);
         Console.WriteLine("Exporting referenced images...");
         var records = new List<AssetRecord>();
         foreach (var asset in assets)
@@ -103,7 +108,12 @@ internal static class Program
                 asset.Definitions.Select(source => new ObjectReference(source.Name, source.ExportType, source.GetPathName())).ToArray(),
                 asset.Metadata.Select(source => new ObjectReference(source.Name, source.ExportType, source.GetPathName())).ToArray(),
                 localized[asset.Id].Select(text => new Translation(text.Locale, text.DisplayName, text.Description)).ToArray(),
-                Images.Export(asset, resources, issues)));
+                Images.Export(asset, resources, issues))
+            {
+                Presentation = new(textById[asset.Id].Name, textById[asset.Id].Description, textById[asset.Id].Candidates,
+                    asset.PresentationNames.Select(name => new ContainerPresentation(name.Role, name.ContainerType,
+                        name.FramePath, name.ContainerIndex, name.SlotPath, name.ContainerPath, name.Metadata.GetPathName())).ToArray())
+            });
             if (records.Count % 250 == 0)
                 Console.WriteLine($"Processed {records.Count:N0}/{assets.Count:N0} assets.");
         }

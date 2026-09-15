@@ -20,6 +20,7 @@ internal sealed partial class EvidenceReader
         if (source.CustomGameData is not null) Visit(source.CustomGameData, "/CustomGameData");
 
         if (source is UDataTable table) ReadDataTable(table);
+        if (source is UCurveTable curves) ReadCurveTable(curves);
         if (source is UStringTable strings) ReadStringTable(strings);
         if (source is UField field)
         {
@@ -71,6 +72,22 @@ internal sealed partial class EvidenceReader
         if (entries.Count == 0) values.Add(new("/StringTable", nameof(UStringTable), "empty-map", null));
         foreach (var (key, source) in entries.OrderBy(entry => entry.Key, StringComparer.Ordinal))
             tableEntries.Add(new(Child("/StringTable", key), table.StringTable.TableNamespace, key, source));
+        Visit(table.StringTable.KeysToMetaData, "/StringTableMetadata");
+    }
+
+    private void ReadCurveTable(UCurveTable table)
+    {
+        // Composite rows are derived by loading other exports. Its tagged parent links
+        // are retained; do not turn field discovery into implicit row evaluation.
+        if (table is UCompositeCurveTable)
+        {
+            issues.Add(new("/Rows", nameof(UCompositeCurveTable), "Composite curve rows require parent-table evaluation."));
+            return;
+        }
+        values.Add(new("/CurveTableMode", "ECurveTableMode", "enum", table.CurveTableMode.ToString()));
+        if (table.RowMap.Count == 0) values.Add(new("/Rows", nameof(UCurveTable), "empty-map", null));
+        foreach (var (name, row) in table.RowMap.OrderBy(row => row.Key.Text, StringComparer.Ordinal))
+            Visit(row, Child("/Rows", name.Text));
     }
 
     private void ReadHardReference(FPackageIndex? reference, string pointer, string role)

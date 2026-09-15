@@ -35,6 +35,17 @@ public sealed class RunTests : IDisposable
         Assert.Single(Directory.EnumerateFiles(directory));
     }
 
+    [Theory]
+    [InlineData("../escaped.json")]
+    [InlineData("localization/../../escaped.json")]
+    [InlineData("/tmp/escaped.json")]
+    [InlineData("localization\\..\\escaped.json")]
+    public void GameDerivedFilenamesCannotEscapeTheOutput(string name)
+    {
+        Assert.Throws<InvalidDataException>(() => Snapshot.Write(directory, name, "invalid"));
+        Assert.Empty(Directory.EnumerateFileSystemEntries(directory));
+    }
+
     [Fact]
     public void FailedInputProducesDiagnosticsAndCanBeRetriedWithoutChangingPublishedFiles()
     {

@@ -1,33 +1,46 @@
 # Discovery
 
-The catalog is a projection of client evidence. Asset IDs do not identify every
-string, texture, UI object, quest node, or store entry.
+The catalog is a projection of typed client data. An asset ID does not identify
+every string, texture, UI object or API node.
 
-## Follow evidence
+## Read the source
 
-- Inventory registered and unregistered packages; report unknown classes and
-  decoding failures.
-- Read serialized properties, nested structures/arrays, templates, string
-  tables and localization resources. A short list of display fields is not a
-  complete resource inventory.
-- Preserve the source object, property path, reference kind and text key.
-  Template inheritance, containment, rewards and presentation links have
-  different meanings.
-- Associate a name or icon with an ID through its explicit identity and
-  presentation fields. A reference to another asset does not transfer that
-  asset's name. Filename similarity is only a discovery lead.
-- Keep unassociated strings and textures discoverable. Do not invent asset IDs
-  for them or silently discard them because the catalog has no matching row.
-- Follow material inputs as evidence; a component texture is not a rendered
-  material icon.
+`Discovery/Registry.cs` inventories every registry entry. The crawler decodes
+data assets, UI metadata, tables, blueprints, unknown classes, unindexed packages,
+and UI textures selected by their registry group. Typed references also bring in
+texture/material dependencies. Other binary media remain inventoried.
 
-The current extractor resolves known catalog fields. The wider package/resource
-inventory was exercised by a separate audit and is not yet part of its public
-output. Keep that coverage gap visible when extending the extractor.
+`EvidenceReader` visits CUE4Parse property tags, arrays, sets, map keys/values,
+structs and text histories directly. Small native adapters cover data/curve/string
+tables and class references. It preserves property pointers, reference kinds,
+nulls, empty overrides and exact numeric strings. It never interprets an ordinary
+string as an object reference or uses CUE4Parse's JSON export as a parsing layer.
 
-## Verify a contribution
+`discovery/objects.jsonl.gz` retains unassociated fields and strings;
+`registry.jsonl.gz` and `packages.jsonl.gz` show selection and decode coverage.
+`localization/` retains the game's merged translation dictionaries. `resources.json`
+indexes decoded UI/referenced textures independently of catalog ownership.
 
-Use a small fixture for the actual property/reference shape. Check the known
-asset and neighboring cases, preserve null versus failed reads, and explain
-any changed ID, name, locale or image association. Historical snapshots find
-regressions; current client evidence determines the result.
+```sh
+gzip -dc .work/preview/discovery/objects.jsonl.gz | rg 'ResearchPoints'
+```
+
+Binary native payloads and composite-curve evaluation are outside field discovery.
+Unsupported compound fields and failed reads are explicit diagnostics. A loaded
+package does not mean every export or every native payload was decoded.
+
+## Assign presentation
+
+- `Assets.cs` follows explicit identity links and enabled ID overrides. Local
+  definitions with no identity stay in discovery.
+- `TextRoles.cs` assigns meaning to fields on specific UI/definition classes.
+  `Text.cs` prefers UI presentation, retains alternatives, and leaves conflicting
+  peers unresolved. `presentation` records chosen keys and defining objects.
+- `Presentation.cs` joins loadout container types and slot references to the
+  corresponding UI container label; its full join path remains in each row.
+- `Images.cs` associates declared image fields. Material inputs are evidence;
+  an ingredient texture alone does not establish the rendered icon.
+
+Historical output only finds changes. Do not restore a name or image without a
+current identity/presentation relationship. Add a small fixture for that exact
+relationship and check neighboring cases, including changed names and nulls.

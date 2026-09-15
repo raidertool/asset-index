@@ -153,20 +153,10 @@ public sealed class PresentationTests
         ("ContainerType", new EnumProperty(new FName("ENewInventoryContainerType::" + type))),
         ("ContainerName", new TextProperty(new FText("inventory", text, text))));
 
-    private static ObjectProperty Reference(UObject source) => new(new FPackageIndex(new TestPackage(source), 1));
+    private static ObjectProperty Reference(UObject source) => new(new FPackageIndex(new FixturePackage(source), 1));
 
     private static UObject Object(string name, string type, params (string Name, FPropertyTagType Value)[] properties) =>
         new(properties.Select(property => new FPropertyTag { Name = property.Name, Tag = property.Value }).ToList())
         { Name = name, Class = new ResolvedLoadedObject(new UObject { Name = type }) };
 
-    private sealed class TestPackage(UObject export) : AbstractUePackage("Fixture", null)
-    {
-        public override FPackageFileSummary Summary => throw new NotSupportedException();
-        public override FNameEntrySerialized[] NameMap => [];
-        public override int ImportMapLength => 0;
-        public override int ExportMapLength => 1;
-        public override int GetExportIndex(string name, StringComparison comparisonType = StringComparison.Ordinal) => 0;
-        public override ResolvedObject? ResolvePackageIndex(FPackageIndex? index) => index is { Index: 1 }
-            ? new ResolvedLoadedObject(export) : null;
-    }
 }

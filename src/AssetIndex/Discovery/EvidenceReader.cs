@@ -16,7 +16,7 @@ internal sealed partial class EvidenceReader
 {
     // Native adapters cover tables and class links. Shader, mesh, audio and other
     // opaque export payloads are outside field evidence; their resource still exists.
-    public const string NativeScope = "Tagged and sparse properties; data/string tables; class references. Binary payloads are not decoded.";
+    public const string NativeScope = "Tagged and sparse properties; data/curve/string tables; class references. Binary payloads and composite curve evaluation are not decoded.";
     private readonly List<ReferenceEvidence> references = [];
     private readonly List<TextEvidence> texts = [];
     private readonly List<ValueEvidence> values = [];
