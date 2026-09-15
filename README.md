@@ -3,8 +3,8 @@
 Extract game asset IDs, localized text, and images with
 [upstream CUE4Parse](https://github.com/FabianFG/CUE4Parse).
 
-**Preview:** coverage and the JSON format are still under review. Runs write
-local files; publication and database import are not enabled.
+**Preview:** coverage and the JSON format are still under review. Preview runs
+write local files without publishing or importing them.
 The root CSVs, [images](images/), [metadata](metadata.json), and
 [schema](schema.json) describe the existing published dataset.
 
@@ -84,10 +84,15 @@ The planned source/data split is not active:
 | Database import | Data commit; private normalization version tracked separately |
 
 Publish the data commit and tag atomically. Once the importer follows `data`,
-identical output creates no snapshot or database version. Historical tags stay
-unchanged. Today the importer follows `main` and versions by commit: pin it to a
-reviewed data commit before merging source changes. No data branch or extractor
-release has been created.
+identical output creates no snapshot or database version, provided normalization
+is unchanged. Historical tags stay unchanged. No data branch or extractor release
+has been created.
+
+Today the importer follows `main` and versions by commit. Before merging source
+changes, upgrade and pin it to a reviewed legacy data commit and drain older
+importer runs. Retire the old publisher and drain its queued/running writes too.
+After merging, initialize and validate `data` with its exact lightweight tag
+before switching the importer. Verify the first import before scheduling publication.
 
 ## Layout
 

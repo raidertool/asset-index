@@ -38,5 +38,5 @@ offline tests and report relevant live coverage changes when available.
 
 Submit source, tests, docs, or mappings. Preview output is not a publication.
 See the README for [manual runs](README.md#manual-preview) and the proposed
-[versioning](README.md#versioning). Cutover must transfer ownership from the old
-publisher, which still updates the root metadata, schema, and README.
+[versioning](README.md#versioning). Retire and drain the old publisher before
+merging the source layout; it still rewrites the root metadata, schema, and README.
