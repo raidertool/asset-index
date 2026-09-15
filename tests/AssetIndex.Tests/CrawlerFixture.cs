@@ -18,6 +18,7 @@ internal sealed class CrawlerExport(string name, string? type = "DataAsset")
     public string? Type { get; } = type;
     public int? OuterIndex { get; init; }
     public Action<UObject>? OnLoad { get; init; }
+    public Func<UObject>? Factory { get; init; }
 
     public static void Link(UObject source, string target) => source.Properties.Add(new FPropertyTag
     {
@@ -46,7 +47,10 @@ internal sealed class CrawlerPackage : AbstractUePackage
         ExportsLazy = exports.Select((spec, index) => new Lazy<UObject>(() =>
         {
             BodyReads.Add(index);
-            var value = new UObject { Name = spec.Name, Class = metadata[index].Type, Outer = metadata[index].Parent };
+            var value = spec.Factory?.Invoke() ?? new UObject();
+            value.Name = spec.Name;
+            value.Class = metadata[index].Type;
+            value.Outer = metadata[index].Parent;
             spec.OnLoad?.Invoke(value);
             return value;
         })).ToArray();

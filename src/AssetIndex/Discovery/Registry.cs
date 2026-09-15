@@ -47,7 +47,7 @@ internal static class Registry
     public static bool IsUiTexture(RegisteredObject asset) =>
         asset.Class == "Texture2D" && asset.Tags.TryGetValue("LODGroup", out var group) && group == "TEXTUREGROUP_UI";
 
-    // Binary media remain inventoried; typed references can select textures and materials.
+    // Binary media remain inventoried; typed references select render inputs and runtime declarations.
     internal static bool SelectClass(TypeMappings mappings, string type)
     {
         var ancestry = CandidateRoots.Select(root => Assets.IsA(mappings, type, root)).ToArray();
@@ -55,12 +55,14 @@ internal static class Registry
     }
 
     internal static bool FollowClass(TypeMappings mappings, string type) => SelectClass(mappings, type) ||
-        Assets.IsA(mappings, type, "Texture") == true || Assets.IsA(mappings, type, "MaterialInterface") == true;
+        Assets.IsA(mappings, type, "Texture") == true || Assets.IsA(mappings, type, "MaterialInterface") == true ||
+        Assets.IsA(mappings, type, "Struct") == true;
 
     internal static bool SelectClass(ExportHeader header) => header.Error is not null || !header.AncestryComplete ||
         CandidateRoots.Any(root => header.Ancestry.Contains(root, StringComparer.OrdinalIgnoreCase));
 
     internal static bool FollowClass(ExportHeader header) => SelectClass(header) ||
         header.Ancestry.Contains("Texture", StringComparer.OrdinalIgnoreCase) ||
-        header.Ancestry.Contains("MaterialInterface", StringComparer.OrdinalIgnoreCase);
+        header.Ancestry.Contains("MaterialInterface", StringComparer.OrdinalIgnoreCase) ||
+        header.Ancestry.Contains("Struct", StringComparer.OrdinalIgnoreCase);
 }

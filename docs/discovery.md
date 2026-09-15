@@ -8,7 +8,8 @@ every string, texture, UI object or API node.
 `Discovery/Registry.cs` inventories every registry entry. Every effective mounted
 package has its export headers inspected. Actual class ancestry selects data assets,
 UI metadata, tables, blueprints and unknown classes, including unregistered exports.
-Registry UI textures and exact typed texture/material targets are also decoded;
+Registry UI textures and exact typed texture/material or runtime `Struct` targets
+(including classes and user-defined structs) are also decoded;
 known Actor, world and other noncandidate bodies remain inventoried. Metadata
 ambiguity is a diagnostic, never a silent exclusion.
 

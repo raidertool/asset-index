@@ -10,6 +10,7 @@ public sealed class RegistryTests
     [InlineData("DataAsset", true, true)]
     [InlineData("Texture", false, true)]
     [InlineData("MaterialInterface", false, true)]
+    [InlineData("Struct", false, true)]
     public void RuntimeClassSelectionUsesItsActualCompleteAncestry(string parent, bool selected, bool followed)
     {
         var header = new ExportHeader("Map.umap", 0, "/Game/Map.Instance", "RuntimeClass_C", "/Game/Classes.RuntimeClass_C",
@@ -29,6 +30,9 @@ public sealed class RegistryTests
     [InlineData("ClassAddedByNextGameUpdate", true, true)]
     [InlineData("Texture2D", false, true)]
     [InlineData("MaterialInstanceConstant", false, true)]
+    [InlineData("Class", false, true)]
+    [InlineData("Struct", false, true)]
+    [InlineData("UserDefinedStruct", false, true)]
     [InlineData("SoundWave", false, false)]
     [InlineData("StaticMesh", false, false)]
     public void SelectionKeepsUnknownClassesAndSeparatesDefinitionsFromBinaryMedia(string type, bool selected, bool followed)
