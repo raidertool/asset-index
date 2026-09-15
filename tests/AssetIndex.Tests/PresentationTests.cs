@@ -25,7 +25,7 @@ public sealed class PresentationTests
         {
             var asset = Assert.Single(assets, asset => asset.Id == id);
             var presentation = Assert.Single(asset.PresentationNames);
-            Assert.Equal("Quick Use", Text.Read(asset, issues).Name?.Source);
+            Assert.Equal("Quick Use", Text.Read(asset, issues, Mappings.Value).Name?.Source);
             Assert.Equal(frame.GetPathName(), presentation.FramePath);
             Assert.Equal(slot.GetPathName(), presentation.SlotPath);
             Assert.Equal(id == 43 ? container.GetPathName() : null, presentation.ContainerPath);
@@ -47,8 +47,8 @@ public sealed class PresentationTests
         objects.Reverse();
         var reverse = Assets.Collect(objects, Mappings.Value, reverseIssues).Single(asset => asset.Id == 42);
 
-        var left = Text.Read(forward, forwardIssues);
-        var right = Text.Read(reverse, reverseIssues);
+        var left = Text.Read(forward, forwardIssues, Mappings.Value);
+        var right = Text.Read(reverse, reverseIssues, Mappings.Value);
 
         Assert.Null(left.Name);
         Assert.Null(right.Name);
@@ -68,7 +68,7 @@ public sealed class PresentationTests
         var issues = new List<ExtractionIssue>();
         var asset = Assets.Collect(objects, Mappings.Value, issues).Single(asset => asset.Id == 43);
 
-        var text = Text.Read(asset, issues);
+        var text = Text.Read(asset, issues, Mappings.Value);
 
         Assert.Equal("Special carrier", text.Name?.Source);
         Assert.Single(asset.PresentationNames);
@@ -86,7 +86,7 @@ public sealed class PresentationTests
         var issues = new List<ExtractionIssue>();
         var asset = Assets.Collect(objects, Mappings.Value, issues).Single(asset => asset.Id == 42);
 
-        Assert.Null(Text.Read(asset, issues).Name);
+        Assert.Null(Text.Read(asset, issues, Mappings.Value).Name);
         Assert.Equal(2, asset.PresentationNames.Count);
         Assert.Contains("Conflicting display-name", Assert.Single(issues).Message);
     }
@@ -112,7 +112,7 @@ public sealed class PresentationTests
         var issues = new List<ExtractionIssue>();
         var asset = Assets.Collect(objects, Mappings.Value, issues).Single(asset => asset.Id == 42);
 
-        Assert.Equal("Quick Use", Text.Read(asset, issues).Name?.Source);
+        Assert.Equal("Quick Use", Text.Read(asset, issues, Mappings.Value).Name?.Source);
         Assert.Single(asset.PresentationNames);
         Assert.Empty(issues);
     }
@@ -124,6 +124,85 @@ public sealed class PresentationTests
         var issues = new List<ExtractionIssue>();
         Assert.Empty(Presentation.Read([frame], Mappings.Value, issues));
         Assert.Contains("No container presentation metadata", Assert.Single(issues).Message);
+    }
+
+    [Fact]
+    public void RuntimeSubclassesKeepTheTypedContainerJoin()
+    {
+        var (objects, slot, container, frame, label) = Fixture();
+        foreach (var source in new[] { slot, container, frame, label }) RuntimeClassFixture.Derive(source);
+        var issues = new List<ExtractionIssue>();
+
+        var assets = Assets.Collect(objects, Mappings.Value, issues);
+
+        foreach (var id in new long[] { 42, 43 })
+        {
+            var asset = Assert.Single(assets, asset => asset.Id == id);
+            Assert.Single(asset.PresentationNames);
+            Assert.Equal("Quick Use", Text.Read(asset, issues, Mappings.Value).Name?.Source);
+        }
+        Assert.Empty(issues);
+    }
+
+    [Fact]
+    public void ContainerTypesUseFNameCaseInsensitiveIdentity()
+    {
+        var (objects, _, _, _, label) = Fixture();
+        label.Properties.Single(property => property.Name.Text == "ContainerType").Tag =
+            new EnumProperty(new FName("enewinventorycontainertype::belt"));
+        var issues = new List<ExtractionIssue>();
+
+        var names = Presentation.Read(objects, Mappings.Value, issues);
+
+        Assert.Equal(2, names.Count);
+        Assert.All(names, name => Assert.Equal("ENewInventoryContainerType::Belt", name.ContainerType));
+        Assert.Empty(issues);
+    }
+
+    [Fact]
+    public void BrokenRuntimeAncestryDoesNotAbortOtherPresentationSources()
+    {
+        var (objects, _, _, _, _) = Fixture();
+        var broken = Label("Broken", "Belt", "Unproven label");
+        RuntimeClassFixture.Derive(broken).Super = null;
+        objects.Add(broken);
+        var issues = new List<ExtractionIssue>();
+
+        var names = Presentation.Read(objects, Mappings.Value, issues);
+
+        Assert.Equal(2, names.Count);
+        Assert.Contains("Runtime superclass metadata is missing", Assert.Single(issues).Message);
+    }
+
+    [Fact]
+    public void ContainerStructFieldsUseCaseInsensitiveNames()
+    {
+        var (objects, _, _, frame, _) = Fixture();
+        Assert.True(Properties.TryGet<FStructFallback[]>(frame, "Containers", out var containers));
+        containers[0].Properties[0].Name = "tYPE";
+        containers[0].Properties[1].Name = "containerSLOTDATAasset";
+        var issues = new List<ExtractionIssue>();
+
+        Assert.Equal(2, Presentation.Read(objects, Mappings.Value, issues).Count);
+
+        Assert.Empty(issues);
+    }
+
+    [Theory]
+    [InlineData("Type")]
+    [InlineData("ContainerSlotDataAsset")]
+    public void EqualDuplicateContainerStructFieldsAreStillAmbiguous(string field)
+    {
+        var (objects, _, _, frame, _) = Fixture();
+        Assert.True(Properties.TryGet<FStructFallback[]>(frame, "Containers", out var containers));
+        var original = containers[0].Properties.Single(property => property.Name.Text == field);
+        containers[0].Properties.Add(new FPropertyTag { Name = field.ToLowerInvariant(), Tag = original.Tag });
+        var issues = new List<ExtractionIssue>();
+
+        Assert.Empty(Presentation.Read(objects, Mappings.Value, issues));
+
+        Assert.Contains("Ambiguous property", Assert.Single(issues).Message);
+        Assert.Equal(frame.GetPathName() + ".Containers[0]", issues[0].Path);
     }
 
     private static (List<UObject> Objects, UObject Slot, UObject Container, UObject Frame, UObject Label) Fixture()
@@ -157,6 +236,6 @@ public sealed class PresentationTests
 
     private static UObject Object(string name, string type, params (string Name, FPropertyTagType Value)[] properties) =>
         new(properties.Select(property => new FPropertyTag { Name = property.Name, Tag = property.Value }).ToList())
-        { Name = name, Class = new ResolvedLoadedObject(new UObject { Name = type }) };
+        { Name = name, Class = new ResolvedLoadedObject(new UScriptClass(type)) };
 
 }

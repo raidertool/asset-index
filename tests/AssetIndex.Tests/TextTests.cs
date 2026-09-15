@@ -1,3 +1,5 @@
+using CUE4Parse.MappingsProvider;
+using CUE4Parse.MappingsProvider.Usmap;
 using CUE4Parse.UE4.Assets;
 using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Assets.Objects;
@@ -12,6 +14,9 @@ namespace AssetIndex.Tests;
 
 public sealed class TextTests
 {
+    private static readonly Lazy<TypeMappings> Mappings = new(() =>
+        new FileUsmapTypeMappingsProvider(Path.Combine(AppContext.BaseDirectory, "mappings", "ArcRaiders.usmap")).MappingsForGame!);
+
     [Theory]
     [InlineData("ItemName")]
     [InlineData("itemname")]
@@ -20,7 +25,7 @@ public sealed class TextTests
         var metadata = WithText(field, new FText("items", "name", "Source name", "Cached French"));
         var issues = new List<ExtractionIssue>();
 
-        var text = Text.Read(Asset(metadata), issues);
+        var text = Text.Read(Asset(metadata), issues, Mappings.Value);
 
         Assert.Equal(new TextReference("items", "name", "Source name"), text.Name);
         Assert.Equal(field, Assert.Single(text.Candidates).Field);
@@ -36,7 +41,7 @@ public sealed class TextTests
         child.Name = "Instance";
         child.Template = new ResolvedLoadedObject(parent);
 
-        var text = Text.Read(Asset(child), []);
+        var text = Text.Read(Asset(child), [], Mappings.Value);
 
         Assert.Equal("Parent name", text.Name?.Source);
         Assert.Equal("Child description", text.Description?.Source);
@@ -53,7 +58,7 @@ public sealed class TextTests
         var child = WithText("ItemName", new FText("items", "child", "Child name"));
         child.Template = new ResolvedLoadedObject(WithText("ItemName", new FText("Parent name")));
 
-        Assert.Equal("Child name", Text.Read(Asset(child), []).Name?.Source);
+        Assert.Equal("Child name", Text.Read(Asset(child), [], Mappings.Value).Name?.Source);
     }
 
     [Fact]
@@ -62,7 +67,7 @@ public sealed class TextTests
         var child = WithText("itemname", new FText(string.Empty));
         child.Template = new ResolvedLoadedObject(WithText("ItemName", new FText("Parent name")));
 
-        Assert.Null(Text.Read(Asset(child), []).Name);
+        Assert.Null(Text.Read(Asset(child), [], Mappings.Value).Name);
     }
 
     [Fact]
@@ -70,7 +75,7 @@ public sealed class TextTests
     {
         var metadata = WithText("LongName", new FText("Experience points"), "UICurrencyMetaDataItem");
 
-        var text = Text.Read(Asset(metadata), []);
+        var text = Text.Read(Asset(metadata), [], Mappings.Value);
 
         Assert.Equal("Experience points", text.Name?.Source);
         Assert.Null(text.Description);
@@ -83,7 +88,7 @@ public sealed class TextTests
             new FText("ST_WeaponMods", "ID_WEAPONMODS_EMPTY_SLOT_FOR_AN_UNDERBARREL_MOD", "Empty slot for an underbarrel mod."), "UIInventorySlotMetaDataItem");
         var issues = new List<ExtractionIssue>();
 
-        var text = Text.Read(Asset(metadata), issues);
+        var text = Text.Read(Asset(metadata), issues, Mappings.Value);
 
         Assert.Null(text.Name);
         Assert.Equal(new TextReference("ST_WeaponMods", "ID_WEAPONMODS_EMPTY_SLOT_FOR_AN_UNDERBARREL_MOD",
@@ -102,7 +107,7 @@ public sealed class TextTests
         var description = WithText(field, new FText("Preferred description"), type);
         var issues = new List<ExtractionIssue>();
 
-        var text = Text.Read(new CatalogAsset(42, [], [tooltip, description]), issues);
+        var text = Text.Read(new CatalogAsset(42, [], [tooltip, description]), issues, Mappings.Value);
 
         Assert.Equal("Preferred description", text.Description?.Source);
         Assert.Empty(issues);
@@ -149,7 +154,7 @@ public sealed class TextTests
         var metadata = WithText("ItemName", new FText(0, ETextHistoryType.NamedFormat, new FormattedHistory()));
         var issues = new List<ExtractionIssue>();
 
-        var text = Text.Read(Asset(metadata), issues);
+        var text = Text.Read(Asset(metadata), issues, Mappings.Value);
 
         Assert.Null(text.Name);
         Assert.Contains("NamedFormat", Assert.Single(issues).Message);
@@ -160,7 +165,7 @@ public sealed class TextTests
     {
         var definition = WithText("Title", new FText("quests", "title", "A new quest"), "QuestDefinition");
         var asset = new CatalogAsset(42, [definition], []);
-        Assert.Equal("A new quest", Text.Read(asset, []).Name?.Source);
+        Assert.Equal("A new quest", Text.Read(asset, [], Mappings.Value).Name?.Source);
     }
 
     [Theory]
@@ -174,7 +179,7 @@ public sealed class TextTests
         second.Name = "DA_Second";
         var issues = new List<ExtractionIssue>();
 
-        var text = Text.Read(new CatalogAsset(42, [first, second], []), issues);
+        var text = Text.Read(new CatalogAsset(42, [first, second], []), issues, Mappings.Value);
 
         Assert.Null(field == "ItemName" ? text.Name : text.Description);
         Assert.Equal(2, text.Candidates.Count);
@@ -193,7 +198,7 @@ public sealed class TextTests
         second.Name = "DA_Second";
         var issues = new List<ExtractionIssue>();
 
-        var text = Text.Read(new CatalogAsset(42, [first, second], []), issues);
+        var text = Text.Read(new CatalogAsset(42, [first, second], []), issues, Mappings.Value);
 
         Assert.Equal(new TextReference("items", "name", "Shared name"), text.Name);
         Assert.Empty(issues);
@@ -206,7 +211,7 @@ public sealed class TextTests
         var longName = WithText("LongName", new FText("Experience points"), "UICurrencyMetaDataItem");
         var issues = new List<ExtractionIssue>();
 
-        var text = Text.Read(new CatalogAsset(42, [], [longName, shortName]), issues);
+        var text = Text.Read(new CatalogAsset(42, [], [longName, shortName]), issues, Mappings.Value);
 
         Assert.Equal("Experience points", text.Name?.Source);
         Assert.Contains(text.Candidates, candidate => candidate.Role == "short-name" && candidate.Reference.Source == "XP");
@@ -219,21 +224,21 @@ public sealed class TextTests
     public void GenericFieldsWithoutAProvenClassRoleAreNotNames(string field)
     {
         var source = WithText(field, new FText("Unrelated widget label"));
-        Assert.Null(Text.Read(Asset(source), []).Name);
+        Assert.Null(Text.Read(Asset(source), [], Mappings.Value).Name);
     }
 
     [Fact]
     public void EmoteTextHasAnExplicitNameRole()
     {
         var source = WithText("Text", new FText("Angry"), "UIEmoteMetaDataItem");
-        Assert.Equal("Angry", Text.Read(Asset(source), []).Name?.Source);
+        Assert.Equal("Angry", Text.Read(Asset(source), [], Mappings.Value).Name?.Source);
     }
 
     [Fact]
     public void NpcLocationLabelDoesNotBecomeTheNpcName()
     {
         var source = WithText("LocationName", new FText("Grenades & Gadgets"), "UINPCMetaDataItem");
-        var text = Text.Read(Asset(source), []);
+        var text = Text.Read(Asset(source), [], Mappings.Value);
         Assert.Null(text.Name);
         Assert.Equal("location-name", Assert.Single(text.Candidates).Role);
     }
@@ -245,7 +250,7 @@ public sealed class TextTests
         definition.Name = "Definition";
         var metadata = WithText("Description", new FText("UI description"), "UISessionModifierMetaDataItem");
         var issues = new List<ExtractionIssue>();
-        var text = Text.Read(new CatalogAsset(42, [definition], [metadata]), issues);
+        var text = Text.Read(new CatalogAsset(42, [definition], [metadata]), issues, Mappings.Value);
 
         Assert.Equal("UI description", text.Description?.Source);
         Assert.Contains(text.Candidates, candidate => candidate.SourceKind == "definition"
@@ -263,7 +268,7 @@ public sealed class TextTests
         var metadata = WithText("ItemName", new FText(archive));
         var issues = new List<ExtractionIssue>();
 
-        var reference = Text.Read(Asset(metadata), issues).Name;
+        var reference = Text.Read(Asset(metadata), issues, Mappings.Value).Name;
 
         Assert.Equal(new TextReference("", "", "XP", CultureInvariant: true), reference);
         Assert.Equal("XP", Text.Resolve(reference, new Dictionary<string, IReadOnlyDictionary<string, string>>(), "fr"));
@@ -280,7 +285,7 @@ public sealed class TextTests
             ["items"] = new Dictionary<string, string> { ["name"] = "Wrong translation" }
         };
 
-        var reference = Text.Read(Asset(metadata), []).Name;
+        var reference = Text.Read(Asset(metadata), [], Mappings.Value).Name;
 
         Assert.Equal(new TextReference("items", "name", "XP", CultureInvariant: true), reference);
         Assert.Equal("XP", Text.Resolve(reference, translations, "fr"));
@@ -295,7 +300,7 @@ public sealed class TextTests
             new FTextHistory.Base("", "", "Source name")));
         var translations = new Dictionary<string, IReadOnlyDictionary<string, string>>();
 
-        var reference = Text.Read(Asset(metadata), []).Name;
+        var reference = Text.Read(Asset(metadata), [], Mappings.Value).Name;
 
         Assert.Equal(new TextReference("", "", "Source name"), reference);
         Assert.Equal("Source name", Text.Resolve(reference, translations, "en"));
@@ -303,11 +308,11 @@ public sealed class TextTests
     }
 
     private static CatalogAsset Asset(UObject metadata) =>
-        new(1, [new UObject { Name = "DA_Test" }], [metadata]);
+        new(1, [new UObject { Name = "DA_Test", Class = new ResolvedLoadedObject(new UScriptClass("Object")) }], [metadata]);
 
     private static UObject WithText(string field, FText text, string type = "UIGameplayItemMetaDataItem")
     {
-        var value = new UObject { Name = "UI_Test", Class = new ResolvedLoadedObject(new UObject { Name = type }) };
+        var value = new UObject { Name = "UI_Test", Class = new ResolvedLoadedObject(new UScriptClass(type)) };
         value.Properties.Add(new FPropertyTag(new FName("TextProperty"), new TextProperty(text))
         {
             Name = new FName(field)

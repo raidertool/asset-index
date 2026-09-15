@@ -33,11 +33,12 @@ internal static class Assets
 
             try
             {
-                if (IsA(mappings, source.ExportType, "UIMetaDataItem") == true)
-                    AssociateMetadata(source, mappings, definitions, metadata);
+                var schema = ClassSchema.Read(source, mappings);
+                if (schema.IsA("UIMetaDataItem"))
+                    AssociateMetadata(source, schema, mappings, definitions, metadata);
                 else
                 {
-                    var id = DefinitionId(source, mappings, out var persistence);
+                    var id = DefinitionId(source, schema, mappings, out var persistence);
                     if (id is null)
                         continue;
                     Add(definitions, id.Value, source);
@@ -56,17 +57,18 @@ internal static class Assets
             .Select(asset => asset with { PresentationNames = presentation[asset.Id].ToArray() }).ToArray();
     }
 
-    private static void AssociateMetadata(UObject source, TypeMappings mappings,
+    private static void AssociateMetadata(UObject source, ClassSchema schema, TypeMappings mappings,
         Dictionary<long, Dictionary<string, UObject>> definitions, Dictionary<long, Dictionary<string, UObject>> metadata)
     {
         var referenceName = MetadataReferences.FirstOrDefault(pair =>
-            IsA(mappings, source.ExportType, pair.Key) == true).Value ?? "PersistenceDataAsset";
-        if (!HasProperty(mappings, source.ExportType, referenceName) &&
-            !HasProperty(mappings, source.ExportType, "OverrideAssetId"))
+            schema.IsA(pair.Key)).Value ?? "PersistenceDataAsset";
+        var hasReference = schema.HasProperty(referenceName, "ObjectProperty", "SoftObjectProperty");
+        var hasOverride = schema.HasProperty("OverrideAssetId", "Int64Property");
+        if (!hasReference && !hasOverride)
             return; // UI labels and filters without game identities are not catalog rows.
 
-        var id = OverrideId(source, "bOverrideAssetId", "OverrideAssetId");
-        var target = id is null ? Properties.Reference(source, referenceName) : null;
+        var id = OverrideId(source, schema, "bOverrideAssetId", "OverrideAssetId");
+        var target = id is null && hasReference ? Properties.Reference(source, referenceName) : null;
         UObject? persistence = null;
         id ??= target is null ? null : DefinitionId(target, mappings, out persistence);
         if (id is null)
@@ -105,34 +107,44 @@ internal static class Assets
         return RequireId(id);
     }
 
-    internal static long? DefinitionId(UObject source, TypeMappings mappings, out UObject? persistence)
+    internal static long? DefinitionId(UObject source, TypeMappings mappings, out UObject? persistence) =>
+        DefinitionId(source, ClassSchema.Read(source, mappings), mappings, out persistence);
+
+    private static long? DefinitionId(UObject source, ClassSchema schema, TypeMappings mappings, out UObject? persistence)
     {
         persistence = null;
-        if (IsA(mappings, source.ExportType, "PersistenceDataAsset") == true ||
-            IsA(mappings, source.ExportType, "OptionalPersistenceDataAsset") == true)
-            return ReadId(source) ?? throw new InvalidDataException("Persistence asset has no AssetId.");
-        if (IsA(mappings, source.ExportType, "ItemDataAssetBase") == true)
+        if (schema.IsA("PersistenceDataAsset") || schema.IsA("OptionalPersistenceDataAsset"))
         {
-            var overridden = OverrideId(source, "bOverrideItemAssetId", "OverrideItemAssetId");
+            if (!schema.HasProperty("AssetId", "Int64Property")) throw new InvalidDataException("Persistence asset has no AssetId declaration.");
+            return ReadId(source) ?? throw new InvalidDataException("Persistence asset has no AssetId.");
+        }
+        if (schema.IsA("ItemDataAssetBase"))
+        {
+            var overridden = OverrideId(source, schema, "bOverrideItemAssetId", "OverrideItemAssetId");
             if (overridden is not null)
                 return overridden;
         }
-        if (IsA(mappings, source.ExportType, "DataAsset") != true ||
-            !HasProperty(mappings, source.ExportType, "PersistenceDataAsset"))
+        if (!schema.IsA("DataAsset") || !schema.HasProperty("PersistenceDataAsset", "ObjectProperty", "SoftObjectProperty"))
             return null;
 
         persistence = Properties.Reference(source, "PersistenceDataAsset");
         // This is the definition's identity link, not a traversal of rewards or other asset references.
         // A local-only definition may leave that optional link empty. It remains in object discovery.
         if (persistence is null) return null;
+        var targetSchema = ClassSchema.Read(persistence, mappings);
+        if (!(targetSchema.IsA("PersistenceDataAsset") || targetSchema.IsA("OptionalPersistenceDataAsset")) ||
+            !targetSchema.HasProperty("AssetId", "Int64Property"))
+            throw new InvalidDataException("Data asset has no resolvable persistence asset: its identity target is not a persistence class.");
         return ReadId(persistence)
             ?? throw new InvalidDataException("Data asset has no resolvable persistence asset or enabled asset ID override.");
     }
 
-    internal static long? OverrideId(UObject source, string enabledName, string overrideName)
+    private static long? OverrideId(UObject source, ClassSchema schema, string enabledName, string overrideName)
     {
+        if (!schema.HasProperty(enabledName, "BoolProperty")) return null;
         if (Properties.TryGet<bool>(source, enabledName, out var enabled) && enabled)
         {
+            if (!schema.HasProperty(overrideName, "Int64Property")) throw new InvalidDataException($"{overrideName} has no property declaration.");
             if (!Properties.TryGet<long>(source, overrideName, out var id))
                 throw new InvalidDataException($"{enabledName} is enabled but {overrideName} is absent.");
             return RequireId(id);
@@ -143,28 +155,14 @@ internal static class Assets
 
     public static bool? IsA(TypeMappings mappings, string typeName, string baseName)
     {
-        var visited = new HashSet<string>(StringComparer.Ordinal);
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         string? current = typeName;
         while (current is not null)
         {
-            if (current == baseName)
+            if (current.Equals(baseName, StringComparison.OrdinalIgnoreCase))
                 return true;
             if (!visited.Add(current) || !mappings.Types.TryGetValue(current, out var type))
                 return null;
-            current = type.SuperType;
-        }
-
-        return false;
-    }
-
-    private static bool HasProperty(TypeMappings mappings, string typeName, string name)
-    {
-        var visited = new HashSet<string>(StringComparer.Ordinal);
-        string? current = typeName;
-        while (current is not null && visited.Add(current) && mappings.Types.TryGetValue(current, out var type))
-        {
-            if (type.Properties.Values.Any(property => property.Name == name))
-                return true;
             current = type.SuperType;
         }
 

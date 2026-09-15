@@ -19,14 +19,7 @@ internal static class Properties
             if (!visited.Add(current))
                 throw new InvalidDataException($"Template cycle while reading {source.GetPathName()}.{name}.");
 
-            FPropertyTag? property = null;
-            foreach (var candidate in current.Properties)
-            {
-                if (!candidate.Name.Text.Equals(name, StringComparison.OrdinalIgnoreCase)) continue;
-                if (property is not null)
-                    throw new InvalidDataException($"Ambiguous property {current.GetPathName()}.{name}.");
-                property = candidate;
-            }
+            var property = FindDirect(current.Properties, name, current.GetPathName());
             if (property is not null)
             {
                 definedAt = current;
@@ -35,6 +28,25 @@ internal static class Properties
         }
 
         return null;
+    }
+
+    public static T Get<T>(FStructFallback source, string name, string path)
+    {
+        var property = FindDirect(source.Properties, name, path);
+        return property?.Tag?.GetValue(typeof(T)) is T result ? result
+            : throw new InvalidDataException($"Cannot read {path}.{name} as {typeof(T).Name}.");
+    }
+
+    private static FPropertyTag? FindDirect(IEnumerable<FPropertyTag> properties, string name, string path)
+    {
+        FPropertyTag? property = null;
+        foreach (var candidate in properties)
+        {
+            if (!candidate.Name.Text.Equals(name, StringComparison.OrdinalIgnoreCase)) continue;
+            if (property is not null) throw new InvalidDataException($"Ambiguous property {path}.{name}.");
+            property = candidate;
+        }
+        return property;
     }
 
     public static bool TryGet<T>(UObject source, string name, [MaybeNullWhen(false)] out T value) =>

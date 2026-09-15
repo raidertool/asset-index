@@ -72,6 +72,11 @@ remain header-only.
 
 ## Assign presentation
 
+Runtime classes follow their actual superclass references into native usmap
+ancestry. Only that native ancestry establishes catalog roles; runtime short names
+cannot impersonate it. Projection verifies header/body parents and scalar typed
+field declarations. Missing or conflicting schemas produce diagnostics.
+
 - `Assets.cs` follows explicit identity links and enabled ID overrides. Local
   definitions with no identity stay in discovery.
 - `TextRoles.cs` assigns meaning to fields on specific UI/definition classes.

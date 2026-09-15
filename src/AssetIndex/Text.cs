@@ -22,8 +22,14 @@ internal static class Text
         var candidates = new List<TextCandidate>();
         foreach (var (sources, kind) in new[] { (asset.Metadata, "metadata"), (asset.Definitions, "definition") })
             foreach (var source in sources)
-                foreach (var field in TextRoles.For(source, mappings ?? source.Owner?.Mappings))
-                    ReadCandidate(source, field, kind, candidates, issues);
+            {
+                try
+                {
+                    foreach (var field in TextRoles.For(source, mappings ?? source.Owner?.Mappings))
+                        ReadCandidate(source, field, kind, candidates, issues);
+                }
+                catch (Exception error) { issues.Add(new("text", source.GetPathName(), error.Message)); }
+            }
         foreach (var presentation in asset.PresentationNames)
             ReadCandidate(presentation.Metadata, new("ContainerName", "display-name"), "container", candidates, issues);
 

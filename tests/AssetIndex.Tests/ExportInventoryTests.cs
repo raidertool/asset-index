@@ -86,7 +86,7 @@ public sealed class ExportInventoryTests
         var headers = ExportInventory.Read(package, "Map.umap", mappings);
 
         Assert.Equal(["UnknownClass"], headers[0].Ancestry);
-        Assert.Contains("no mapping or superclass", headers[0].Error);
+        Assert.Contains("has no mapping", headers[0].Error);
         Assert.Contains("ends before Object", headers[1].Error);
         Assert.All(headers, header => Assert.False(header.AncestryComplete));
     }
@@ -163,7 +163,7 @@ public sealed class ExportInventoryTests
     }
 
     [Fact]
-    public void MappedContinuationCannotLoopIntoEarlierRuntimeAncestry()
+    public void RuntimeShortNamesDoNotReplaceNativeDeclarationIdentity()
     {
         var package = new MetadataPackage("/Game/Map");
         var declaration = package.Add("RuntimeClass", Native("BlueprintGeneratedClass"));
@@ -175,22 +175,25 @@ public sealed class ExportInventoryTests
 
         var header = ExportInventory.Read(package, "Map.umap", mappings)[1];
 
-        Assert.Contains("Mapped class ancestry repeats", header.Error);
-        Assert.False(header.AncestryComplete);
+        Assert.Equal(["RuntimeClass", "Actor", "RuntimeClass", "Object"], header.Ancestry);
+        Assert.Null(header.Error);
+        Assert.True(header.AncestryComplete);
     }
 
     [Fact]
     public void RealIoMetadataKeepsMissingSerializedLinksAndInvalidIndicesVisible()
     {
-        var missingImport = 1UL << FPackageObjectIndex.TypeShift;
+        var nativeObject = (1UL << FPackageObjectIndex.TypeShift) | 2;
+        var nativeWorld = (1UL << FPackageObjectIndex.TypeShift) | 3;
+        var missingImport = (1UL << FPackageObjectIndex.TypeShift) | 99;
         var entries = new[]
         {
-            Entry(0, type: 0), Entry(1, type: 0, super: 0), Entry(2, type: 0, super: missingImport),
+            Entry(0, type: nativeObject), Entry(1, type: nativeObject, super: nativeWorld), Entry(2, type: nativeObject, super: missingImport),
             Entry(3, type: 1), Entry(4, type: 1, outer: missingImport), Entry(5, type: 2),
             Entry(6, type: 1, outer: 99)
         };
         var forced = 0;
-        var package = IoMetadata(entries, ["Object", "World", "Actor", "Map", "BadOuter", "BadSuper", "BadIndex"], () => forced++);
+        var package = IoMetadata(entries, ["ObjectInstance", "RuntimeWorld", "RuntimeActor", "Map", "BadOuter", "BadSuper", "BadIndex", "Object", "World", "/Script/Fixture"], () => forced++);
         // Upstream resolved wrappers hide a missing outer as package root and a
         // missing superclass as null; inventory must inspect the serialized links.
         Assert.IsType<ResolvedPackageObject>(package.ResolvePackageIndex(new(package, 5))!.Outer);
@@ -200,7 +203,7 @@ public sealed class ExportInventoryTests
 
         Assert.Equal(entries.Length, headers.Count);
         Assert.Null(headers[3].Error);
-        Assert.Equal(["World", "Object"], headers[3].Ancestry);
+        Assert.Equal(["RuntimeWorld", "World", "Object"], headers[3].Ancestry);
         Assert.Contains("Serialized outer index", headers[4].Error);
         Assert.Contains("Serialized superclass index", headers[5].Error);
         Assert.Contains("outside its package header", headers[6].Error);
@@ -217,7 +220,13 @@ public sealed class ExportInventoryTests
         Set(typeof(IoPackage), package, "ImportMap", Array.Empty<FPackageObjectIndex>());
         Set(typeof(IoPackage), package, "<NameMap>k__BackingField", names.Select(name => new FNameEntrySerialized(name)).ToArray());
         var globals = (IoGlobalData)RuntimeHelpers.GetUninitializedObject(typeof(IoGlobalData));
-        Set(typeof(IoGlobalData), globals, "ScriptObjectEntriesMap", new Dictionary<FPackageObjectIndex, FScriptObjectEntry>());
+        var script = 1UL << FPackageObjectIndex.TypeShift;
+        Set(typeof(IoGlobalData), globals, "ScriptObjectEntriesMap", new Dictionary<FPackageObjectIndex, FScriptObjectEntry>
+        {
+            [new(script | 1)] = ScriptEntry(9, script | 1, FPackageObjectIndex.Invalid),
+            [new(script | 2)] = ScriptEntry(7, script | 2, script | 1),
+            [new(script | 3)] = ScriptEntry(8, script | 3, script | 1)
+        });
         Set(typeof(IoPackage), package, "_globalData", globals);
         Set(typeof(AbstractUePackage), package, "<ExportsLazy>k__BackingField", entries.Select(_ => new Lazy<UObject>(() =>
         {
@@ -239,6 +248,18 @@ public sealed class ExportInventoryTests
         }
         using var archive = new FByteArchive("Synthetic export header", stream.ToArray(), new VersionContainer(EGame.GAME_ArcRaiders));
         return new FExportMapEntry(archive);
+    }
+
+    private static FScriptObjectEntry ScriptEntry(uint name, ulong index, ulong outer)
+    {
+        using var stream = new MemoryStream();
+        using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, true))
+        {
+            writer.Write(name); writer.Write(0U); writer.Write(index);
+            writer.Write(outer); writer.Write(FPackageObjectIndex.Invalid);
+        }
+        using var archive = new FByteArchive("Synthetic native script entry", stream.ToArray());
+        return archive.Read<FScriptObjectEntry>();
     }
 
     private static void Set(Type type, object target, string name, object value) =>

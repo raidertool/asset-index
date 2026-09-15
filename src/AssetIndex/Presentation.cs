@@ -14,23 +14,30 @@ internal static class Presentation
         TypeMappings mappings, ICollection<ExtractionIssue> issues)
     {
         var names = new List<PresentationName>();
-        var metadata = new Dictionary<string, List<UObject>>(StringComparer.Ordinal);
+        var metadata = new Dictionary<string, List<UObject>>(StringComparer.OrdinalIgnoreCase);
         var instances = objects.Where(source => !source.Flags.HasFlag(EObjectFlags.RF_ClassDefaultObject)).ToArray();
-        foreach (var source in instances.Where(source => Assets.IsA(mappings, source.ExportType, "UIInventoryContainerMetaDataItem") == true))
+        var frames = new List<UObject>();
+        foreach (var source in instances)
         {
             try
             {
-                if (!Properties.TryGet<FName>(source, "ContainerType", out var type)) continue;
-                if (!metadata.TryGetValue(type.Text, out var entries)) metadata[type.Text] = entries = [];
-                entries.Add(source);
+                var schema = ClassSchema.Read(source, mappings);
+                if (schema.IsA("LoadoutFrameItemDataAsset")) frames.Add(source);
+                if (schema.IsA("UIInventoryContainerMetaDataItem") && schema.HasProperty("ContainerType", "EnumProperty", "ByteProperty") &&
+                    Properties.TryGet<FName>(source, "ContainerType", out var type))
+                {
+                    if (!metadata.TryGetValue(type.Text, out var entries)) metadata[type.Text] = entries = [];
+                    entries.Add(source);
+                }
             }
             catch (Exception error) { issues.Add(new("presentation", source.GetPathName(), error.Message)); }
         }
-        foreach (var frame in instances.Where(source => Assets.IsA(mappings, source.ExportType, "LoadoutFrameItemDataAsset") == true))
+        foreach (var frame in frames)
         {
             try
             {
-                if (!Properties.TryGet<FStructFallback[]>(frame, "Containers", out var containers)) continue;
+                if (!ClassSchema.Read(frame, mappings).HasProperty("Containers", "ArrayProperty") ||
+                    !Properties.TryGet<FStructFallback[]>(frame, "Containers", out var containers)) continue;
                 for (var index = 0; index < containers.Length; index++)
                     ReadContainer(frame, index, containers[index], metadata, mappings, names, issues);
             }
@@ -47,10 +54,10 @@ internal static class Presentation
         var path = $"{frame.GetPathName()}.Containers[{index}]";
         try
         {
-            var type = entry.Get<FName>("Type").Text;
+            var type = Properties.Get<FName>(entry, "Type", path).Text;
             if (!metadata.TryGetValue(type, out var labels))
                 throw new InvalidDataException($"No container presentation metadata for {type}.");
-            var slot = entry.Get<FPackageIndex>("ContainerSlotDataAsset").Load()
+            var slot = Properties.Get<FPackageIndex>(entry, "ContainerSlotDataAsset", path).Load()
                 ?? throw new InvalidDataException("ContainerSlotDataAsset could not be loaded.");
             RequireType(slot, "InventoryContainerSlotDataAsset", mappings);
             var slotId = Assets.DefinitionId(slot, mappings, out _)
@@ -72,7 +79,7 @@ internal static class Presentation
 
     private static void RequireType(UObject source, string expected, TypeMappings mappings)
     {
-        if (Assets.IsA(mappings, source.ExportType, expected) != true)
+        if (!ClassSchema.Read(source, mappings).IsA(expected))
             throw new InvalidDataException($"Expected {expected}, found {source.ExportType} at {source.GetPathName()}.");
     }
 }

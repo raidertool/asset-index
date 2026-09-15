@@ -192,7 +192,7 @@ public sealed class AssetsTests
     [Theory]
     [InlineData("FakeInventoryServiceItemData", "PersistenceDataAsset")]
     [InlineData("QuestReward", "Item")]
-    public void RuntimeAndRewardReferencesDoNotCreateDefinitions(string type, string field)
+    public void StructSchemasCannotBeTreatedAsObjectClasses(string type, string field)
     {
         var target = Object("Identity", "PersistenceDataAsset", ("AssetId", new Int64Property(99)));
         var package = new FixturePackage(target);
@@ -200,6 +200,18 @@ public sealed class AssetsTests
         var issues = new List<ExtractionIssue>();
 
         Assert.Empty(Assets.Collect([payload], Mappings.Value, issues));
+        Assert.Contains(issues, issue => issue.Stage == "asset" && issue.Message.Contains("ends before Object"));
+    }
+
+    [Fact]
+    public void UnrelatedObjectReferencesDoNotCreateDefinitions()
+    {
+        var identity = Object("Identity", "PersistenceDataAsset", ("AssetId", new Int64Property(99)));
+        var unrelated = Object("Unrelated", "Object",
+            ("PersistenceDataAsset", new ObjectProperty(new FPackageIndex(new FixturePackage(identity), 1))));
+        var issues = new List<ExtractionIssue>();
+
+        Assert.Empty(Assets.Collect([unrelated], Mappings.Value, issues));
         Assert.Empty(issues);
     }
 
@@ -313,7 +325,7 @@ public sealed class AssetsTests
         }).ToList())
         {
             Name = name,
-            Class = new ResolvedLoadedObject(new UObject { Name = type })
+            Class = new ResolvedLoadedObject(new UScriptClass(type))
         };
     }
 

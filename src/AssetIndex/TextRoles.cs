@@ -9,7 +9,7 @@ internal static class TextRoles
 {
     // Roles come from these UI/definition classes, not a global match on property names.
     // Unknown classes and additional fields remain available in the raw resource export.
-    private static readonly IReadOnlyDictionary<string, TextField[]> Fields = new Dictionary<string, TextField[]>
+    private static readonly IReadOnlyDictionary<string, TextField[]> Fields = new Dictionary<string, TextField[]>(StringComparer.OrdinalIgnoreCase)
     {
         ["UIGameplayItemMetaDataItem"] = [new("ItemName", "display-name"), new("Description", "description")],
         ["UIClanBackgroundMetaDataItem"] = [new("ItemName", "display-name"), new("Description", "description")],
@@ -45,13 +45,15 @@ internal static class TextRoles
 
     public static IReadOnlyList<TextField> For(UObject source, TypeMappings? mappings)
     {
-        var visited = new HashSet<string>(StringComparer.Ordinal);
-        string? type = source.ExportType;
-        while (type is not null && visited.Add(type))
+        if (mappings is null) throw new InvalidDataException($"Type mappings are unavailable for {source.GetPathName()}.");
+        var schema = ClassSchema.Read(source, mappings);
+        foreach (var type in schema.NativeAncestry)
         {
-            if (Fields.TryGetValue(type, out var fields)) return fields;
-            if (mappings is null || !mappings.Types.TryGetValue(type, out var definition)) break;
-            type = definition.SuperType;
+            if (!Fields.TryGetValue(type, out var fields)) continue;
+            foreach (var field in fields)
+                if (!schema.HasProperty(field.Name, "TextProperty"))
+                    throw new InvalidDataException($"Text role has no property declaration: {type}.{field.Name}.");
+            return fields;
         }
         return [];
     }
