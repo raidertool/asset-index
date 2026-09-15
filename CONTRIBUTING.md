@@ -12,7 +12,7 @@ enough; add abstractions when a concrete feature needs them.
 5. If you can test with game files, include the game build and relevant coverage
    results in your PR. Say clearly when you could not run that check.
 
-Known gaps include XP imagery, missing localized names, shared Scrappy imagery,
+Coverage checks include XP imagery, missing localized names, shared Scrappy imagery,
 and IDs reported in [issues](https://github.com/raidertool/asset-index/issues).
 Existing data is useful evidence, but matching it is not proof of completeness.
 
@@ -29,8 +29,11 @@ as described in the [README](README.md#run-locally). Keep credentials in your
 local environment; do not put them in commands committed to the repository,
 issues, fixtures, or test output. Keep game files and depot caches outside Git.
 
-PR CI runs offline. Maintainer Steam previews run separately in private Exfil
-with its existing burner credentials; contributors do not need access to them.
+PR CI runs offline. The public repository also defines a manual
+[preview workflow](README.md#manual-preview-job) for reviewed maintainer runs.
+Complete maintainer review of the workflow and dependency pin before configuring
+credentials or dispatching it. Contributors can test locally with their own
+credentials; no maintainer secrets are shared.
 
 ## Review the output
 

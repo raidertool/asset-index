@@ -43,6 +43,24 @@ local Steam credentials, then pass the mounted `PioneerGame/Content/Paks`
 directory as `--game-dir`. Follow SteamDepotFS's platform and authentication
 instructions; this extractor does not manage Steam accounts.
 
+## Manual preview job
+
+The [Extract preview](.github/workflows/extract.yml) workflow runs only when
+manually requested. Maintainer review of the workflow and its pinned
+[SteamDepotFS authentication change](https://github.com/raidertool/SteamDepotFS/pull/3)
+is pending; complete that review before configuring credentials or running it.
+
+After review, configure repository Actions secrets `STEAM_USERNAME` and
+`STEAM_PASSWORD`, or use `STEAM_USERNAME` with `STEAM_ACCESS_TOKEN` instead.
+The account must have game-file access and authenticate without an interactive
+Steam Guard prompt. Choose **Actions → Extract preview → Run workflow** on the
+reviewed branch. No credentials are needed for PR tests.
+
+Download `asset-index-preview-<run ID>` from the run. It contains only
+`assets.json`, `coverage.json`, and `images/`, retained for seven days. Partial
+outputs are uploaded when extraction fails; review coverage before using them.
+Steam session logs and depot caches stay out of the artifact.
+
 ## Preview output
 
 | Path | Contents |

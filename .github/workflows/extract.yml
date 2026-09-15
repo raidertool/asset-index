@@ -1,0 +1,176 @@
+name: Extract preview
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: extract-preview
+  cancel-in-progress: false
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      CUE4PARSE_SKIP_NATIVE: "true"
+    steps:
+      - name: Check out extractor
+        timeout-minutes: 5
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Check out SteamDepotFS
+        timeout-minutes: 5
+        uses: actions/checkout@v4
+        with:
+          repository: raidertool/SteamDepotFS
+          # Modern authentication: https://github.com/raidertool/SteamDepotFS/pull/3 (under review).
+          ref: 91a8cc1a38dfb51312a63ffc4f9955256d96e789
+          path: .work/SteamDepotFS
+          persist-credentials: false
+
+      - name: Set up .NET
+        timeout-minutes: 5
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            10.0.302
+            8.0.x
+
+      - name: Build and test offline
+        timeout-minutes: 10
+        run: |
+          dotnet test tests/AssetIndex.Tests/AssetIndex.Tests.csproj -c Release --nologo
+          dotnet build .work/SteamDepotFS/src/SteamDepotFs/SteamDepotFs.csproj -c Release --nologo
+
+      - name: Install FUSE
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y fuse3 libfuse2
+          if [[ ! -c /dev/fuse ]]; then
+            sudo modprobe fuse
+          fi
+          test -c /dev/fuse
+
+      - name: Read Steam depot and extract preview
+        timeout-minutes: 80
+        shell: bash
+        env:
+          STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
+          STEAM_PASSWORD: ${{ secrets.STEAM_PASSWORD }}
+          STEAM_ACCESS_TOKEN: ${{ secrets.STEAM_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          umask 077
+          if [[ -z "$STEAM_USERNAME" || ( -z "$STEAM_PASSWORD" && -z "$STEAM_ACCESS_TOKEN" ) ]]; then
+            echo "Configure STEAM_USERNAME and either STEAM_PASSWORD or STEAM_ACCESS_TOKEN after review." >&2
+            exit 1
+          fi
+          depotfs="$GITHUB_WORKSPACE/.work/SteamDepotFS/src/SteamDepotFs/bin/Release/net8.0/SteamDepotFs.dll"
+          depot_args=(
+            --app 1808500 --depot 1808501 --branch public
+            --cache-dir "$RUNNER_TEMP/steam-depot-cache"
+            --cache-max-bytes 8G --cache-low-watermark 6G --cache-min-free-bytes 2G
+          )
+
+          report_steam_failure() {
+            local phase="$1" result="$2" log="$3" status reason
+            reason="Unrecognized Steam error; verify this account locally before retrying."
+            status="$(sed -nE 's/^(Steam logon failed:|Authentication failed:) (InvalidPassword|AccountDisabled|AccountNotFound|AccountLogonDenied|AccountLoginDeniedNeedTwoFactor|InvalidLoginAuthCode|ExpiredLoginAuthCode|RateLimitExceeded|LimitExceeded|ServiceUnavailable|NoConnection|AccessDenied)([ (.].*)?$/\2/p' "$log" | tail -1)"
+            case "$status" in
+              InvalidPassword) reason="Steam rejected the credentials or session token (InvalidPassword); check the configured secrets." ;;
+              AccountLogonDenied|AccountLoginDeniedNeedTwoFactor|InvalidLoginAuthCode|ExpiredLoginAuthCode)
+                reason="Steam requires valid Guard authentication; authenticate locally and configure a valid session token." ;;
+              AccountDisabled|AccountNotFound|AccessDenied)
+                reason="Steam denied this account; verify the username and account access locally." ;;
+              RateLimitExceeded|LimitExceeded) reason="Steam rate limited authentication; wait before retrying." ;;
+              ServiceUnavailable|NoConnection) reason="Steam is unavailable; retry after connectivity recovers." ;;
+            esac
+            if [[ "$result" == 124 || "$result" == 137 ]]; then
+              reason="Steam timed out; verify connectivity and account access before retrying."
+            elif grep -Eq '^Steam (Guard requires |rejected the supplied Guard code\.)' "$log"; then
+              reason="Steam Guard is missing or rejected; authenticate locally and configure a valid session token."
+            elif grep -Eq '^Could not get depot key for app=[0-9]+ depot=[0-9]+: AccessDenied$' "$log"; then
+              reason="Steam denied depot access; verify this account owns the game and can access its files."
+            fi
+            printf '%s failed (exit %s): %s\n' "$phase" "$result" "$reason" >&2
+          }
+
+          # GitHub masks these secrets. Keep raw Steam logs off the job log and out of artifacts.
+          if timeout --kill-after=15s 16m dotnet "$depotfs" smoke "${depot_args[@]}" --timeout 900 \
+            > "$RUNNER_TEMP/steam-smoke.log" 2>&1; then
+            manifest_id="$(sed -nE 's/.*manifest=([0-9]+).*/\1/p' "$RUNNER_TEMP/steam-smoke.log" | tail -1)"
+          else
+            result=$?
+            report_steam_failure "Steam depot access" "$result" "$RUNNER_TEMP/steam-smoke.log"
+            exit "$result"
+          fi
+          if [[ ! "$manifest_id" =~ ^[0-9]+$ ]]; then
+            echo "SteamDepotFS did not resolve a manifest." >&2
+            exit 1
+          fi
+          {
+            echo "Extractor commit: $GITHUB_SHA"
+            echo "Steam app: 1808500; depot: 1808501; manifest: $manifest_id"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          mount_dir="$RUNNER_TEMP/arc-depot"
+          mkdir -p "$mount_dir"
+          timeout --kill-after=15s 65m dotnet "$depotfs" mount "${depot_args[@]}" \
+            --timeout 3900 --manifest "$manifest_id" --mount-point "$mount_dir" \
+            > "$RUNNER_TEMP/steam-mount.log" 2>&1 &
+          mount_pid=$!
+          cleanup() {
+            timeout --kill-after=5s 10s fusermount3 -u "$mount_dir" >/dev/null 2>&1 || true
+            kill "$mount_pid" >/dev/null 2>&1 || true
+            for _ in {1..5}; do
+              if ! kill -0 "$mount_pid" 2>/dev/null; then
+                return
+              fi
+              sleep 1
+            done
+            kill -KILL "$mount_pid" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          unset STEAM_USERNAME STEAM_PASSWORD STEAM_ACCESS_TOKEN
+          for _ in {1..120}; do
+            if mountpoint -q "$mount_dir"; then
+              break
+            fi
+            if ! kill -0 "$mount_pid" 2>/dev/null; then
+              result=0
+              wait "$mount_pid" || result=$?
+              report_steam_failure "Steam mount" "$result" "$RUNNER_TEMP/steam-mount.log"
+              exit 1
+            fi
+            sleep 1
+          done
+          if ! mountpoint -q "$mount_dir"; then
+            report_steam_failure "Steam mount" 124 "$RUNNER_TEMP/steam-mount.log"
+            exit 1
+          fi
+          game_dir="$mount_dir/PioneerGame/Content/Paks"
+          timeout --kill-after=5s 20s test -d "$game_dir"
+          timeout --kill-after=15s 60m dotnet run --project src/AssetIndex -c Release --no-build -- \
+            --game-dir "$game_dir" --usmap mappings/ArcRaiders.usmap \
+            --output "$RUNNER_TEMP/asset-index-preview"
+
+      - name: Save preview artifacts
+        timeout-minutes: 5
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-index-preview-${{ github.run_id }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/asset-index-preview/assets.json
+            ${{ runner.temp }}/asset-index-preview/coverage.json
+            ${{ runner.temp }}/asset-index-preview/images/
