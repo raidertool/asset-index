@@ -39,6 +39,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for tests and mapping updates.
 IDs are decimal strings to preserve signed 64-bit values in JavaScript. Each ID
 can have multiple definitions and images. Unsupported material icons remain
 explicitly marked; missing text is not filled from an older snapshot.
+See [discovery rules](docs/discovery.md) before adding new associations.
 
 Exit codes: `0` succeeded, `1` incomplete, `2` invalid input. Inspect coverage
 and affected images even after success: success does not prove completeness.
@@ -74,8 +75,9 @@ pending; the current importer still follows `main`.
 
 - Extractor releases: `vX.Y.Z` tags in **this repository**. The old `exfil-v…`
   component identifies the legacy producer, not this extractor.
-- Snapshots: the immutable `data` commit; optional `arc-<build>-<dataShortSha>`
-  tags for browsing. Existing historical tags stay unchanged.
+- Snapshots: the immutable `data` commit and its lightweight
+  `arc-<manifestId>-<dataCommit12>` tag, published atomically. Existing historical
+  tags stay unchanged.
 - Snapshot metadata: extractor commit, Steam app/depot/manifest, and JSON format
   version. The source commit also identifies the bundled mapping.
 - Importer: use the data commit, so source-only edits create no database version.
