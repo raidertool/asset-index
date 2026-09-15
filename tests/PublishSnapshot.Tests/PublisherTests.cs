@@ -130,17 +130,21 @@ public sealed partial class PublisherTests : IDisposable
     [Fact]
     public void RejectedTagPushIsAtomicAndIdenticalInputRetryWorks()
     {
-        var hook = InstallHook("while read old new ref; do\n  case \"$ref\" in refs/tags/*) exit 1 ;; esac\ndone\nexit 0\n");
+        var hook = InstallHook("case \"$1\" in refs/tags/*) exit 1 ;; esac\nexit 0\n", "update");
         var before = remoteGit.Run("show-ref");
+        var seedGit = new Git(seed);
+        var seedReferences = seedGit.Run("show-ref");
 
         Assert.Throws<IOException>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
         Assert.Equal(before, remoteGit.Run("show-ref"));
+        Assert.Equal(seedReferences, seedGit.Run("show-ref"));
         File.Delete(hook);
 
         var retry = Publisher.Publish(preview, remote, NextExtractor, "456");
         Assert.True(retry.Changed);
         Assert.Equal(retry.Commit, RemoteRef("refs/heads/data"));
         Assert.Equal(retry.Commit, RemoteRef("refs/tags/" + retry.Tag));
+        Assert.Equal(seedReferences, seedGit.Run("show-ref"));
     }
 
     [Fact]
@@ -337,9 +341,9 @@ public sealed partial class PublisherTests : IDisposable
         foreach (var row in rows) writer.WriteLine(JsonSerializer.Serialize(row));
     }
 
-    private string InstallHook(string content)
+    private string InstallHook(string content, string name = "pre-receive")
     {
-        var path = Path.Combine(remote, "hooks", "pre-receive");
+        var path = Path.Combine(remote, "hooks", name);
         File.WriteAllText(path, "#!/bin/sh\n" + content);
         if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         return path;
