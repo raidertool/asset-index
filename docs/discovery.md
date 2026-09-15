@@ -21,6 +21,10 @@ It preserves property pointers, reference kinds,
 nulls, empty overrides and exact numeric strings. It never interprets an ordinary
 string as an object reference or uses CUE4Parse's JSON export as a parsing layer.
 
+Material references come from serialized properties and cached bindings. Unrelated
+package imports do not become material edges; registry and mounted-file inventories
+retain the broader content scope.
+
 Property headers retain each tag's exact name/type, nullable static-array index/size
 and serialization mode. Values use ordinal paths such as `/Properties/0`; nested
 tagged structs add their own `/Properties/0`. Repeated scalar names remain separate

@@ -59,6 +59,7 @@ public sealed class GameFilesTests
 
             using var provider = GameFiles.Open(options);
 
+            Assert.True(provider.SkipReferencedTextures);
             Assert.Equal("PioneerGame/Plugins/TestPlugin/Content/Fixture.uasset", provider.FixPath("/TestPlugin/Fixture"));
             Assert.True(provider.TryGetGameFile("/TestPlugin/Fixture", out _));
         }

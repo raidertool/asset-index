@@ -13,7 +13,8 @@ internal static class GameFiles
 
     public static TheiaFileProvider Open(Options options)
     {
-        var provider = new PackageProvider(options.GameDirectory);
+        // Package imports are not evidence that a particular material uses a texture.
+        var provider = new PackageProvider(options.GameDirectory) { SkipReferencedTextures = true };
         try
         {
             provider.MappingsContainer = new FileUsmapTypeMappingsProvider(options.Usmap);

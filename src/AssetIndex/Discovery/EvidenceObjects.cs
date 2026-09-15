@@ -26,7 +26,6 @@ internal sealed partial class EvidenceReader
         if (source is UStringTable strings) ReadStringTable(strings);
         if (source is UMaterialInterface material)
             Visit(material.CachedExpressionData, "/Native/CachedExpressionData");
-        if (source is UMaterial parent) ReadMaterialDependencies(parent);
         if (source is UField field)
         {
             ReadHardReference(field.SuperField, "/Native/SuperField", "super");
@@ -66,18 +65,6 @@ internal sealed partial class EvidenceReader
             }
         }
         catch (Exception error) { issues.Add(new("/Class", "runtime-schema", AssetDiscovery.DescribeError(error))); }
-    }
-
-    private void ReadMaterialDependencies(UMaterial material)
-    {
-        // CUE combines serialized texture references with package-import dependencies.
-        // Keep these distinct from cached property bindings; they are not rendered icons.
-        for (var index = 0; index < material.ReferencedTextures.Count; index++)
-        {
-            var texture = material.ReferencedTextures[index];
-            ReadResolvedReference(texture is null ? null : new ResolvedLoadedObject(texture),
-                $"/Native/ReferencedTextures/{index}", "material-texture-dependency", "object");
-        }
     }
 
     private void ReadClassReferences(UClass type)

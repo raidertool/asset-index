@@ -275,7 +275,7 @@ public sealed class EvidenceTests
     public void CachedMaterialFieldsKeepExactTextureBindingsWithoutLoadingThem()
     {
         var package = new TestPackage(new NeverLoadedReference("BackgroundMask"));
-        var material = new UMaterialInterface
+        var material = new UMaterial
         {
             Name = "Material",
             CachedExpressionData = new FStructFallback([
@@ -297,7 +297,7 @@ public sealed class EvidenceTests
     }
 
     [Fact]
-    public void MaterialTextureDependenciesStayEdgesWithoutClaimingTextureContentsOrRendering()
+    public void MergedMaterialTextureHelperDoesNotCreateReferences()
     {
         var texture = new UTexture2D { Name = "Ingredient" };
         texture.Properties.Add(Property("UnrelatedText", new TextProperty(new FText("Texture-owned text"))));
@@ -307,11 +307,35 @@ public sealed class EvidenceTests
 
         var evidence = EvidenceReader.Read(material);
 
-        Assert.Contains(evidence.References, reference => reference.Pointer == "/Native/ReferencedTextures/0"
-            && reference.Role == "material-texture-dependency" && reference.TargetPath == "Ingredient");
-        Assert.Contains(evidence.References, reference => reference.Pointer == "/Native/ReferencedTextures/1"
-            && reference.Role == "material-texture-dependency" && reference.IsNull);
+        Assert.DoesNotContain(evidence.References, reference => reference.TargetPath == "Ingredient");
+        Assert.DoesNotContain(evidence.References, reference => reference.Pointer.StartsWith("/Native/ReferencedTextures", StringComparison.Ordinal));
         Assert.Empty(evidence.Texts);
+        Assert.Empty(evidence.Issues);
+    }
+
+    [Fact]
+    public void TaggedMaterialTextureBindingsSurviveUpstreamArrayConversion()
+    {
+        var texture = new UTexture2D { Name = "Bound" };
+        var package = new TestPackage(new ResolvedLoadedObject(texture));
+        var array = new UScriptArray([
+            new ObjectProperty(new FPackageIndex(package, 1)), new ObjectProperty(new FPackageIndex())
+        ], "ObjectProperty");
+        var tag = Property("ReferencedTextures", new ArrayProperty(array));
+        var material = new UMaterial { Name = "Material" };
+        material.Properties.Add(tag);
+
+        Assert.True(material.TryGetValue<UTexture[]>(out var converted, "ReferencedTextures"));
+        material.ReferencedTextures.AddRange(converted);
+        var evidence = EvidenceReader.Read(material);
+
+        Assert.Same(tag, Assert.Single(material.Properties));
+        Assert.Same(array, tag.Tag!.GenericValue);
+        Assert.Contains(evidence.Properties, property => property.Pointer == "/Properties/0" && property.Name == "ReferencedTextures");
+        var binding = Assert.Single(evidence.References, reference => reference.TargetPath == "Bound");
+        Assert.Equal("/Properties/0/0", binding.Pointer);
+        Assert.Equal("hard", binding.Kind);
+        Assert.Contains(evidence.References, reference => reference.Pointer == "/Properties/0/1" && reference.IsNull);
         Assert.Empty(evidence.Issues);
     }
 
