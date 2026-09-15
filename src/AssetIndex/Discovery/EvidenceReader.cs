@@ -93,7 +93,7 @@ internal sealed partial class EvidenceReader
             case FPropertyTagType property: Visit(property.GenericValue, pointer, type, depth + 1); return;
             case FScriptStruct structure: Visit(structure.StructType, pointer, type, depth + 1); return;
             case FStructFallback structure: ReadProperties(structure.Properties, Child(pointer, "Properties"), depth, type); return;
-            case UScriptArray array: ReadSequence(array.Properties, pointer, type, "array", depth); return;
+            case UScriptArray array: ReadArray(array, pointer, type, depth); return;
             case UScriptSet set: ReadSequence(set.Properties, pointer, type, "set", depth); return;
             case UScriptMap map: ReadMap(map.Properties, pointer, type, depth); return;
             case FPackageIndex reference: ReadHardReference(reference, pointer, "property"); return;
@@ -115,7 +115,7 @@ internal sealed partial class EvidenceReader
             case double number: values.Add(new(pointer, type, "float", number.ToString("R", CultureInfo.InvariantCulture))); return;
             case decimal number: values.Add(new(pointer, type, "decimal", number.ToString(CultureInfo.InvariantCulture))); return;
             case Enum enumeration: values.Add(new(pointer, type, "enum", enumeration.ToString())); return;
-            case byte[] bytes: values.Add(new(pointer, type, "binary", bytes.Length.ToString(CultureInfo.InvariantCulture))); return;
+            case byte[] bytes: ReadBytes(bytes, pointer, type); return;
             case IDictionary map: ReadMap(map, pointer, type, depth); return;
             case IList sequence: ReadSequence(sequence, pointer, type, "array", depth); return;
             case FField field:
@@ -132,6 +132,26 @@ internal sealed partial class EvidenceReader
             default: issues.Add(new(pointer, type, $"Unsupported compound value: {value.GetType().FullName}.")); return;
         }
     }
+
+    private void ReadArray(UScriptArray array, string pointer, string type, int depth)
+    {
+        // ByteProperty arrays can decode as enum names. Compact only proven plain
+        // bytes; other element types still expose their values and references.
+        var enumName = array.InnerTagData?.EnumName;
+        if (array.InnerType != "ByteProperty" || array.InnerTagData?.Enum is not null ||
+            enumName is not null && !enumName.Equals("None", StringComparison.OrdinalIgnoreCase) ||
+            array.Properties.Any(property => property is not ByteProperty))
+        {
+            ReadSequence(array.Properties, pointer, type, "array", depth);
+            return;
+        }
+        var bytes = new byte[array.Properties.Count];
+        for (var index = 0; index < bytes.Length; index++) bytes[index] = ((ByteProperty)array.Properties[index]).Value;
+        ReadBytes(bytes, pointer, array.InnerType + "[]");
+    }
+
+    private void ReadBytes(byte[] bytes, string pointer, string type) =>
+        values.Add(new(pointer, type, "binary-base64", Convert.ToBase64String(bytes)));
 
     private void ReadSequence(IList sequence, string pointer, string type, string kind, int depth)
     {
