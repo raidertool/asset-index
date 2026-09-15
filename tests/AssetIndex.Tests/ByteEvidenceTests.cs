@@ -1,4 +1,5 @@
 using AssetIndex.Discovery;
+using CUE4Parse.UE4.Assets;
 using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Assets.Objects;
 using CUE4Parse.UE4.Assets.Objects.Properties;
@@ -105,7 +106,7 @@ public sealed class ByteEvidenceTests
     private static ObjectEvidence Read(FPropertyTagType value) => EvidenceReader.Read(new UObject([
         new FPropertyTag { Name = "Data", PropertyType = value.GetType().Name, Tag = value }
     ])
-    { Name = "Fixture" });
+    { Name = "Fixture", Outer = new ResolvedPackageObject(new FixturePackage { Name = "/Game/Fixture" }) });
 
     private sealed class NativeValue(object value) : FPropertyTagType
     {

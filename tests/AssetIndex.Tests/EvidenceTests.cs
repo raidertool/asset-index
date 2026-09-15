@@ -19,6 +19,7 @@ namespace AssetIndex.Tests;
 
 public sealed class EvidenceTests
 {
+    private static readonly ResolvedPackageObject Root = new(new TestPackage(null, EPackageFlags.PKG_UnversionedProperties));
     [Fact]
     public void ReadsTypedNestedValuesWithOrdinalPointersAndExactNames()
     {
@@ -78,7 +79,7 @@ public sealed class EvidenceTests
         Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/2" && value.Kind == "empty-map");
         Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/3" && value.Value == "");
         Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/5" && value.Value == "false");
-        Assert.Contains(evidence.References, reference => reference.Pointer == "/Template" && reference.Role == "template" && reference.TargetPath == "Parent");
+        Assert.Contains(evidence.References, reference => reference.Pointer == "/Template" && reference.Role == "template" && reference.TargetPath == "/Game/Fixture.Parent");
         Assert.Contains(evidence.References, reference => reference.Pointer == "/Properties/4" && reference.IsNull);
         Assert.Empty(evidence.Issues);
     }
@@ -97,14 +98,14 @@ public sealed class EvidenceTests
         var evidence = EvidenceReader.Read(source);
 
         var hard = Assert.Single(evidence.References, reference => reference.Pointer == "/Properties/0");
-        Assert.Equal("Target", hard.TargetPath);
+        Assert.Equal("/Game/Fixture.Target", hard.TargetPath);
         Assert.Equal(1, hard.PackageIndex);
         Assert.Null(hard.Error);
         var broken = Assert.Single(evidence.References, reference => reference.Pointer == "/Properties/1");
         Assert.False(broken.IsNull);
         Assert.Null(broken.TargetPath);
         Assert.NotNull(broken.Error);
-        Assert.Contains(evidence.References, reference => reference.Kind == "resolved" && reference.TargetPath == "Target");
+        Assert.Contains(evidence.References, reference => reference.Kind == "resolved" && reference.TargetPath == "/Game/Fixture.Target");
         Assert.Contains(evidence.References, reference => reference.Kind == "soft" && reference.TargetPath == "/Game/A.A:Child");
     }
 
@@ -120,9 +121,9 @@ public sealed class EvidenceTests
             Property("Single", new DelegateProperty(callback)),
             Property("Many", new MulticastDelegateProperty(multicast))));
 
-        Assert.Contains(evidence.References, reference => reference.Pointer == "/Properties/0/Object" && reference.TargetPath == "Handler");
+        Assert.Contains(evidence.References, reference => reference.Pointer == "/Properties/0/Object" && reference.TargetPath == "/Game/Fixture.Handler");
         Assert.Contains(evidence.Values, value => value.Pointer == "/Properties/0/FunctionName" && value.Value == "OnChanged");
-        Assert.Contains(evidence.References, reference => reference.Pointer == "/Properties/1/InvocationList/0/Object" && reference.TargetPath == "Handler");
+        Assert.Contains(evidence.References, reference => reference.Pointer == "/Properties/1/InvocationList/0/Object" && reference.TargetPath == "/Game/Fixture.Handler");
         var broken = Assert.Single(evidence.References, reference => reference.Pointer == "/Properties/1/InvocationList/1/Object");
         Assert.False(broken.IsNull);
         Assert.NotNull(broken.Error);
@@ -163,7 +164,7 @@ public sealed class EvidenceTests
             Property("Bound", new InterfaceProperty(new FScriptInterface(new FPackageIndex(package, 1)))),
             Property("Null", new InterfaceProperty(new FScriptInterface(new FPackageIndex())))));
 
-        Assert.Contains(evidence.References, reference => reference.Pointer == "/Properties/0/Object" && reference.TargetPath == "Implementation");
+        Assert.Contains(evidence.References, reference => reference.Pointer == "/Properties/0/Object" && reference.TargetPath == "/Game/Fixture.Implementation");
         Assert.Contains(evidence.References, reference => reference.Pointer == "/Properties/1/Object" && reference.IsNull);
         Assert.Empty(evidence.Issues);
     }
@@ -208,7 +209,7 @@ public sealed class EvidenceTests
         Assert.Equal("/Game/ST_Items.ST_Items", text.TableId);
         Assert.Null(text.Namespace);
         Assert.Null(text.Source);
-        var table = new UStringTable { Name = "ST_Items" };
+        var table = new UStringTable { Name = "ST_Items", Outer = Root };
         var data = Make<FStringTable>((nameof(FStringTable.TableNamespace), "Items"),
             (nameof(FStringTable.KeysToEntries), new Dictionary<string, string> { ["NAME/"] = "Source", ["EMPTY"] = "" }));
         typeof(UStringTable).GetProperty(nameof(UStringTable.StringTable))!.SetValue(table, data);
@@ -235,7 +236,7 @@ public sealed class EvidenceTests
     [Fact]
     public void NativeCurveRowsAreEvidenceEvenWithoutCatalogIds()
     {
-        var table = new UCurveTable { Name = "Weather" };
+        var table = new UCurveTable { Name = "Weather", Outer = Root };
         table.RowMap.Add("Wind/Intensity", new FStructFallback([Property("DefaultValue", new FloatProperty(0.75f))]));
         var evidence = EvidenceReader.Read(table);
         Assert.Contains(evidence.Values, value => value.Pointer == "/Rows/Wind~1Intensity/Properties/0" && value.Value == "0.75");
@@ -245,7 +246,7 @@ public sealed class EvidenceTests
     [Fact]
     public void CompositeCurveEvaluationIsExplicitlyUnresolved()
     {
-        var evidence = EvidenceReader.Read(new UCompositeCurveTable { Name = "Composite" });
+        var evidence = EvidenceReader.Read(new UCompositeCurveTable { Name = "Composite", Outer = Root });
         Assert.Contains(evidence.Issues, issue => issue.Pointer == "/Rows" && issue.Message.Contains("parent-table"));
     }
 
@@ -257,6 +258,7 @@ public sealed class EvidenceTests
         var source = new UClass
         {
             Name = "Class",
+            Outer = Root,
             ClassDefaultObject = new FPackageIndex(package, 1),
             ClassGeneratedBy = new FPackageIndex(package, 1),
             Children = [new FPackageIndex(package, 1)],
@@ -265,9 +267,9 @@ public sealed class EvidenceTests
 
         var evidence = EvidenceReader.Read(source);
 
-        Assert.Contains(evidence.References, reference => reference.Pointer == "/Native/ClassDefaultObject" && reference.Role == "class-default" && reference.TargetPath == "Default");
-        Assert.Contains(evidence.References, reference => reference.Pointer == "/Native/Children/0" && reference.TargetPath == "Default");
-        Assert.Contains(evidence.References, reference => reference.Pointer == "/Native/FuncMap/entries/0/value" && reference.TargetPath == "Default");
+        Assert.Contains(evidence.References, reference => reference.Pointer == "/Native/ClassDefaultObject" && reference.Role == "class-default" && reference.TargetPath == "/Game/Fixture.Default");
+        Assert.Contains(evidence.References, reference => reference.Pointer == "/Native/Children/0" && reference.TargetPath == "/Game/Fixture.Default");
+        Assert.Contains(evidence.References, reference => reference.Pointer == "/Native/FuncMap/entries/0/value" && reference.TargetPath == "/Game/Fixture.Default");
         Assert.Empty(evidence.Issues);
     }
 
@@ -278,6 +280,7 @@ public sealed class EvidenceTests
         var material = new UMaterial
         {
             Name = "Material",
+            Outer = Root,
             CachedExpressionData = new FStructFallback([
                 Property("ReferencedTextures", new ArrayProperty(new UScriptArray([
                     new ObjectProperty(new FPackageIndex(package, 1)), new ObjectProperty(new FPackageIndex(package, 2))
@@ -289,7 +292,7 @@ public sealed class EvidenceTests
         var evidence = EvidenceReader.Read(material);
 
         Assert.Contains(evidence.References, reference => reference.Pointer == "/Native/CachedExpressionData/Properties/0/0"
-            && reference.Role == "property" && reference.TargetPath == "BackgroundMask");
+            && reference.Role == "property" && reference.TargetPath == "/Game/Fixture.BackgroundMask");
         Assert.Contains(evidence.References, reference => reference.Pointer == "/Native/CachedExpressionData/Properties/0/1"
             && reference.Error is not null);
         Assert.Contains(evidence.Values, value => value.Pointer == "/Native/CachedExpressionData/Properties/1" && value.Value == "Background");
@@ -299,15 +302,15 @@ public sealed class EvidenceTests
     [Fact]
     public void MergedMaterialTextureHelperDoesNotCreateReferences()
     {
-        var texture = new UTexture2D { Name = "Ingredient" };
+        var texture = new UTexture2D { Name = "Ingredient", Outer = Root };
         texture.Properties.Add(Property("UnrelatedText", new TextProperty(new FText("Texture-owned text"))));
-        var material = new UMaterial { Name = "Material" };
+        var material = new UMaterial { Name = "Material", Outer = Root };
         material.ReferencedTextures.Add(texture);
         material.ReferencedTextures.Add(null!);
 
         var evidence = EvidenceReader.Read(material);
 
-        Assert.DoesNotContain(evidence.References, reference => reference.TargetPath == "Ingredient");
+        Assert.DoesNotContain(evidence.References, reference => reference.TargetPath == "/Game/Fixture.Ingredient");
         Assert.DoesNotContain(evidence.References, reference => reference.Pointer.StartsWith("/Native/ReferencedTextures", StringComparison.Ordinal));
         Assert.Empty(evidence.Texts);
         Assert.Empty(evidence.Issues);
@@ -316,13 +319,13 @@ public sealed class EvidenceTests
     [Fact]
     public void TaggedMaterialTextureBindingsSurviveUpstreamArrayConversion()
     {
-        var texture = new UTexture2D { Name = "Bound" };
+        var texture = new UTexture2D { Name = "Bound", Outer = Root };
         var package = new TestPackage(new ResolvedLoadedObject(texture));
         var array = new UScriptArray([
             new ObjectProperty(new FPackageIndex(package, 1)), new ObjectProperty(new FPackageIndex())
         ], "ObjectProperty");
         var tag = Property("ReferencedTextures", new ArrayProperty(array));
-        var material = new UMaterial { Name = "Material" };
+        var material = new UMaterial { Name = "Material", Outer = Root };
         material.Properties.Add(tag);
 
         Assert.True(material.TryGetValue<UTexture[]>(out var converted, "ReferencedTextures"));
@@ -332,7 +335,7 @@ public sealed class EvidenceTests
         Assert.Same(tag, Assert.Single(material.Properties));
         Assert.Same(array, tag.Tag!.GenericValue);
         Assert.Contains(evidence.Properties, property => property.Pointer == "/Properties/0" && property.Name == "ReferencedTextures");
-        var binding = Assert.Single(evidence.References, reference => reference.TargetPath == "Bound");
+        var binding = Assert.Single(evidence.References, reference => reference.TargetPath == "/Game/Fixture.Bound");
         Assert.Equal("/Properties/0/0", binding.Pointer);
         Assert.Equal("hard", binding.Kind);
         Assert.Contains(evidence.References, reference => reference.Pointer == "/Properties/0/1" && reference.IsNull);
@@ -346,6 +349,7 @@ public sealed class EvidenceTests
         var source = new UClass
         {
             Name = "Class",
+            Outer = Root,
             ChildProperties = [new FArrayProperty
             {
                 Name = "Targets", ArrayDim = 1, ElementSize = 16,
@@ -363,7 +367,7 @@ public sealed class EvidenceTests
         Assert.Contains(evidence.Values, value => value.Pointer == "/Native/ChildProperties/0/PropertyFlags"
             && value.Value!.Contains("BlueprintVisible") && value.Value.Contains("Transient"));
         Assert.Contains(evidence.References, reference => reference.Pointer == "/Native/ChildProperties/0/Inner/PropertyClass"
-            && reference.TargetPath == "DeclaredClass" && reference.PackageIndex == 1);
+            && reference.TargetPath == "/Game/Fixture.DeclaredClass" && reference.PackageIndex == 1);
         Assert.Empty(evidence.Issues);
     }
 
@@ -374,6 +378,7 @@ public sealed class EvidenceTests
         var function = new UFunction
         {
             Name = "Function",
+            Outer = Root,
             ChildProperties = [new FMapProperty
             {
                 Name = "ByKind",
@@ -384,8 +389,8 @@ public sealed class EvidenceTests
 
         var evidence = EvidenceReader.Read(function);
 
-        Assert.Contains(evidence.References, reference => reference.Pointer == "/Native/ChildProperties/0/KeyProp/Enum" && reference.TargetPath == "DeclaredType");
-        Assert.Contains(evidence.References, reference => reference.Pointer == "/Native/ChildProperties/0/ValueProp/Struct" && reference.TargetPath == "DeclaredType");
+        Assert.Contains(evidence.References, reference => reference.Pointer == "/Native/ChildProperties/0/KeyProp/Enum" && reference.TargetPath == "/Game/Fixture.DeclaredType");
+        Assert.Contains(evidence.References, reference => reference.Pointer == "/Native/ChildProperties/0/ValueProp/Struct" && reference.TargetPath == "/Game/Fixture.DeclaredType");
         Assert.Contains(evidence.Values, value => value.Pointer == "/Native/ChildProperties/0/KeyProp/UnderlyingProp"
             && value.Kind == "field-declaration" && value.Type == nameof(FByteProperty));
         Assert.Empty(evidence.Issues);
@@ -394,10 +399,11 @@ public sealed class EvidenceTests
     [Fact]
     public void EmptyDeclarationsAndNullableNestedDeclarationsRemainExplicit()
     {
-        var empty = EvidenceReader.Read(new UClass { Name = "Empty", ChildProperties = [] });
+        var empty = EvidenceReader.Read(new UClass { Name = "Empty", Outer = Root, ChildProperties = [] });
         var optional = EvidenceReader.Read(new UClass
         {
             Name = "Optional",
+            Outer = Root,
             ChildProperties = [new FOptionalProperty { Name = "Value", ValueProperty = null }]
         });
 
@@ -413,7 +419,7 @@ public sealed class EvidenceTests
         var declaration = new FArrayProperty { Name = "Cyclic" };
         declaration.Inner = declaration;
 
-        var evidence = EvidenceReader.Read(new UClass { Name = "Class", ChildProperties = [declaration] });
+        var evidence = EvidenceReader.Read(new UClass { Name = "Class", Outer = Root, ChildProperties = [declaration] });
 
         Assert.Contains(evidence.Values, value => value.Pointer == "/Native/ChildProperties/0/Name" && value.Value == "Cyclic");
         Assert.Equal("/Native/ChildProperties/0/Inner", Assert.Single(evidence.Issues).Pointer);
@@ -455,8 +461,8 @@ public sealed class EvidenceTests
         var evidence = EvidenceReader.Read(parent);
 
         Assert.Empty(evidence.Texts);
-        Assert.Contains(evidence.References, reference => reference.Kind == "object" && reference.TargetPath == "Parent.Child");
-        Assert.Contains(EvidenceReader.Read(child).References, reference => reference.Role == "outer" && reference.TargetPath == "Parent");
+        Assert.Contains(evidence.References, reference => reference.Kind == "object" && reference.TargetPath == "/Game/Fixture.Parent:Child");
+        Assert.Contains(EvidenceReader.Read(child).References, reference => reference.Role == "outer" && reference.TargetPath == "/Game/Fixture.Parent");
     }
 
     [Fact]
@@ -486,7 +492,7 @@ public sealed class EvidenceTests
         var evidence = EvidenceReader.Read(first);
 
         Assert.Equal("", evidence.Path);
-        Assert.Contains(evidence.Issues, issue => issue.Type == "object-path" && issue.Message.Contains("cycle"));
+        Assert.Contains(evidence.Issues, issue => issue.Type == "object-path" && issue.Message.Contains("repeats"));
         Assert.Contains(evidence.References, reference => reference.Role == "outer" && reference.Error is not null);
     }
 
@@ -532,6 +538,7 @@ public sealed class EvidenceTests
         source.Class = new ResolvedLoadedObject(new UStruct
         {
             Name = "RuntimeLayout",
+            Outer = Root,
             ChildProperties = [new FIntProperty { Name = "Value", ArrayDim = 1 }, new FIntProperty { Name = "Value", ArrayDim = 1 }]
         });
 
@@ -608,11 +615,12 @@ public sealed class EvidenceTests
     [Fact]
     public void RuntimeStaticArrayLayoutsAreRejectedThroughActualAncestors()
     {
-        var parent = new UStruct { Name = "RuntimeParent", ChildProperties = [new FIntProperty { Name = "Values", ArrayDim = 2 }] };
+        var parent = new UStruct { Name = "RuntimeParent", Outer = Root, ChildProperties = [new FIntProperty { Name = "Values", ArrayDim = 2 }] };
         var package = new TestPackage(new ResolvedLoadedObject(parent));
-        var child = new UStruct { Name = "RuntimeChild", ChildProperties = [], SuperStruct = new FPackageIndex(package, 1) };
+        var child = new UStruct { Name = "RuntimeChild", Outer = Root, ChildProperties = [], SuperStruct = new FPackageIndex(package, 1) };
         var source = Object("Instance", Property("Value", new IntProperty(3)));
         source.Class = new ResolvedLoadedObject(child);
+        source.Outer = null; // An absent owner still requires runtime layout validation.
         Assert.Null(source.Owner);
 
         var evidence = EvidenceReader.Read(source);
@@ -626,7 +634,7 @@ public sealed class EvidenceTests
     [InlineData(EPackageFlags.PKG_UnversionedProperties, 1)]
     public void RuntimeArrayGuardMatchesOwningPackageSerialization(EPackageFlags flags, int expectedIssues)
     {
-        var runtime = new UStruct { Name = "Runtime", ChildProperties = [new FIntProperty { Name = "Values", ArrayDim = 2 }] };
+        var runtime = new UStruct { Name = "Runtime", Outer = Root, ChildProperties = [new FIntProperty { Name = "Values", ArrayDim = 2 }] };
         var package = new TestPackage(new ResolvedLoadedObject(runtime), flags);
         var first = Property("Values", new IntProperty(42));
         first.PropertyTagFlags = EPropertyTagFlags.HasArrayIndex;
@@ -650,9 +658,9 @@ public sealed class EvidenceTests
     [Fact]
     public void RuntimeLayoutGuardStopsAtTheNativeUsmapBoundary()
     {
-        var native = new UScriptClass("Native") { ChildProperties = [new FIntProperty { Name = "Values", ArrayDim = 2 }] };
+        var native = new UScriptClass("Native") { Outer = Root, ChildProperties = [new FIntProperty { Name = "Values", ArrayDim = 2 }] };
         var package = new TestPackage(new ResolvedLoadedObject(native));
-        var runtime = new UStruct { Name = "Runtime", ChildProperties = [], SuperStruct = new FPackageIndex(package, 1) };
+        var runtime = new UStruct { Name = "Runtime", Outer = Root, ChildProperties = [], SuperStruct = new FPackageIndex(package, 1) };
         var source = Object("Instance");
         source.Class = new ResolvedLoadedObject(runtime);
 
@@ -664,7 +672,7 @@ public sealed class EvidenceTests
     [Fact]
     public void CyclicRuntimeLayoutBecomesADiagnostic()
     {
-        var runtime = new UStruct { Name = "Cycle", ChildProperties = [] };
+        var runtime = new UStruct { Name = "Cycle", Outer = Root, ChildProperties = [] };
         runtime.SuperStruct = new FPackageIndex(new TestPackage(new ResolvedLoadedObject(runtime)), 1);
         var source = Object("Instance");
         source.Class = new ResolvedLoadedObject(runtime);
@@ -672,7 +680,7 @@ public sealed class EvidenceTests
         Assert.Contains(EvidenceReader.Read(source).Issues, issue => issue.Type == "runtime-schema" && issue.Message.Contains("ancestry repeats"));
     }
 
-    private static UObject Object(string name, params FPropertyTag[] properties) => new(properties.ToList()) { Name = name };
+    private static UObject Object(string name, params FPropertyTag[] properties) => new(properties.ToList()) { Name = name, Outer = Root };
     private static FPropertyTag Property(string name, FPropertyTagType value) => new() { Name = name, PropertyType = value.GetType().Name, Tag = value };
     private sealed class ValueProperty(object? value) : FPropertyTagType
     {
@@ -685,17 +693,18 @@ public sealed class EvidenceTests
         public object? Unsupported;
         public object Computed => throw new InvalidOperationException("Getters must not be evaluated.");
     }
-    private sealed class NeverLoadedReference(string name) : ResolvedObject(null!)
+    private sealed class NeverLoadedReference(string name) : ResolvedObject(Root.Package)
     {
         public override FName Name => name;
+        public override ResolvedObject Outer => Root;
         public override Lazy<UObject>? Object => throw new InvalidOperationException("Export loading is not evidence reading.");
     }
-    private sealed class FreshOuterReference() : ResolvedObject(null!)
+    private sealed class FreshOuterReference() : ResolvedObject(Root.Package)
     {
         public override FName Name => "Loop";
         public override ResolvedObject Outer => new FreshOuterReference();
     }
-    private sealed class TestPackage(ResolvedObject target, EPackageFlags flags = EPackageFlags.PKG_None) : AbstractUePackage("/Game/Fixture", null)
+    private sealed class TestPackage(ResolvedObject? target, EPackageFlags flags = EPackageFlags.PKG_None) : AbstractUePackage("/Game/Fixture", null)
     {
         public override FPackageFileSummary Summary { get; } = new() { PackageFlags = flags };
         public override FNameEntrySerialized[] NameMap => [];
@@ -706,7 +715,7 @@ public sealed class EvidenceTests
     }
     private sealed class TestTable : UDataTable
     {
-        public TestTable(Dictionary<FName, FStructFallback> rows) { Name = "Table"; RowMap = rows; RowStructName = "FixtureRow"; }
+        public TestTable(Dictionary<FName, FStructFallback> rows) { Name = "Table"; Outer = Root; RowMap = rows; RowStructName = "FixtureRow"; }
     }
     private static T Make<T>(params (string Name, object Value)[] fields)
     {

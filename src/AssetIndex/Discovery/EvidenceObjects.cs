@@ -1,4 +1,3 @@
-using System.Text;
 using CUE4Parse.UE4.Assets;
 using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Assets.Exports.Engine;
@@ -132,7 +131,7 @@ internal sealed partial class EvidenceReader
         try
         {
             var target = reference.ResolvedObject;
-            references.Add(new(pointer, "hard", role, target is null ? null : PathOf(target), false,
+            references.Add(new(pointer, "hard", role, target is null ? null : ObjectMetadata.Path(target), false,
                 reference.Owner?.Name, reference.Index, target?.ExportIndex,
                 target is null ? "Package index has no resolved target." : null));
         }
@@ -146,7 +145,7 @@ internal sealed partial class EvidenceReader
     {
         try
         {
-            references.Add(new(pointer, kind, role, reference is null ? null : PathOf(reference), reference is null,
+            references.Add(new(pointer, kind, role, reference is null ? null : ObjectMetadata.Path(reference), reference is null,
                 reference?.Package?.Name, null, reference?.ExportIndex, null));
         }
         catch (Exception error)
@@ -157,27 +156,11 @@ internal sealed partial class EvidenceReader
 
     private string? DescribePath(ResolvedObject reference, string pointer)
     {
-        try { return PathOf(reference); }
+        try { return ObjectMetadata.Path(reference); }
         catch (Exception error)
         {
             issues.Add(new(pointer, "object-path", AssetDiscovery.DescribeError(error)));
             return null;
         }
-    }
-
-    private static string PathOf(ResolvedObject reference)
-    {
-        var chain = new List<ResolvedObject>();
-        var seen = new HashSet<ResolvedObject>(ReferenceEqualityComparer.Instance);
-        for (var current = reference; current is not null; current = current.Outer)
-        {
-            if (chain.Count >= 128) throw new InvalidDataException("Object outer chain exceeds 128 levels.");
-            if (!seen.Add(current)) throw new InvalidDataException("Object outer chain contains a cycle.");
-            chain.Add(current);
-        }
-        var path = new StringBuilder(chain[^1].Name.Text);
-        for (var index = chain.Count - 2; index >= 0; index--)
-            path.Append(index == chain.Count - 3 ? ':' : '.').Append(chain[index].Name.Text);
-        return path.ToString();
     }
 }
