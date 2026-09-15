@@ -1,128 +1,118 @@
+using AssetIndex.Discovery;
 using CUE4Parse.GameTypes.Theia.FileProvider;
-using CUE4Parse.MappingsProvider;
-using CUE4Parse.UE4.AssetRegistry;
-using CUE4Parse.UE4.AssetRegistry.Objects;
 using CUE4Parse.UE4.Assets.Exports;
 
 namespace AssetIndex;
 
-internal sealed record DiscoveryResult(
-    IReadOnlyList<CatalogAsset> Assets,
-    IReadOnlyList<ExtractionIssue> Issues,
-    int RegisteredAssets,
-    int Candidates,
-    int Loaded);
+internal sealed record PackageRead(string Path, string Reason, string Status, int Exports, int Loaded);
+internal sealed record DiscoveryResult(IReadOnlyList<CatalogAsset> Assets, IReadOnlyList<UObject> Objects,
+    IReadOnlyList<RegisteredObject> Registry, IReadOnlyList<PackageRead> Packages,
+    IReadOnlyList<ExtractionIssue> Issues)
+{
+    public int RegisteredAssets => Registry.Count;
+    public int Candidates => Packages.Count;
+    public int Loaded => Packages.Count(package => package.Status == "loaded");
+}
 
 internal static class AssetDiscovery
 {
-    public static DiscoveryResult Read(TheiaFileProvider provider)
-    {
-        var issues = new List<ExtractionIssue>();
-        var registry = ReadRegistry(provider, issues);
-        var mappings = provider.MappingsForGame
-            ?? throw new InvalidDataException("Asset discovery requires type mappings.");
-        var candidates = CandidatePackages(registry, mappings, issues);
-        var objects = new List<UObject>();
-        var loaded = 0;
-        var attempted = 0;
-
-        foreach (var path in candidates)
-        {
-            try
-            {
-                var package = provider.LoadPackage(GameFiles.ResolvePackagePath(provider, path));
-                foreach (var export in package.ExportsLazy)
-                {
-                    try
-                    {
-                        objects.Add(export.Value);
-                    }
-                    catch (Exception exception)
-                    {
-                        issues.Add(new("decode", path, DescribeError(exception)));
-                    }
-                }
-
-                loaded++;
-            }
-            catch (Exception exception)
-            {
-                issues.Add(new("package", path, DescribeError(exception)));
-            }
-
-            attempted++;
-            if (attempted % 100 == 0 || attempted == candidates.Count)
-                Console.Error.WriteLine($"Read {attempted}/{candidates.Count} candidate packages; {loaded} loaded, {issues.Count} issues.");
-        }
-
-        ReportUnindexedPackages(provider, registry, issues);
-        var assets = Assets.Collect(objects, mappings, issues);
-        return new(assets, issues, registry.Count, candidates.Count, loaded);
-    }
+    public static DiscoveryResult Read(TheiaFileProvider provider, Action<ObjectEvidence> writeEvidence) =>
+        new ObjectCrawler(provider, writeEvidence).Read();
 
     internal static string DescribeError(Exception error)
     {
         var cause = error.GetBaseException().Message;
         return cause == error.Message ? error.Message : $"{error.Message} Cause: {cause}";
     }
+}
 
-    private static IReadOnlyList<FAssetData> ReadRegistry(TheiaFileProvider provider, List<ExtractionIssue> issues)
+internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvidence> writeEvidence)
+{
+    private readonly CUE4Parse.MappingsProvider.TypeMappings mappings = provider.MappingsForGame
+        ?? throw new InvalidDataException("Asset discovery requires type mappings.");
+    private readonly List<ExtractionIssue> issues = [];
+    private readonly SortedDictionary<string, string> pending = new(StringComparer.Ordinal);
+    private readonly HashSet<string> visited = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, UObject> objects = new(StringComparer.Ordinal);
+    private readonly List<PackageRead> packages = [];
+    private Dictionary<string, RegisteredObject[]> registeredPackages = new(StringComparer.OrdinalIgnoreCase);
+
+    public DiscoveryResult Read()
     {
-        var assets = new Dictionary<string, FAssetData>(StringComparer.Ordinal);
-        var registries = provider.Files.Values
-            .Where(file => Path.GetFileName(file.Path).Equals("AssetRegistry.bin", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(file => file.Path, StringComparer.Ordinal);
-        foreach (var file in registries)
-        {
-            try
-            {
-                using var reader = file.CreateReader();
-                var registry = new FAssetRegistryState(reader);
-                foreach (var asset in registry.PreallocatedAssetDataBuffers)
-                    assets.TryAdd(asset.ObjectPath, asset);
-            }
-            catch (Exception exception)
-            {
-                issues.Add(new("registry", file.Path, DescribeError(exception)));
-            }
-        }
+        var registry = Registry.Read(provider, issues);
+        registeredPackages = registry.GroupBy(asset => asset.Package).ToDictionary(group => group.Key,
+            group => group.ToArray(), StringComparer.OrdinalIgnoreCase);
+        var indexed = registry.Select(asset => Normalize(asset.Package)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var asset in registry)
+            if (Registry.SelectClass(mappings, asset.Class) || Registry.IsUiTexture(asset))
+                Enqueue(asset.Package, Registry.IsUiTexture(asset) ? "ui-texture" : "definition");
+        foreach (var file in provider.Files.Values.Where(file => file.IsUePackage))
+            if (!indexed.Contains(Normalize(file.Path))) Enqueue(file.Path, "unindexed");
 
-        if (assets.Count == 0)
-            issues.Add(new("registry", "AssetRegistry.bin", "No registered assets were read."));
-        return assets.Values.OrderBy(asset => asset.ObjectPath, StringComparer.Ordinal).ToArray();
+        while (pending.Count > 0)
+        {
+            var (path, reason) = pending.First();
+            pending.Remove(path);
+            if (!visited.Add(path)) continue;
+            ReadPackage(path, reason);
+            if (packages.Count % 250 == 0 || pending.Count == 0)
+                Console.Error.WriteLine($"Read {packages.Count:N0} packages; {pending.Count:N0} pending, {objects.Count:N0} objects, {issues.Count:N0} issues.");
+        }
+        var allObjects = objects.Values.OrderBy(source => source.GetPathName(), StringComparer.Ordinal).ToArray();
+        return new(Assets.Collect(allObjects, mappings, issues), allObjects, registry, packages, issues);
     }
 
-    private static IReadOnlyList<string> CandidatePackages(
-        IReadOnlyList<FAssetData> registry, TypeMappings mappings, List<ExtractionIssue> issues)
-    {
-        var packages = new SortedSet<string>(StringComparer.Ordinal);
-        foreach (var group in registry.GroupBy(asset => asset.AssetClass.Text))
-        {
-            var candidate = Assets.IsA(mappings, group.Key, "DataAsset");
-            var metadata = Assets.IsA(mappings, group.Key, "UIMetaDataItem");
-            if (candidate == false && metadata == false)
-                continue;
-            if (candidate is null && metadata != true)
-            {
-                issues.Add(new("schema", group.Key, $"Class ancestry is unknown for {group.Count()} registered assets; skipped until mappings identify their class."));
-                continue;
-            }
-            foreach (var asset in group)
-                packages.Add(asset.PackageName.Text);
-        }
+    private string Normalize(string path) => Path.ChangeExtension(provider.FixPath(GameFiles.ResolvePackagePath(provider, path)), null);
 
-        return packages.ToArray();
+    private void Enqueue(string path, string reason)
+    {
+        var physical = GameFiles.ResolvePackagePath(provider, path);
+        if (!visited.Contains(physical)) pending.TryAdd(physical, reason);
     }
 
-    private static void ReportUnindexedPackages(
-        TheiaFileProvider provider, IReadOnlyList<FAssetData> registry, List<ExtractionIssue> issues)
+    private void ReadPackage(string path, string reason)
     {
-        var indexed = registry.Select(asset => Path.ChangeExtension(provider.FixPath(GameFiles.ResolvePackagePath(provider, asset.PackageName.Text)), null))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var unindexed = provider.Files.Values
-            .Where(file => file.IsUePackage && !indexed.Contains(Path.ChangeExtension(provider.FixPath(file.Path), null)))
-            .Select(file => file.Path).Order(StringComparer.Ordinal).ToArray();
-        if (unindexed.Length > 0)
-            issues.Add(new("coverage", "AssetRegistry.bin", $"{unindexed.Length} packages are absent from the registry; their classes and IDs remain unaudited. Examples: {string.Join(", ", unindexed.Take(5))}"));
+        CUE4Parse.UE4.Assets.IPackage package;
+        try { package = provider.LoadPackage(path); }
+        catch (Exception error)
+        {
+            issues.Add(new("package", path, AssetDiscovery.DescribeError(error)));
+            packages.Add(new(path, reason, "failed", 0, 0));
+            return;
+        }
+
+        var loaded = 0;
+        for (var index = 0; index < package.ExportsLazy.Length; index++)
+        {
+            UObject source;
+            try { source = package.ExportsLazy[index].Value; }
+            catch (Exception error)
+            {
+                issues.Add(new("decode", $"{path}#export/{index}", AssetDiscovery.DescribeError(error)));
+                continue;
+            }
+            loaded++;
+            if (objects.TryAdd(source.GetPathName(), source)) ReadEvidence(source);
+        }
+        packages.Add(new(path, reason, loaded == package.ExportsLazy.Length ? "loaded" : "partial", package.ExportsLazy.Length, loaded));
+    }
+
+    private void ReadEvidence(UObject source)
+    {
+        var evidence = EvidenceReader.Read(source);
+        writeEvidence(evidence);
+        foreach (var issue in evidence.Issues)
+            issues.Add(new("evidence", evidence.Path + issue.Pointer, issue.Message));
+        foreach (var reference in evidence.References)
+        {
+            if (reference.Error is not null)
+                issues.Add(new("reference", evidence.Path + reference.Pointer, reference.Error));
+            if (reference.IsNull || reference.TargetPath is not { } target || target.StartsWith("/Script/", StringComparison.Ordinal)) continue;
+            var packagePath = target.Split('.', 2)[0];
+            if (!packagePath.StartsWith('/')) continue;
+            if (registeredPackages.TryGetValue(packagePath, out var entries) &&
+                !entries.Any(asset => Registry.FollowClass(mappings, asset.Class))) continue;
+            Enqueue(packagePath, "reference");
+        }
     }
 }

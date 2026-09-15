@@ -11,4 +11,8 @@ internal sealed record RunReport(
     int EnglishNames,
     int Descriptions,
     int Images,
-    IReadOnlyList<ExtractionIssue> Issues);
+    IReadOnlyList<ExtractionIssue> Issues,
+    IReadOnlyList<ExtractionIssue> Notices,
+    DiscoveryCoverage Discovery);
+
+internal sealed record DiscoveryCoverage(string NativeScope, string MappingSha256, int Objects, int Textures);

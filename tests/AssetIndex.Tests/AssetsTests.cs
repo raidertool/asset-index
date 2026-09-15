@@ -233,7 +233,6 @@ public sealed class AssetsTests
     }
 
     [Theory]
-    [InlineData("ItemDataAsset")]
     [InlineData("UICurrencyMetaDataItem")]
     public void MissingIdentityIsReportedForIdentityBearingClasses(string type)
     {
@@ -241,6 +240,21 @@ public sealed class AssetsTests
 
         Assert.Empty(Assets.Collect([Object("Unresolved", type)], Mappings.Value, issues));
         Assert.Contains("no resolvable", Assert.Single(issues).Message);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LocalDefinitionsWithoutAnIdentityLinkAreNotAssignedIds(bool explicitNull)
+    {
+        var source = Object("LocalModifier", "SessionModifierDataAsset");
+        if (explicitNull) source.Properties.Add(new FPropertyTag
+        {
+            Name = "PersistenceDataAsset", Tag = new ObjectProperty(new FPackageIndex((IPackage)null!, 0))
+        });
+        var issues = new List<ExtractionIssue>();
+        Assert.Empty(Assets.Collect([source], Mappings.Value, issues));
+        Assert.Empty(issues);
     }
 
     [Fact]

@@ -59,7 +59,9 @@ public sealed class ImagesTests
         var issues = new List<ExtractionIssue>();
         try
         {
-            var image = Assert.Single(Images.Export(new CatalogAsset(42, [definition], []), output, issues));
+            var resources = new TextureResources(output, issues);
+            var image = Assert.Single(Images.Export(new CatalogAsset(42, [definition], []), resources, issues));
+            Assert.Equal(image.Texture, Assert.Single(resources.Entries).Path);
             Assert.Equal(texture.GetPathName(), image.Texture);
             Assert.Equal("Icon", image.Field);
             Assert.Equal(definition.GetPathName(), image.Source);

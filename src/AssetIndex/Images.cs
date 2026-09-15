@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using CUE4Parse.UE4.Assets.Exports.Texture;
 using CUE4Parse_Conversion.Options;
 using CUE4Parse_Conversion.Textures;
@@ -19,7 +17,7 @@ internal static class Images
         "Portrait", "ImageAsset", "UnlockImage", "PreviewImage", "IconMaterial", "EmptySlotImage"
     ];
 
-    public static IReadOnlyList<AssetImage> Export(CatalogAsset asset, string output, ICollection<ExtractionIssue> issues)
+    public static IReadOnlyList<AssetImage> Export(CatalogAsset asset, TextureResources resources, ICollection<ExtractionIssue> issues)
     {
         var images = new List<AssetImage>();
         foreach (var source in asset.Definitions.Concat(asset.Metadata))
@@ -44,13 +42,8 @@ internal static class Images
                         continue;
                     }
                     texturePath = texture.GetPathName();
-                    var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(texturePath)));
-                    var file = $"images/{hash}.png";
-                    var decoded = texture.Decode()
-                        ?? throw new InvalidDataException("Texture has no decodable mip.");
-                    Directory.CreateDirectory(Path.Combine(output, "images"));
-                    System.IO.File.WriteAllBytes(Path.Combine(output, file), Encode(decoded));
-                    images.Add(new(field, path, texturePath, "exported", file, decoded.Width, decoded.Height));
+                    var resource = resources.Export(texture);
+                    images.Add(new(field, path, texturePath, resource.Status, resource.File, resource.Width, resource.Height));
                 }
                 catch (Exception error)
                 {

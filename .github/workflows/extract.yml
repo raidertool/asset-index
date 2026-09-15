@@ -30,7 +30,7 @@ jobs:
         with:
           repository: raidertool/SteamDepotFS
           # Modern authentication: https://github.com/raidertool/SteamDepotFS/pull/3 (under review).
-          ref: 91a8cc1a38dfb51312a63ffc4f9955256d96e789
+          ref: e3e8baa02d1a66a67c48328d97ee7c7e6e03187c
           path: .work/SteamDepotFS
           persist-credentials: false
 
@@ -173,4 +173,7 @@ jobs:
           path: |
             ${{ runner.temp }}/asset-index-preview/assets.json
             ${{ runner.temp }}/asset-index-preview/coverage.json
+            ${{ runner.temp }}/asset-index-preview/resources.json
+            ${{ runner.temp }}/asset-index-preview/discovery/
+            ${{ runner.temp }}/asset-index-preview/localization/
             ${{ runner.temp }}/asset-index-preview/images/

@@ -117,7 +117,9 @@ internal static class Assets
 
         persistence = Properties.Reference(source, "PersistenceDataAsset");
         // This is the definition's identity link, not a traversal of rewards or other asset references.
-        return (persistence is null ? null : ReadId(persistence))
+        // A local-only definition may leave that optional link empty. It remains in object discovery.
+        if (persistence is null) return null;
+        return ReadId(persistence)
             ?? throw new InvalidDataException("Data asset has no resolvable persistence asset or enabled asset ID override.");
     }
 

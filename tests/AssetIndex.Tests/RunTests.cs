@@ -20,6 +20,22 @@ public sealed class RunTests : IDisposable
     }
 
     [Fact]
+    public void WriteFailureLeavesNoPartialSnapshotAndAllowsTheSameInputToBeRetried()
+    {
+        Assert.Throws<IOException>(() => Snapshot.WriteFile(directory, "atomic.json", stream =>
+        {
+            stream.Write("partial"u8);
+            throw new IOException("Deliberate write failure.");
+        }));
+        Assert.Empty(Directory.EnumerateFiles(directory));
+        Snapshot.Write(directory, "atomic.json", new { value = "complete" });
+        var original = File.ReadAllBytes(Path.Combine(directory, "atomic.json"));
+        Assert.Throws<IOException>(() => Snapshot.Write(directory, "atomic.json", new { value = "replacement" }));
+        Assert.Equal(original, File.ReadAllBytes(Path.Combine(directory, "atomic.json")));
+        Assert.Single(Directory.EnumerateFiles(directory));
+    }
+
+    [Fact]
     public void FailedInputProducesDiagnosticsAndCanBeRetriedWithoutChangingPublishedFiles()
     {
         var published = Path.Combine(directory, "assets.json");
