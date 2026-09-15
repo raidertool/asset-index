@@ -57,12 +57,18 @@ internal static class Program
             Console.WriteLine("Mounting game containers...");
             using var provider = GameFiles.Open(options);
             Console.WriteLine($"Mounted {provider.Files.Count:N0} files. Reading typed object fields and references...");
-            using var evidence = new EvidenceFile(options.OutputDirectory);
-            discovery = AssetDiscovery.Read(provider, evidence.Write);
-            evidence.Complete();
+            using (var evidence = new EvidenceFile(options.OutputDirectory))
+            using (var progress = new ExtractionProgress(Console.Error))
+            {
+                discovery = AssetDiscovery.Read(provider, evidence.Write, (registry, files) =>
+                {
+                    Snapshot.WriteLines(options.OutputDirectory, "discovery/files.jsonl.gz", files);
+                    Snapshot.WriteLines(options.OutputDirectory, "discovery/registry.jsonl.gz", registry);
+                }, progress);
+                progress.Set("finish-evidence");
+                evidence.Complete();
+            }
             issues.AddRange(discovery.Issues);
-            Snapshot.WriteLines(options.OutputDirectory, "discovery/files.jsonl.gz", discovery.Files);
-            Snapshot.WriteLines(options.OutputDirectory, "discovery/registry.jsonl.gz", discovery.Registry);
             Snapshot.WriteLines(options.OutputDirectory, "discovery/packages.jsonl.gz", discovery.Packages);
             var materials = new MaterialIcons(provider,
                 new(TextureAddress.TA_Wrap, TextureAddress.TA_Wrap, TextureFilter.TF_Bilinear),

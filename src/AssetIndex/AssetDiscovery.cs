@@ -17,8 +17,9 @@ internal sealed record DiscoveryResult(IReadOnlyList<CatalogAsset> Assets, IRead
 
 internal static class AssetDiscovery
 {
-    public static DiscoveryResult Read(TheiaFileProvider provider, Action<ObjectEvidence> writeEvidence) =>
-        new ObjectCrawler(provider, writeEvidence).Read();
+    public static DiscoveryResult Read(TheiaFileProvider provider, Action<ObjectEvidence> writeEvidence,
+        Action<IReadOnlyList<RegisteredObject>, IReadOnlyList<PackageFile>> writeInventory, ExtractionProgress progress) =>
+        new ObjectCrawler(provider, writeEvidence, progress).Read(writeInventory);
 
     internal static string DescribeError(Exception error)
     {
@@ -27,7 +28,8 @@ internal static class AssetDiscovery
     }
 }
 
-internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvidence> writeEvidence)
+internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvidence> writeEvidence,
+    ExtractionProgress? progress = null)
 {
     private readonly CUE4Parse.MappingsProvider.TypeMappings mappings = provider.MappingsForGame
         ?? throw new InvalidDataException("Asset discovery requires type mappings.");
@@ -40,10 +42,21 @@ internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvi
     private readonly ReferenceClosure references = new();
     private Dictionary<string, RegisteredObject[]> registeredPackages = new(StringComparer.OrdinalIgnoreCase);
 
-    public DiscoveryResult Read()
+    public DiscoveryResult Read(Action<IReadOnlyList<RegisteredObject>, IReadOnlyList<PackageFile>> writeInventory)
     {
+        progress?.Set("read-registry");
         var registry = Registry.Read(provider, issues);
+        return Read(registry, writeInventory);
+    }
+
+    internal DiscoveryResult Read(IReadOnlyList<RegisteredObject> registry,
+        Action<IReadOnlyList<RegisteredObject>, IReadOnlyList<PackageFile>> writeInventory)
+    {
+        progress?.Set("inventory");
         var files = PackageInventory.Read(provider, registry, issues);
+        progress?.Set("write-inventory");
+        writeInventory(registry, files);
+        progress?.Set("select-packages");
         registeredPackages = registry.GroupBy(asset => asset.Package, StringComparer.OrdinalIgnoreCase).ToDictionary(group => group.Key,
             group => group.ToArray(), StringComparer.OrdinalIgnoreCase);
         foreach (var asset in registry)
@@ -70,7 +83,9 @@ internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvi
                     $"memory {process.WorkingSet64 / (1024 * 1024):N0} MiB resident, {GC.GetTotalMemory(false) / (1024 * 1024):N0} MiB managed; {storage}last {path}.");
             }
         }
+        progress?.Set("reference-closure");
         foreach (var issue in references.Check(objects.Keys)) AddIssue(issue, "reference:missing-target");
+        progress?.Set("catalog");
         var allObjects = objects.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => pair.Value.Source).ToArray();
         return new(Assets.Collect(allObjects, mappings, issues), allObjects, registry, files, packages, issues);
     }
@@ -83,6 +98,7 @@ internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvi
 
     private void ReadPackage(string path, string reason)
     {
+        progress?.Set("load-package", path);
         CUE4Parse.UE4.Assets.IPackage package;
         try { package = provider.LoadPackage(path); }
         catch (Exception error)
@@ -95,6 +111,7 @@ internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvi
         var loaded = 0;
         for (var index = 0; index < package.ExportsLazy.Length; index++)
         {
+            progress?.Set("decode-export", path, index);
             UObject source;
             try { source = package.ExportsLazy[index].Value; }
             catch (Exception error)
@@ -103,10 +120,11 @@ internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvi
                 continue;
             }
             loaded++;
+            progress?.Set("read-evidence", path, index);
             var evidence = EvidenceReader.Read(source);
             if (evidence.Path.Length == 0)
             {
-                ReadEvidence(evidence);
+                ReadEvidence(evidence, path, index);
                 continue;
             }
             var origin = $"{path}#export/{index}";
@@ -114,14 +132,16 @@ internal sealed class ObjectCrawler(TheiaFileProvider provider, Action<ObjectEvi
                 AddIssue(new("decode", origin,
                     $"Duplicate object path {evidence.Path}; first decoded at {objects[evidence.Path].Origin}; repeated at {origin}."),
                     "decode:duplicate-object-path");
-            ReadEvidence(evidence);
+            ReadEvidence(evidence, path, index);
         }
         packages.Add(new(path, reason, loaded == package.ExportsLazy.Length ? "loaded" : "partial", package.ExportsLazy.Length, loaded));
     }
 
-    private void ReadEvidence(ObjectEvidence evidence)
+    private void ReadEvidence(ObjectEvidence evidence, string path, int exportIndex)
     {
+        progress?.Set("write-evidence", path, exportIndex);
         writeEvidence(evidence);
+        progress?.Set("follow-references", path, exportIndex);
         foreach (var issue in evidence.Issues)
             AddIssue(new("evidence", evidence.Path + issue.Pointer, issue.Message), "evidence:" + issue.Type + ":" + issue.Message);
         foreach (var reference in evidence.References)

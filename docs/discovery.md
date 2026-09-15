@@ -43,6 +43,10 @@ every nested layout or recover fields skipped by the decoder.
 `registryPackages`. Empty lists identify unindexed inputs; each must have an
 attempt in `packages.jsonl.gz`. The crosswalk uses the provider's mount resolution,
 including package IDs, and excludes older shadowed archive versions and payloads.
+Registry and file inventories are saved before crawling. Every 30 seconds, stderr
+reports the active discovery operation, requested package and export index. Nested
+decoder dependencies may be loaded within that operation. Interrupted object streams
+remain temporary; inventories alone do not establish completed extraction.
 `localization/` retains the game's merged translation dictionaries. `resources.json`
 indexes UI/referenced textures and supported material images independently of catalog ownership.
 
