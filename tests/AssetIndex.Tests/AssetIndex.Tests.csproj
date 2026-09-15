@@ -13,5 +13,6 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" PrivateAssets="all" />
     <ProjectReference Include="../../src/AssetIndex/AssetIndex.csproj" />
     <Using Include="Xunit" />
+    <None Update="Fixtures/extractor-icon.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

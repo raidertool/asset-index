@@ -25,6 +25,7 @@ internal sealed class ImageResources(string output, ICollection<ExtractionIssue>
             {
                 UTexture2D texture => texture.Decode() ?? throw new InvalidDataException("Texture has no decodable mip."),
                 UMaterialInstanceConstant material when materials is not null => materials.Render(material),
+                UMaterial material when materials is not null => materials.Render(material),
                 _ => throw new NotSupportedException($"Unsupported image source: {source.ExportType}.")
             };
             var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(path)));

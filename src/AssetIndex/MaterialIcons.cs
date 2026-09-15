@@ -14,16 +14,19 @@ internal sealed record IconParameters(Vector3 ColorA, Vector3 ColorB, Vector3 Co
     float MetalA = 0, float MetalB = 0, float MetalC = 0, float CoverageB = 0, float CoverageC = 0,
     Vector4 Selection = default);
 
-// Only the verified M_CharacterColorSchemeIcon graph. This is a standalone,
-// unscaled UI image with white tint, no widget effects, sRGB output and straight alpha.
+// Verified material graphs rendered as standalone, unscaled UI images with
+// white tint, no widget effects, sRGB output and straight alpha.
 internal sealed class MaterialIcons(TheiaFileProvider provider, MaterialSampling backgroundSampling, MaterialSampling bevelSampling)
 {
     internal const string ParentPath = "/Game/Pioneer/UI/Assets/Materials/M_CharacterColorSchemeIcon.M_CharacterColorSchemeIcon";
     internal const string ParentHash = "db3d344eae234463df74e485ff0710460e17b40d603fb8fe87bfedfa462a13d6";
     internal const string BackgroundPath = "/Game/Pioneer/UI/Assets/Materials/T_CharacterColorSchemeIcon_Background.T_CharacterColorSchemeIcon_Background";
     internal const string BevelPath = "/Game/Pioneer/UI/Assets/Materials/T_CharacterColorSchemeIcon_Bevel.T_CharacterColorSchemeIcon_Bevel";
+    private readonly ExtractorIcon extractor = new(provider);
     private MaterialTexture? background;
     private MaterialTexture? bevel;
+
+    public CTexture Render(UMaterial material) => extractor.Render(material);
 
     public CTexture Render(UMaterialInstanceConstant material)
     {
@@ -110,21 +113,8 @@ internal sealed class MaterialIcons(TheiaFileProvider provider, MaterialSampling
             throw new NotSupportedException($"Unverified color icon parameter binding: {name}.");
     }
 
-    internal static CTexture RenderPixels(IconParameters parameters, MaterialTexture background, MaterialTexture bevel)
-    {
-        var pixels = new byte[background.Width * background.Height * 4];
-        for (var y = 0; y < background.Height; y++)
-            for (var x = 0; x < background.Width; x++)
-            {
-                var color = Pixel(new((x + .5f) / background.Width, (y + .5f) / background.Height), parameters, background, bevel);
-                var offset = (y * background.Width + x) * 4;
-                pixels[offset] = Byte(Srgb(color.X));
-                pixels[offset + 1] = Byte(Srgb(color.Y));
-                pixels[offset + 2] = Byte(Srgb(color.Z));
-                pixels[offset + 3] = Byte(color.W);
-            }
-        return new(background.Width, background.Height, EPixelFormat.PF_R8G8B8A8, pixels);
-    }
+    internal static CTexture RenderPixels(IconParameters parameters, MaterialTexture background, MaterialTexture bevel) =>
+        MaterialPixels.Render(background.Width, background.Height, uv => Pixel(uv, parameters, background, bevel));
 
     internal static Vector4 Pixel(Vector2 uv, IconParameters p, MaterialTexture background, MaterialTexture bevel)
     {
@@ -144,13 +134,6 @@ internal sealed class MaterialIcons(TheiaFileProvider provider, MaterialSampling
         color = Vector3.Max(Vector3.Zero, Vector3.Lerp(color, new(p.Selection.X, p.Selection.Y, p.Selection.Z), p.Selection.W));
         return new(color, Math.Clamp(sample.W, 0, 1));
     }
-
-    private static float Srgb(float value) => value < .00313067f ? 12.92f * value : 1.055f * MathF.Pow(value, .4166667f) - .055f;
-    private static byte Byte(float value)
-    {
-        if (!float.IsFinite(value)) throw new NotSupportedException("Color icon output contains a nonfinite channel.");
-        return (byte)MathF.Round(Math.Clamp(value, 0, 1) * 255);
-    }
 }
 
 internal sealed class MaterialTexture
@@ -164,10 +147,10 @@ internal sealed class MaterialTexture
     {
         if (sampling.Filter is not (TextureFilter.TF_Nearest or TextureFilter.TF_Bilinear) ||
             !SupportedAddress(sampling.X) || !SupportedAddress(sampling.Y))
-            throw new NotSupportedException("Color icon sampling must specify an explicit supported filter and address modes.");
+            throw new NotSupportedException("Material sampling must specify an explicit supported filter and address modes.");
         if (texture.PixelFormat is not (EPixelFormat.PF_B8G8R8A8 or EPixelFormat.PF_R8G8B8A8) ||
             texture.Width <= 0 || texture.Height <= 0 || texture.Data.Length != checked(texture.Width * texture.Height * 4))
-            throw new NotSupportedException("Color icon sampling requires decoded RGBA8 or BGRA8 pixels.");
+            throw new NotSupportedException("Material sampling requires decoded RGBA8 or BGRA8 pixels.");
         (Width, Height, this.sampling) = (texture.Width, texture.Height, sampling);
         pixels = new Vector4[Width * Height];
         for (var index = 0; index < pixels.Length; index++)
@@ -186,7 +169,7 @@ internal sealed class MaterialTexture
         var y = uv.Y * Height;
         if (!float.IsFinite(x) || !float.IsFinite(y) || (double)x < int.MinValue + 1d || (double)x > int.MaxValue - 1d ||
             (double)y < int.MinValue + 1d || (double)y > int.MaxValue - 1d)
-            throw new NotSupportedException("Color icon sample coordinates exceed the finite pixel range.");
+            throw new NotSupportedException("Material sample coordinates exceed the finite pixel range.");
         if (sampling.Filter == TextureFilter.TF_Nearest) return At((int)MathF.Floor(x), (int)MathF.Floor(y));
         x -= .5f;
         y -= .5f;
