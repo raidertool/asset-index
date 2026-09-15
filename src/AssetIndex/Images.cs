@@ -14,7 +14,7 @@ internal static class Images
     private static readonly string[] Fields =
     [
         "Icon", "BigIcon", "TinyIcon", "Image", "CurrencyIcon", "CurrencyBigIcon", "EnemyIcon", "EnemyImage",
-        "OfferImage", "OfferImageSquare", "OfferImageWide", "OfferImagePortrait"
+        "OfferImage", "OfferImage_1x1", "OfferImage_2x1", "OfferImage_9x16", "OfferImage_16x9", "OfferImage_Thumbnail"
     ];
 
     public static IReadOnlyList<AssetImage> Export(CatalogAsset asset, string output, ICollection<ExtractionIssue> issues)
