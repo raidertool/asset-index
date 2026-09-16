@@ -34,7 +34,9 @@ prove package inspection, without rewriting object paths.
 
 Property headers require unique, contiguous ordinal slots and valid array metadata.
 Field pointers must resolve within declared property containers; native fields
-retain their own paths. Binary values require canonical, lossless base64.
+retain their own paths. Base64 must be canonical. `numeric-le-base64` also requires
+a supported canonical array type (for example, `UInt16Property[]`) and a decoded
+byte length divisible by its element width. See [discovery](discovery.md) for the encoding.
 
 Validation reads a private copy on disk. Later changes to the input directory
 cannot change the validated payload; large images and evidence streams are not
@@ -61,6 +63,8 @@ existing commit, metadata and tag. Only metadata and coverage are excluded from
 payload equality. Unowned text or resource changes therefore create a snapshot;
 source-only edits with unchanged output do not. New run provenance stays in its
 logs/artifacts. Retrying identical input creates no revision.
+
+## Activation
 
 Before merging source changes, upgrade and pin the importer to a reviewed legacy
 data commit and drain older importer runs. Retire the old publisher and drain its

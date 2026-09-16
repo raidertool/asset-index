@@ -80,16 +80,16 @@ is unchanged. Historical tags stay unchanged. No data branch or extractor releas
 has been created.
 
 Today the importer follows `main` and versions by commit. Before merging source
-changes, upgrade and pin it to a reviewed legacy data commit and drain older
-importer runs. Retire the old publisher and drain its queued/running writes too.
-After merging, initialize and validate `data` with its exact lightweight tag
-before switching the importer. Verify the first import before scheduling publication.
+changes or enabling publication, follow the [activation order](docs/publication.md#activation).
+See [snapshot publication](docs/publication.md) for the command and validation contract.
 
 ## Layout
 
 ```text
-src/AssetIndex/          Extractor
-tests/AssetIndex.Tests/  Offline tests
-mappings/               Game property mapping
-vendor/CUE4Parse/        Pinned upstream dependency
+src/AssetIndex/                Extractor
+src/PublishSnapshot/           Snapshot validator and publisher (inactive)
+tests/AssetIndex.Tests/        Offline extractor tests
+tests/PublishSnapshot.Tests/   Offline publisher and Git atomicity tests
+mappings/                     Game property mapping
+vendor/CUE4Parse/              Pinned upstream dependency
 ```
