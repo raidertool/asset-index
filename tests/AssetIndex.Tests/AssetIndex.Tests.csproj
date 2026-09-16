@@ -14,5 +14,7 @@
     <ProjectReference Include="../../src/AssetIndex/AssetIndex.csproj" />
     <Using Include="Xunit" />
     <None Update="Fixtures/extractor-icon.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../vendor/CUE4Parse/CUE4Parse.Tests/Fixtures/UE5_8/IoStore/Tagged/Zlib/CUE4ParseFixtures-Minimal-Zlib-Windows.*"
+          Link="Fixtures/IoStore/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

@@ -32,7 +32,21 @@ internal class PackageProvider(string directory) : TheiaFileProvider(directory, 
         Files.FindPayloads(file, out _, out var ubulks, out var uptnls);
         Func<FByteBulkDataHeader?, FArchive?>? ubulk = ubulks.Count > 0 ? header => ubulks[0].SafeCreateReader(header) : null;
         Func<FByteBulkDataHeader?, FArchive?>? uptnl = uptnls.Count > 0 ? header => uptnls[0].SafeCreateReader(header) : null;
-        return new IoPackage(archives.Open(file, io.IoStoreReader.Versions), io.IoStoreReader.ContainerHeader, ubulk, uptnl, this);
+        return new IoPackage(archives.Open(file, io.IoStoreReader.Versions,
+            (offset, count) => ReadRange(io, offset, count)), io.IoStoreReader.ContainerHeader, ubulk, uptnl, this);
+    }
+
+    internal static byte[] ReadRange(FIoStoreEntry file, long offset, int count)
+    {
+        if (offset < 0 || count < 0 || offset > file.Size - count)
+            throw new EndOfStreamException($"Read exceeds package bounds: {file.Path}.");
+        if (count == 0) return [];
+        // Upstream IoStore treats these two header fields as a package-relative range.
+        // Its container reader still owns block selection, decryption and decompression.
+        var bytes = file.Read(new FByteBulkDataHeader(0, count, (uint)count, offset, FBulkDataCookedIndex.Default));
+        if (bytes.Length != count)
+            throw new InvalidDataException($"IoStore reader returned an unexpected range length: {file.Path}.");
+        return bytes;
     }
 
     public override void Dispose()

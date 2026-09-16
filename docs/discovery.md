@@ -13,8 +13,9 @@ Registry UI textures and exact typed texture/material or runtime `Struct` target
 known Actor, world and other noncandidate bodies remain inventoried. Metadata
 ambiguity is a diagnostic, never a silent exclusion.
 
-IoStore package bytes use a 256 MiB memory cache and a temporary disk spool,
-deleted when the provider closes. Lazy readers can revisit evicted bytes;
+IoStore reads fetch decoded package pages on demand, with a 256 MiB memory cache.
+Fetched pages remain in a temporary disk spool until the provider closes, so lazy
+readers can revisit evicted bytes. Upstream handles compressed-block reads;
 decoded objects and image pixels use separate memory.
 
 `EvidenceReader` visits CUE4Parse property tags, arrays, sets, map keys/values,
