@@ -13,6 +13,7 @@ internal sealed class CatalogCollector(TypeMappings mappings, Func<UObject, Obje
     private readonly Dictionary<long, Dictionary<string, CatalogSource>> metadata = [];
     private readonly ConditionalWeakTable<UObject, CatalogSource> sources = new();
     private readonly PresentationCollector presentation = new(mappings, issues);
+    private readonly VisualSlotLabelCollector visualSlots = new(mappings, issues);
 
     public void Observe(UObject source)
     {
@@ -20,11 +21,13 @@ internal sealed class CatalogCollector(TypeMappings mappings, Func<UObject, Obje
         try { Assets.Associate(source, mappings, Add); }
         catch (Exception error) { issues.Add(new("asset", ObjectMetadata.Path(source), error.Message)); }
         presentation.Observe(source);
+        visualSlots.Observe(source);
     }
 
     public IReadOnlyList<CatalogAsset> Complete()
     {
         var names = presentation.Complete().ToLookup(name => name.AssetId);
+        var slotNames = visualSlots.Complete().ToLookup(name => name.AssetId);
         var result = new List<CatalogAsset>();
         foreach (var id in definitions.Keys.Union(metadata.Keys).Order())
         {
@@ -32,7 +35,8 @@ internal sealed class CatalogCollector(TypeMappings mappings, Func<UObject, Obje
             var associated = Sorted(metadata, id);
             if (defined.Length == 0)
                 issues.Add(new("asset", id.ToString(), "UI metadata has no matching asset definition; retaining its explicit ID."));
-            result.Add(new(id, defined, associated) { PresentationNames = names[id].ToArray() });
+            result.Add(new(id, defined, associated)
+            { PresentationNames = names[id].ToArray(), VisualSlotNames = slotNames[id].ToArray() });
         }
         return result;
     }

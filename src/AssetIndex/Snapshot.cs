@@ -8,8 +8,14 @@ internal sealed record ObjectReference(string Name, string Class, string Path);
 internal sealed record Translation(string Locale, string DisplayName, string Description);
 internal sealed record ContainerPresentation(string Role, string ContainerType, string FramePath,
     int ContainerIndex, string SlotPath, string? ContainerPath, string MetadataPath);
+internal sealed record VisualSlotMemberPresentation(string ItemPath, string MetadataPath);
+internal sealed record VisualSlotPresentation(string SlotPath, string TypeTag, string MetadataPath,
+    IReadOnlyList<VisualSlotMemberPresentation> Members);
 internal sealed record AssetPresentation(TextReference? Name, TextReference? Description,
-    IReadOnlyList<TextCandidate> Candidates, IReadOnlyList<ContainerPresentation> Containers);
+    IReadOnlyList<TextCandidate> Candidates, IReadOnlyList<ContainerPresentation> Containers)
+{
+    public IReadOnlyList<VisualSlotPresentation> VisualSlots { get; init; } = [];
+}
 internal sealed record AssetRecord(
     [property: JsonNumberHandling(JsonNumberHandling.WriteAsString)] long Id,
     IReadOnlyList<ObjectReference> Definitions, IReadOnlyList<ObjectReference> Metadata,

@@ -19,6 +19,7 @@ internal static class TextRoles
         ["UICharacterVisualSkinMetaDataItem"] = [new("DisplayName", "display-name"), new("Description", "description")],
         ["UICharacterVisualSkinPartMetaDataItem"] = [new("DisplayName", "display-name")],
         ["UICharacterVisualSkinSlotMetaDataItem"] = [new("DisplayName", "display-name")],
+        ["UICharacterCustomizationQuickNavTabMetaDataItem"] = [new("DisplayName", "display-name")],
         ["UIEnvironmentalDamageSourceMetaDataItem"] = [new("DisplayName", "display-name")],
         ["UIStashSlotMetaDataItem"] = [new("DisplayName", "display-name"), new("Description", "description"), new("EffectFormatText", "effect-format")],
         ["UINPCMetaDataItem"] =

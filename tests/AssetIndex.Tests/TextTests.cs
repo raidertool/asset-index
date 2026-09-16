@@ -246,6 +246,109 @@ public sealed class TextTests
     }
 
     [Fact]
+    public void NpcDefinitionUsesSpecificUiNameAndRetainsGenericItemName()
+    {
+        var gameplay = WithText("ItemName", new FText("Juanito"));
+        var npc = WithText("DisplayName", new FText("Ermal"), "UINPCMetaDataItem");
+        var text = Text.Read(Asset([Definition("NPCItemDataAsset")], [gameplay, npc], []), []);
+
+        Assert.Equal("Ermal", text.Name?.Source);
+        Assert.Equal(2, text.Candidates.Count);
+        Assert.Contains(text.Candidates, candidate => candidate.Reference.Source == "Juanito");
+        Assert.Empty(text.Notices);
+    }
+
+    [Fact]
+    public void NpcSpecificNameRetainsTemplateProvenance()
+    {
+        var parent = WithText("DisplayName", new FText("Ermal"), "UINPCMetaDataItem");
+        parent.Name = "Template";
+        var npc = Definition("UINPCMetaDataItem");
+        npc.Template = new ResolvedLoadedObject(parent);
+        var text = Text.Read(Asset([Definition("NPCItemDataAsset")], [npc], []), []);
+
+        Assert.Equal("Ermal", text.Name?.Source);
+        Assert.Equal(parent.GetPathName(), Assert.Single(text.Candidates).DefinedAt);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void EmptyOrConflictingNpcSpecificNamesDoNotRestoreTheGenericName(bool conflict)
+    {
+        var gameplay = WithText("ItemName", new FText("Generic name"));
+        var npc = WithText("DisplayName", new FText(conflict ? "First name" : ""), "UINPCMetaDataItem");
+        var second = WithText("DisplayName", new FText("Second name"), "UINPCMetaDataItem");
+        second.Name = "Other";
+        var metadata = conflict ? new[] { gameplay, npc, second } : [gameplay, npc];
+
+        var text = Text.Read(Asset([Definition("NPCItemDataAsset")], metadata, []), []);
+
+        Assert.Null(text.Name);
+        Assert.Equal(conflict ? 1 : 0, text.Notices.Count);
+    }
+
+    [Fact]
+    public void ModifierDescriptionAlsoProvidesItsLabelWithOriginalProvenance()
+    {
+        var parent = WithText("Description", new FText("XP Boost 20%"), "SessionModifierDataAsset");
+        parent.Name = "Template";
+        var modifier = Definition("SessionModifierDataAsset");
+        modifier.Template = new ResolvedLoadedObject(parent);
+
+        var text = Text.Read(Asset([modifier], [], []), []);
+
+        Assert.Equal(text.Description, text.Name);
+        Assert.Equal("XP Boost 20%", text.Name?.Source);
+        var candidate = Assert.Single(text.Candidates);
+        Assert.Equal("description", candidate.Role);
+        Assert.Equal("Description", candidate.Field);
+        Assert.Equal(parent.GetPathName(), candidate.DefinedAt);
+    }
+
+    [Theory]
+    [InlineData("Name")]
+    [InlineData("")]
+    public void ModifierExplicitNameOrEmptyNameDoesNotFallBackToDescription(string name)
+    {
+        var modifier = WithText("Description", new FText("XP Boost 20%"), "SessionModifierDataAsset");
+        var metadata = WithText("ItemName", new FText(name));
+
+        var text = Text.Read(Asset([modifier], [metadata], []), []);
+
+        Assert.Equal(name.Length == 0 ? null : name, text.Name?.Source);
+    }
+
+    [Theory]
+    [InlineData("ItemName", "UIGameplayItemMetaDataItem")]
+    [InlineData("Description", "UISessionModifierMetaDataItem")]
+    public void ModifierDoesNotBypassConflictingNamesOrDescriptions(string field, string type)
+    {
+        var modifier = WithText("Description", new FText("Definition fallback"), "SessionModifierDataAsset");
+        var first = WithText(field, new FText("First"), type);
+        var second = WithText(field, new FText("Second"), type);
+        second.Name = "Other";
+
+        var text = Text.Read(Asset([modifier], [first, second], []), []);
+
+        Assert.Null(text.Name);
+        Assert.Single(text.Notices);
+    }
+
+    [Theory]
+    [InlineData("QuestDefinition", "Description", "UISessionModifierMetaDataItem")]
+    [InlineData("SessionModifierDataAsset", "Description", "UIGameplayItemMetaDataItem")]
+    [InlineData("SessionModifierDataAsset", "EmptySlotTooltipText", "UIInventorySlotMetaDataItem")]
+    public void OtherDefinitionsAndUnrelatedDescriptionsDoNotGainModifierLabels(string definition, string field, string type)
+    {
+        var metadata = WithText(field, new FText("Unrelated description"), type);
+        var text = Text.Read(Asset([Definition(definition)], [metadata], []), []);
+
+        Assert.Null(text.Name);
+        Assert.Equal("Unrelated description", text.Description?.Source);
+    }
+
+    [Fact]
     public void EmptyPrimaryMetadataDoesNotSelectALowerRoleOrDefinition()
     {
         var metadata = WithText("LongName", new FText(string.Empty), "UICurrencyMetaDataItem");
@@ -375,6 +478,7 @@ public sealed class TextTests
         var text = Text.Read(Asset([definition], [metadata], issues), issues);
 
         Assert.Equal("UI description", text.Description?.Source);
+        Assert.Equal(text.Description, text.Name);
         Assert.Contains(text.Candidates, candidate => candidate.SourceKind == "definition"
             && candidate.SourcePath == definition.GetPathName() && candidate.Reference.Source == "Definition description");
         Assert.Empty(issues);
@@ -431,6 +535,9 @@ public sealed class TextTests
 
     private static CatalogAsset Asset(UObject metadata, ICollection<ExtractionIssue>? issues = null) =>
         Asset([], [metadata], issues ?? []);
+
+    private static UObject Definition(string type) =>
+        new() { Name = "Definition", Class = new ResolvedLoadedObject(new UScriptClass(type)) };
 
     private static CatalogAsset Asset(UObject[] definitions, UObject[] metadata, ICollection<ExtractionIssue> issues)
     {

@@ -174,7 +174,7 @@ internal sealed class ObjectCrawler(PackageProvider provider, Action<ObjectEvide
             return;
         }
         var header = matches[0];
-        if (Registry.FollowClass(header)) Select(work, header);
+        if (references.NeedsBody(target) || Registry.FollowClass(header)) Select(work, header);
         else references.Inventory(target);
     }
 
@@ -256,9 +256,10 @@ internal sealed class ObjectCrawler(PackageProvider provider, Action<ObjectEvide
             if (!packagePath.StartsWith('/')) continue;
             var work = RequestPackage(packagePath, "reference");
             if (!target.Contains('.')) continue; // Package-only outer links have no export body to select.
-            references.Require(evidence.Path + reference.Pointer, target);
-            if (work.Targets.TryAdd(target, evidence.Path + reference.Pointer) && work.Headers is not null && work.Failure is null)
-                SelectTarget(work, target, evidence.Path + reference.Pointer);
+            var source = evidence.Path + reference.Pointer;
+            var changed = references.Require(source, target, reference.Role is "class-default" or "template");
+            work.Targets.TryAdd(target, source);
+            if (changed && work.Headers is not null && work.Failure is null) SelectTarget(work, target, source);
         }
     }
 

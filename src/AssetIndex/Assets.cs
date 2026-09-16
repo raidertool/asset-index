@@ -9,6 +9,7 @@ internal sealed record CatalogSource(ObjectReference Reference, IReadOnlyList<Te
 internal sealed record CatalogAsset(long Id, IReadOnlyList<CatalogSource> Definitions, IReadOnlyList<CatalogSource> Metadata)
 {
     public IReadOnlyList<PresentationName> PresentationNames { get; init; } = [];
+    public IReadOnlyList<VisualSlotName> VisualSlotNames { get; init; } = [];
 }
 
 internal static class Assets

@@ -22,16 +22,46 @@ internal static class Text
     {
         var candidates = asset.Metadata.SelectMany(source => source.Text.Select(candidate => candidate with { SourceKind = "metadata" }))
             .Concat(asset.Definitions.SelectMany(source => source.Text.Select(candidate => candidate with { SourceKind = "definition" })))
-            .Concat(asset.PresentationNames.SelectMany(name => name.Text)).ToArray();
+            .Concat(asset.PresentationNames.SelectMany(name => name.Text))
+            .Concat(asset.VisualSlotNames.SelectMany(name => name.Text)).ToArray();
         foreach (var issue in asset.PresentationNames.SelectMany(name => name.TextIssues).Distinct()) issues.Add(issue);
+        foreach (var issue in asset.VisualSlotNames.SelectMany(name => name.TextIssues).Distinct()) issues.Add(issue);
 
         var distinct = candidates.Distinct().OrderBy(candidate => candidate.SourcePath, StringComparer.Ordinal)
             .ThenBy(candidate => candidate.Field, StringComparer.Ordinal).ToArray();
         var notices = new List<ExtractionIssue>();
-        return new AssetText(asset.Id, Select(distinct, ["display-name", "title", "short-name"], notices),
-            Select(distinct, ["description", "tooltip"], notices))
+        var description = Select(distinct, ["description", "tooltip"], notices);
+        return new AssetText(asset.Id, SelectName(asset, distinct, description, notices), description)
         { Candidates = distinct, Notices = notices };
     }
+
+    private static TextReference? SelectName(CatalogAsset asset, IReadOnlyList<TextCandidate> candidates,
+        TextReference? description, ICollection<ExtractionIssue> notices)
+    {
+        if (asset.Definitions.Any(source => source.Reference.Class == "NPCItemDataAsset"))
+        {
+            // NPC presentation owns the visible NPC label; generic item metadata remains evidence.
+            var npcNames = candidates.Where(candidate => candidate.SourceKind == "metadata" &&
+                candidate.SourceClass == "UINPCMetaDataItem" && candidate.Field == "DisplayName" &&
+                candidate.Role == "display-name").ToArray();
+            if (npcNames.Length > 0) return Select(npcNames, ["display-name"], notices);
+        }
+
+        string[] roles = ["display-name", "title", "short-name"];
+        if (candidates.Any(candidate => roles.Contains(candidate.Role)))
+            return Select(candidates, roles, notices);
+
+        // Modifiers use their Description as a presentation label. Keep its original role/field.
+        if (asset.Definitions.Any(source => source.Reference.Class == "SessionModifierDataAsset") &&
+            candidates.Any(candidate => candidate.Reference == description && IsModifierDescription(candidate)))
+            return description;
+        return null;
+    }
+
+    private static bool IsModifierDescription(TextCandidate candidate) =>
+        candidate.Role == "description" && candidate.Field == "Description" &&
+        (candidate.SourceKind, candidate.SourceClass) is ("definition", "SessionModifierDataAsset") or
+            ("metadata", "UISessionModifierMetaDataItem");
 
     public static IReadOnlyList<TextCandidate> Capture(UObject source, TypeMappings? mappings,
         ICollection<ExtractionIssue> issues)
@@ -124,7 +154,7 @@ internal static class Text
     {
         // UI presentation owns its labels. Definition text and contextual container labels
         // remain candidates with provenance even when the UI supplies the primary value.
-        foreach (var kind in new[] { "metadata", "definition", "container" })
+        foreach (var kind in new[] { "metadata", "definition", "container", "visual-slot" })
             foreach (var role in roles)
             {
                 var peers = candidates.Where(candidate => candidate.SourceKind == kind && candidate.Role == role).ToArray();

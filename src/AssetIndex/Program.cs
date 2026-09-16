@@ -131,6 +131,11 @@ internal static class Program
                 Presentation = new(textById[asset.Id].Name, textById[asset.Id].Description, textById[asset.Id].Candidates,
                     asset.PresentationNames.Select(name => new ContainerPresentation(name.Role, name.ContainerType,
                         name.FramePath, name.ContainerIndex, name.SlotPath, name.ContainerPath, name.Metadata.Path)).ToArray())
+                {
+                    VisualSlots = asset.VisualSlotNames.Select(name => new VisualSlotPresentation(name.SlotPath,
+                        name.TypeTag, name.Metadata.Path, name.Members.Select(member =>
+                            new VisualSlotMemberPresentation(member.ItemPath, member.MetadataPath)).ToArray())).ToArray()
+                }
             });
             if (records.Count % 250 == 0)
                 Console.WriteLine($"Processed {records.Count:N0}/{assets.Count:N0} assets.");

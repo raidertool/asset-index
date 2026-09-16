@@ -48,4 +48,22 @@ public sealed class ReferenceClosureTests
 
         Assert.Equal("first", Assert.Single(references.Check([])).Path);
     }
+
+    [Fact]
+    public void RequiredBodiesCannotBeSatisfiedByHeadersBeforeOrAfterPromotion()
+    {
+        var references = new ReferenceClosure();
+        const string target = "/Game/Target.Default";
+        Assert.True(references.Require("ordinary", target));
+        references.Inventory(target);
+        Assert.Empty(references.Check([]));
+
+        Assert.True(references.Require("class-default", target, requireBody: true));
+        Assert.True(references.NeedsBody(target));
+        Assert.Single(references.Check([]));
+        references.Inventory(target);
+        Assert.False(references.Require("template", target, requireBody: true));
+        Assert.Single(references.Check([]));
+        Assert.Empty(references.Check([target.ToLowerInvariant()]));
+    }
 }

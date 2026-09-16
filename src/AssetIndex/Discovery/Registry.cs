@@ -10,6 +10,7 @@ internal sealed record RegisteredObject(string Path, string Package, string Clas
 internal static class Registry
 {
     private static readonly string[] CandidateRoots = ["DataAsset", "UIMetaDataItem", "DataTable", "CurveTable", "StringTable", "Blueprint", "BlueprintGeneratedClass"];
+    private static readonly string[] ReferenceRoots = ["Texture", "MaterialInterface", "Struct", "Widget", "WidgetTree", "PanelSlot"];
     public static IReadOnlyList<RegisteredObject> Read(TheiaFileProvider provider, ICollection<ExtractionIssue> issues)
     {
         var objects = new SortedDictionary<string, RegisteredObject>(StringComparer.Ordinal);
@@ -55,14 +56,11 @@ internal static class Registry
     }
 
     internal static bool FollowClass(TypeMappings mappings, string type) => SelectClass(mappings, type) ||
-        Assets.IsA(mappings, type, "Texture") == true || Assets.IsA(mappings, type, "MaterialInterface") == true ||
-        Assets.IsA(mappings, type, "Struct") == true;
+        ReferenceRoots.Any(root => Assets.IsA(mappings, type, root) == true);
 
     internal static bool SelectClass(ExportHeader header) => header.Error is not null || !header.AncestryComplete ||
         CandidateRoots.Any(root => header.Ancestry.Contains(root, StringComparer.OrdinalIgnoreCase));
 
     internal static bool FollowClass(ExportHeader header) => SelectClass(header) ||
-        header.Ancestry.Contains("Texture", StringComparer.OrdinalIgnoreCase) ||
-        header.Ancestry.Contains("MaterialInterface", StringComparer.OrdinalIgnoreCase) ||
-        header.Ancestry.Contains("Struct", StringComparer.OrdinalIgnoreCase);
+        ReferenceRoots.Any(root => header.Ancestry.Contains(root, StringComparer.OrdinalIgnoreCase));
 }
