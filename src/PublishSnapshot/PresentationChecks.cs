@@ -12,9 +12,8 @@ internal static class PresentationChecks
     public static void Validate(JsonElement asset, HashSet<string> sources, HashSet<string> discovered)
     {
         var presentation = asset.GetProperty("presentation");
-        Fields(presentation, "name", "description", "candidates", "containers", "visualSlots", "inventoryRoots");
+        Fields(presentation, "name", "description", "candidates", "containers", "visualSlots");
         var containerSources = ReadContainers(presentation.GetProperty("containers"), sources, discovered);
-        containerSources.UnionWith(InventoryRootChecks.Read(presentation.GetProperty("inventoryRoots"), sources, discovered));
         var owners = new Dictionary<string, HashSet<string>>
         {
             ["definition"] = asset.GetProperty("definitions").EnumerateArray().Select(source => ObjectPath(source, "path")).ToHashSet(StringComparer.Ordinal),

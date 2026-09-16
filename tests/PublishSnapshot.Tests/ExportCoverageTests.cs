@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace PublishSnapshot.Tests;
@@ -26,7 +27,7 @@ public sealed partial class PublisherTests
             case "duplicate-path": AddHeaderSibling("PersistenceDataAsset", ["DataAsset", "Object"], "/game/da_test.da_test"); break;
             case "wrong-package": ChangeLines("discovery/exports.jsonl.gz", rows => rows[0]!["path"] = "/Game/Other.DA_Test"); break;
             case "wrong-class": ChangeLines("discovery/objects.jsonl.gz", rows => rows[0]!["class"] = "Actor"); break;
-            case "incomplete-ancestry": ChangeLines("discovery/exports.jsonl.gz", rows => rows[0]!["ancestry"] = new JsonArray("PersistenceDataAsset")); break;
+            case "incomplete-ancestry": ChangeLines("discovery/exports.jsonl.gz", rows => rows[0]!["ancestry"] = new JsonArray(rows[0]!["class"]!.GetValue<string>())); break;
             case "unknown-header": ChangeLines("discovery/exports.jsonl.gz", rows => rows[0]!["ancestryComplete"] = false); break;
             case "header-error": ChangeLines("discovery/exports.jsonl.gz", rows => rows[0]!["error"] = "Superclass import missing"); break;
             case "out-of-range-index": ChangeLines("discovery/packages.jsonl.gz", rows => rows[0]!["selected"] = new JsonArray(1)); break;
@@ -66,8 +67,10 @@ public sealed partial class PublisherTests
     public void ExportClassNamesUseUnrealCaseInsensitiveIdentity()
     {
         ChangeLines("discovery/exports.jsonl.gz", rows =>
-            rows[0]!["ancestry"] = new JsonArray("persistencedataasset", "dataasset", "object"));
-        ChangeLines("discovery/objects.jsonl.gz", rows => rows[0]!["class"] = "PERSISTENCEDATAASSET");
+            rows[0]!["ancestry"] = new JsonArray(rows[0]!["ancestry"]!.AsArray()
+                .Select(value => (JsonNode?)JsonValue.Create(value!.GetValue<string>().ToLowerInvariant())).ToArray()));
+        ChangeLines("discovery/objects.jsonl.gz", rows =>
+            rows[0]!["class"] = rows[0]!["class"]!.GetValue<string>().ToUpperInvariant());
 
         Assert.True(Publisher.Publish(preview, remote, NextExtractor, "456").Changed);
     }
@@ -141,15 +144,19 @@ public sealed partial class PublisherTests
     {
         var target = AddHeaderSibling("Actor", ["Object"]);
         AddTarget(target);
-        AddRequiredReference(target.ToLowerInvariant(), role, pointer);
         AddSiblingBody(target, "Actor");
+        var ownerClass = role == "template" ? "Actor" : "BlueprintGeneratedClass";
+        var owner = AddHeaderSibling(ownerClass, role == "template" ? ["Object"] : ["Class", "Struct", "Field", "Object"],
+            "/Game/DA_Test.ReferenceOwner", index: 2);
+        AddSiblingBody(owner, ownerClass, index: 2);
+        AddRequiredReference(target.ToLowerInvariant(), role, pointer, owner);
         using (Preview.Read(preview)) { }
-        ChangeLines("discovery/objects.jsonl.gz", rows => rows.RemoveAt(rows.Count - 1));
-        ChangeJson("coverage.json", node => node["discovery"]!["objects"] = 2);
+        ChangeLines("discovery/objects.jsonl.gz", rows => rows.Remove(rows.Single(row => row!["path"]!.GetValue<string>() == target)));
+        ChangeJson("coverage.json", node => node["discovery"]!["objects"] = node["discovery"]!["objects"]!.GetValue<int>() - 1);
         ChangeLines("discovery/packages.jsonl.gz", rows =>
         {
-            rows[0]!["selected"] = new JsonArray(0);
-            rows[0]!["decoded"] = new JsonArray(0);
+            rows[0]!["selected"] = new JsonArray(0, 2);
+            rows[0]!["decoded"] = new JsonArray(0, 2);
         });
         var references = remoteGit.Run("show-ref");
         var inputs = HashFiles(preview);
@@ -185,7 +192,7 @@ public sealed partial class PublisherTests
             ["class"] = "Texture2D",
             ["tags"] = new JsonObject { ["LODGroup"] = "TEXTUREGROUP_UI" }
         }));
-        ChangeJson("coverage.json", node => node["registeredAssets"] = 3);
+        ChangeJson("coverage.json", node => node["registeredAssets"] = node["registeredAssets"]!.GetValue<int>() + 1);
 
         var error = Assert.Throws<InvalidDataException>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
 
@@ -215,7 +222,7 @@ public sealed partial class PublisherTests
             ["class"] = "Actor",
             ["tags"] = new JsonObject()
         }));
-        ChangeJson("coverage.json", node => node["registeredAssets"] = 3);
+        ChangeJson("coverage.json", node => node["registeredAssets"] = node["registeredAssets"]!.GetValue<int>() + 1);
         ChangeLines("discovery/files.jsonl.gz", rows => rows[0]!["registryPackages"]!.AsArray().Add("/RuntimeOnly/Alias"));
         AddTarget(target);
 
@@ -256,7 +263,7 @@ public sealed partial class PublisherTests
             ["class"] = "World",
             ["tags"] = new JsonObject()
         }));
-        ChangeJson("coverage.json", node => node["registeredAssets"] = 3);
+        ChangeJson("coverage.json", node => node["registeredAssets"] = node["registeredAssets"]!.GetValue<int>() + 1);
 
         var error = Assert.Throws<InvalidDataException>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
 
@@ -273,39 +280,44 @@ public sealed partial class PublisherTests
         Assert.Contains("contradicts its mounted registry owner", error.Message);
     }
 
-    private string AddHeaderSibling(string type, string[] ancestors, string path = "/Game/DA_Test.Sibling")
+    private string AddHeaderSibling(string type, string[] ancestors, string path = "/Game/DA_Test.Sibling", int index = 1)
     {
-        ChangeLines("discovery/exports.jsonl.gz", rows => rows.Add(ExportHeader("PioneerGame/Content/DA_Test.uasset", 1, path, type, ancestors)));
-        ChangeLines("discovery/packages.jsonl.gz", rows => rows[0]!["exports"] = 2);
+        ChangeLines("discovery/exports.jsonl.gz", rows => rows.Add(ExportHeader("PioneerGame/Content/DA_Test.uasset", index, path, type, ancestors)));
+        ChangeLines("discovery/packages.jsonl.gz", rows => rows[0]!["exports"] = index + 1);
         return path;
     }
 
-    private void AddSiblingBody(string path, string type)
+    private void AddSiblingBody(string path, string type, int index = 1)
     {
         ChangeLines("discovery/objects.jsonl.gz", rows => rows.Add(new JsonObject
         {
             ["path"] = path,
             ["class"] = type,
             ["properties"] = new JsonArray(),
-            ["references"] = new JsonArray(),
+            ["references"] = JsonSerializer.SerializeToNode(ObjectLinks(type)),
             ["texts"] = new JsonArray(),
             ["values"] = new JsonArray(),
             ["tableEntries"] = new JsonArray(),
             ["issues"] = new JsonArray()
         }));
-        ChangeJson("coverage.json", node => node["discovery"]!["objects"] = 3);
+        ChangeJson("coverage.json", node => node["discovery"]!["objects"] = node["discovery"]!["objects"]!.GetValue<int>() + 1);
         ChangeLines("discovery/packages.jsonl.gz", rows =>
         {
-            rows[0]!["selected"] = new JsonArray(0, 1);
-            rows[0]!["decoded"] = new JsonArray(0, 1);
+            rows[0]!["selected"]!.AsArray().Add(index);
+            rows[0]!["decoded"]!.AsArray().Add(index);
         });
     }
 
-    private void AddRequiredReference(string path, string role, string pointer) => ChangeLines("discovery/objects.jsonl.gz", rows =>
-        rows[0]!["references"]!.AsArray().Add(new JsonObject
+    private void AddRequiredReference(string path, string role, string pointer, string? owner = null) => ChangeLines("discovery/objects.jsonl.gz", rows =>
+    {
+        var source = owner is null ? rows[0]! : rows.Single(row => row!["path"]!.GetValue<string>() == owner)!;
+        var references = source["references"]!.AsArray();
+        var existing = references.SingleOrDefault(reference => reference!["pointer"]!.GetValue<string>() == pointer);
+        if (existing is not null) references.Remove(existing);
+        references.Add(new JsonObject
         {
             ["pointer"] = pointer,
-            ["kind"] = "resolved",
+            ["kind"] = role == "class-default" ? "hard" : "resolved",
             ["role"] = role,
             ["targetPath"] = path,
             ["isNull"] = false,
@@ -313,7 +325,8 @@ public sealed partial class PublisherTests
             ["packageIndex"] = null,
             ["exportIndex"] = null,
             ["error"] = null
-        }));
+        });
+    });
 
     private void AddTarget(string path) => ChangeLines("discovery/objects.jsonl.gz", rows =>
     {

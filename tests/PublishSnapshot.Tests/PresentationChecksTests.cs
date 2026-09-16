@@ -182,7 +182,6 @@ public sealed class PresentationChecksTests
             ["name"] = null,
             ["description"] = null,
             ["candidates"] = new JsonArray(candidates.Select(candidate => candidate.DeepClone()).ToArray()),
-            ["inventoryRoots"] = new JsonArray(),
             ["visualSlots"] = new JsonArray(new JsonObject
             {
                 ["slotPath"] = Definition,
@@ -215,25 +214,37 @@ public sealed partial class PublisherTests
     [Fact]
     public void ConsistentAmbiguousTextRetainsCandidatesAndStillRequiresSuccessfulExtraction()
     {
+        const string other = "/Game/OtherMetadata.OtherMetadata";
         ChangeJson("assets.json", rows =>
         {
+            var metadata = rows[0]!["metadata"]![0]!.DeepClone();
+            metadata["name"] = "OtherMetadata";
+            metadata["path"] = other;
+            rows[0]!["metadata"]!.AsArray().Add(metadata);
             var presentation = rows[0]!["presentation"]!;
             var candidate = presentation["candidates"]![0]!.DeepClone();
-            candidate["field"] = "OtherName";
+            candidate["sourcePath"] = other;
+            candidate["definedAt"] = other;
             candidate["reference"]!["source"] = "Other name";
             presentation["candidates"]!.AsArray().Add(candidate);
             presentation["name"] = null;
             rows[0]!["text"]![0]!["displayName"] = "";
         });
-        ChangeJson("coverage.json", coverage => coverage["englishNames"] = 0);
+        ChangeJson("coverage.json", coverage =>
+        {
+            coverage["englishNames"] = 0;
+            coverage["discovery"]!["objects"] = 4;
+        });
         ChangeLines("discovery/objects.jsonl.gz", rows =>
         {
-            rows[0]!["properties"]!.AsArray().Add(PropertyHeader("/Properties/4", "OtherName", "TextProperty"));
-            var text = rows[0]!["texts"]![0]!.DeepClone();
-            text["pointer"] = "/Properties/4";
-            text["source"] = "Other name";
-            rows[0]!["texts"]!.AsArray().Add(text);
+            var metadata = rows[0]!.DeepClone();
+            metadata["path"] = other;
+            metadata["texts"]![0]!["source"] = "Other name";
+            rows.Add(metadata);
         });
+        AddUnindexedPackage("PioneerGame/Content/OtherMetadata.uasset", loaded: true, exports: 1);
+        ChangeLines("discovery/exports.jsonl.gz", rows => rows.Add(ExportHeader(
+            "PioneerGame/Content/OtherMetadata.uasset", 0, other, "UIGameplayItemMetaDataItem", "UIMetaDataItem", "Object")));
 
         using var captured = Preview.Read(preview);
         using var assets = Preview.ReadJson(captured.Files, "assets.json");

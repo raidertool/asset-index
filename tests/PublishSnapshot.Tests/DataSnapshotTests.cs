@@ -9,8 +9,8 @@ public sealed partial class PublisherTests
     public void PublicationRetainsEveryCatalogImageAndLocaleWithoutChangingTheFullPreview()
     {
         var second = AddUnownedImage("/Game/T_Second.T_Second", "Texture2D");
-        AddCatalogImage("SecondaryIcon", "/Game/T_Second.T_Second", second);
-        AddCatalogImage("AlternateIcon", Texture, Image);
+        AddCatalogImage("BigIcon", "/Game/T_Second.T_Second", second);
+        AddCatalogImage("TinyIcon", Texture, Image);
         var unowned = AddUnownedImage("/Game/T_Unowned.T_Unowned", "Texture2D");
         WriteLines(preview, "localization/ko.jsonl.gz", new[] { new { @namespace = "Shared", key = "KOREAN", value = "한국어" } });
         ChangeJson("assets.json", rows =>
@@ -40,7 +40,7 @@ public sealed partial class PublisherTests
     public void ResourceOrderingDoesNotCreateAnotherSnapshot()
     {
         var second = AddUnownedImage("/Game/T_Second.T_Second", "Texture2D");
-        AddCatalogImage("SecondaryIcon", "/Game/T_Second.T_Second", second);
+        AddCatalogImage("BigIcon", "/Game/T_Second.T_Second", second);
         var first = Publisher.Publish(preview, remote, NextExtractor, "456");
         ChangeJson("resources.json", rows =>
         {
@@ -124,8 +124,9 @@ public sealed partial class PublisherTests
         Assert.True(File.Exists(captured.Files[Image].Path));
     }
 
-    private void AddCatalogImage(string field, string resource, string file) => ChangeJson("assets.json", rows =>
-        rows[0]!["images"]!.AsArray().Add(new JsonObject
+    private void AddCatalogImage(string field, string resource, string file)
+    {
+        ChangeJson("assets.json", rows => rows[0]!["images"]!.AsArray().Add(new JsonObject
         {
             ["field"] = field,
             ["source"] = "/Game/DA_Test.DA_Test",
@@ -135,4 +136,15 @@ public sealed partial class PublisherTests
             ["width"] = 2,
             ["height"] = 1
         }));
+        ChangeLines("discovery/objects.jsonl.gz", rows =>
+        {
+            var source = rows[0]!;
+            var pointer = "/Properties/" + source["properties"]!.AsArray().Count;
+            source["properties"]!.AsArray().Add(PropertyHeader(pointer, field, "SoftObjectProperty"));
+            var reference = source["references"]![0]!.DeepClone();
+            reference["pointer"] = pointer;
+            reference["targetPath"] = resource;
+            source["references"]!.AsArray().Add(reference);
+        });
+    }
 }

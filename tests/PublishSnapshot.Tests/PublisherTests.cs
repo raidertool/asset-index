@@ -50,6 +50,7 @@ public sealed partial class PublisherTests : IDisposable
         Assert.Equal("arc-456-" + result.Commit[..12], result.Tag);
         Assert.Equal(result.Commit, RemoteRef("refs/tags/" + result.Tag));
         Assert.Equal("commit", remoteGit.Run("cat-file", "-t", "refs/tags/" + result.Tag).Trim());
+        Assert.Equal("alex@alexbowe.com\nalex@alexbowe.com", remoteGit.Run("show", "-s", "--format=%ae%n%ce", result.Commit).Trim());
         Assert.Equal(DataSnapshot.Required.Append(Image).Append("metadata.json").Order(),
             remoteGit.Run("ls-tree", "-r", "--name-only", result.Commit).Split('\n', StringSplitOptions.RemoveEmptyEntries).Order());
         using var metadata = JsonDocument.Parse(remoteGit.Run("show", result.Commit + ":metadata.json"));
@@ -62,7 +63,7 @@ public sealed partial class PublisherTests : IDisposable
     public void IdenticalPayloadKeepsOldCommitTagAndMetadataDespiteNewProvenance()
     {
         WritePreview(preview, "Initial name");
-        ChangeJson("coverage.json", node => node["discovery"]!["mappingSha256"] = new string('c', 64));
+        ChangeJson("coverage.json", node => node["discovery"]!["nativeScope"] = "Updated scan description");
         var references = remoteGit.Run("show-ref");
 
         var result = Publisher.Publish(preview, remote, NextExtractor, "18446744073709551615");
@@ -219,8 +220,8 @@ public sealed partial class PublisherTests : IDisposable
         var asset = new
         {
             id = "42",
-            definitions = new[] { new { name = "DA_Test", @class = "PersistenceDataAsset", path = "/Game/DA_Test.DA_Test" } },
-            metadata = Array.Empty<object>(),
+            definitions = new[] { new { name = "DA_Identity", @class = "PersistenceDataAsset", path = "/Game/DA_Identity.DA_Identity" } },
+            metadata = new[] { new { name = "DA_Test", @class = "UIGameplayItemMetaDataItem", path = "/Game/DA_Test.DA_Test" } },
             text = new[] { new { locale = "en", displayName = name, description = "Description" } },
             images = new[] { new { field = "Icon", source = "/Game/DA_Test.DA_Test", resource = Texture, status = "exported", file = Image, width = 2, height = 1 } },
             presentation = new
@@ -229,50 +230,55 @@ public sealed partial class PublisherTests : IDisposable
                 description = new { @namespace = "", key = "", source = "Description", cultureInvariant = true },
                 candidates = new[]
                 {
-                    new { role = "display-name", sourceKind = "definition", sourcePath = "/Game/DA_Test.DA_Test", sourceClass = "PersistenceDataAsset", field = "ItemName", definedAt = "/Game/DA_Test.DA_Test", reference = new { @namespace = "", key = "", source = name, cultureInvariant = true } },
-                    new { role = "description", sourceKind = "definition", sourcePath = "/Game/DA_Test.DA_Test", sourceClass = "PersistenceDataAsset", field = "Description", definedAt = "/Game/DA_Test.DA_Test", reference = new { @namespace = "", key = "", source = "Description", cultureInvariant = true } }
+                    new { role = "display-name", sourceKind = "metadata", sourcePath = "/Game/DA_Test.DA_Test", sourceClass = "UIGameplayItemMetaDataItem", field = "ItemName", definedAt = "/Game/DA_Test.DA_Test", reference = new { @namespace = "", key = "", source = name, cultureInvariant = true } },
+                    new { role = "description", sourceKind = "metadata", sourcePath = "/Game/DA_Test.DA_Test", sourceClass = "UIGameplayItemMetaDataItem", field = "Description", definedAt = "/Game/DA_Test.DA_Test", reference = new { @namespace = "", key = "", source = "Description", cultureInvariant = true } }
                 },
                 containers = Array.Empty<object>(),
-                visualSlots = Array.Empty<object>(),
-                inventoryRoots = Array.Empty<object>()
+                visualSlots = Array.Empty<object>()
             }
         };
         File.WriteAllBytes(Path.Combine(directory, "assets.json"), JsonSerializer.SerializeToUtf8Bytes(new[] { asset }, Preview.Json));
         File.WriteAllBytes(Path.Combine(directory, "coverage.json"), JsonSerializer.SerializeToUtf8Bytes(new
         {
             status = "succeeded",
-            registeredAssets = 2,
-            candidates = 2,
-            loaded = 2,
+            registeredAssets = 3,
+            candidates = 3,
+            loaded = 3,
             assetIds = 1,
             englishNames = 1,
             descriptions = 1,
             images = 1,
             issues = Array.Empty<object>(),
             notices = Array.Empty<object>(),
-            discovery = new { nativeScope = "Tagged fields", mappingSha256 = new string('a', 64), objects = 2, resources = 1 }
+            discovery = new { nativeScope = "Tagged fields", mappingSha256 = MappingHash(), objects = 3, resources = 1 }
         }, Preview.Json));
         File.WriteAllBytes(Path.Combine(directory, "resources.json"), JsonSerializer.SerializeToUtf8Bytes(new[]
         {
             new { path = Texture, status = "exported", file = Image, width = 2, height = 1 }
         }, Preview.Json));
-        WriteLines(directory, "discovery/objects.jsonl.gz", new[] { "/Game/DA_Test.DA_Test", Texture }.Select(path => new
+        WriteLines(directory, "discovery/objects.jsonl.gz", new[] { "/Game/DA_Test.DA_Test", Texture, "/Game/DA_Identity.DA_Identity" }.Select(path => new
         {
             path,
-            @class = path == Texture ? "Texture2D" : "PersistenceDataAsset",
-            properties = path == Texture ? [] : new[]
+            @class = path == Texture ? "Texture2D" : path == "/Game/DA_Identity.DA_Identity" ? "PersistenceDataAsset" : "UIGameplayItemMetaDataItem",
+            properties = path == Texture ? [] : path == "/Game/DA_Identity.DA_Identity" ? new[]
             {
-                PropertyHeader("/Properties/0", "AssetId", "Int64Property"),
+                PropertyHeader("/Properties/0", "AssetId", "Int64Property")
+            } : new[]
+            {
+                PropertyHeader("/Properties/0", "PersistenceDataAsset", "ObjectProperty"),
                 PropertyHeader("/Properties/1", "ItemName", "TextProperty"),
                 PropertyHeader("/Properties/2", "Description", "TextProperty"),
                 PropertyHeader("/Properties/3", "Icon", "SoftObjectProperty")
             },
-            references = path == Texture ? Array.Empty<object>() : new object[]
+            references = ObjectLinks(path == Texture ? "Texture2D" : path == "/Game/DA_Identity.DA_Identity" ? "PersistenceDataAsset" : "UIGameplayItemMetaDataItem",
+                path != "/Game/DA_Test.DA_Test" ? Array.Empty<object>() : new object[]
             {
                 new { pointer = "/Properties/3", kind = "soft", role = "property", targetPath = Texture,
+                    isNull = false, package = (string?)null, packageIndex = (int?)null, exportIndex = (int?)null, error = (string?)null },
+                new { pointer = "/Properties/0", kind = "hard", role = "property", targetPath = "/Game/DA_Identity.DA_Identity",
                     isNull = false, package = (string?)null, packageIndex = (int?)null, exportIndex = (int?)null, error = (string?)null }
-            },
-            texts = path == Texture ? Array.Empty<object>() : new object[]
+            }),
+            texts = path != "/Game/DA_Test.DA_Test" ? Array.Empty<object>() : new object[]
             {
                 new { pointer = "/Properties/1", flags = 2, history = "None", @namespace = (string?)null, key = (string?)null, source = name, tableId = (string?)null },
                 new { pointer = "/Properties/2", flags = 2, history = "None", @namespace = (string?)null, key = (string?)null, source = "Description", tableId = (string?)null }
@@ -280,32 +286,36 @@ public sealed partial class PublisherTests : IDisposable
             values = path == Texture ? new object[]
             {
                 new { pointer = "/Properties", type = "properties", kind = "empty-struct", value = (string?)null }
-            } : new object[]
+            } : path == "/Game/DA_Identity.DA_Identity" ? new object[]
             {
                 new { pointer = "/Properties/0", type = "Int64Property", kind = "integer", value = "42" }
-            },
+            } : Array.Empty<object>(),
             tableEntries = Array.Empty<object>(),
             issues = Array.Empty<object>()
         }));
         WriteLines(directory, "discovery/registry.jsonl.gz", new[]
         {
-            new { path = "/Game/DA_Test.DA_Test", package = "/Game/DA_Test", @class = "PersistenceDataAsset", tags = new { } },
-            new { path = Texture, package = "/Game/T_Test", @class = "Texture2D", tags = new { } }
+            new { path = "/Game/DA_Test.DA_Test", package = "/Game/DA_Test", @class = "UIGameplayItemMetaDataItem", tags = new { } },
+            new { path = Texture, package = "/Game/T_Test", @class = "Texture2D", tags = new { } },
+            new { path = "/Game/DA_Identity.DA_Identity", package = "/Game/DA_Identity", @class = "PersistenceDataAsset", tags = new { } }
         });
         WriteLines(directory, "discovery/files.jsonl.gz", new[]
         {
             new { path = "PioneerGame/Content/DA_Test.uasset", registryPackages = new[] { "/Game/DA_Test" } },
-            new { path = "PioneerGame/Content/T_Test.uasset", registryPackages = new[] { "/Game/T_Test" } }
+            new { path = "PioneerGame/Content/T_Test.uasset", registryPackages = new[] { "/Game/T_Test" } },
+            new { path = "PioneerGame/Content/DA_Identity.uasset", registryPackages = new[] { "/Game/DA_Identity" } }
         });
         WriteLines(directory, "discovery/packages.jsonl.gz", new[]
         {
             new { path = "PioneerGame/Content/DA_Test.uasset", name = "/Game/DA_Test", reason = "definition", status = "succeeded", exports = 1, selected = new[] { 0 }, decoded = new[] { 0 } },
-            new { path = "PioneerGame/Content/T_Test.uasset", name = "/Game/T_Test", reason = "reference", status = "succeeded", exports = 1, selected = new[] { 0 }, decoded = new[] { 0 } }
+            new { path = "PioneerGame/Content/T_Test.uasset", name = "/Game/T_Test", reason = "reference", status = "succeeded", exports = 1, selected = new[] { 0 }, decoded = new[] { 0 } },
+            new { path = "PioneerGame/Content/DA_Identity.uasset", name = "/Game/DA_Identity", reason = "reference", status = "succeeded", exports = 1, selected = new[] { 0 }, decoded = new[] { 0 } }
         });
         WriteLines(directory, "discovery/exports.jsonl.gz", new[]
         {
-            ExportHeader("PioneerGame/Content/DA_Test.uasset", 0, "/Game/DA_Test.DA_Test", "PersistenceDataAsset", "DataAsset", "Object"),
-            ExportHeader("PioneerGame/Content/T_Test.uasset", 0, Texture, "Texture2D", "Texture", "Object")
+            ExportHeader("PioneerGame/Content/DA_Test.uasset", 0, "/Game/DA_Test.DA_Test", "UIGameplayItemMetaDataItem", "UIMetaDataItem", "DataAsset", "Object"),
+            ExportHeader("PioneerGame/Content/T_Test.uasset", 0, Texture, "Texture2D", "Texture", "Object"),
+            ExportHeader("PioneerGame/Content/DA_Identity.uasset", 0, "/Game/DA_Identity.DA_Identity", "PersistenceDataAsset", "DataAsset", "Object")
         });
         WriteLines(directory, "localization/en.jsonl.gz", new[] { new { @namespace = "Shared", key = "UNCHANGED", value = "Unowned text" } });
     }
@@ -336,6 +346,17 @@ public sealed partial class PublisherTests : IDisposable
         ["ancestryComplete"] = true,
         ["error"] = null
     };
+
+    private static string MappingHash() => Convert.ToHexStringLower(SHA256.HashData(
+        File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "mappings", "ArcRaiders.usmap"))));
+
+    private static object[] ObjectLinks(string type, params object[] fields) => fields.Concat(new object[]
+    {
+        new { pointer = "/Class", kind = "resolved", role = "class", targetPath = "/Script/Fixture." + type,
+            isNull = false, package = (string?)null, packageIndex = (int?)null, exportIndex = (int?)null, error = (string?)null },
+        new { pointer = "/Template", kind = "resolved", role = "template", targetPath = (string?)null,
+            isNull = true, package = (string?)null, packageIndex = (int?)null, exportIndex = (int?)null, error = (string?)null }
+    }).ToArray();
 
     private static JsonObject PropertyHeader(string pointer, string name = "Field", string type = "Int64Property",
         int? arrayIndex = null, int? arraySize = null, string serializeType = "Property") => new()

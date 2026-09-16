@@ -79,7 +79,7 @@ internal static class Publisher
             }
             File.WriteAllBytes(Path.Combine(directory, "metadata.json"), JsonSerializer.SerializeToUtf8Bytes(metadata, Preview.Json));
             git.Run("add", "--all", "--", ".");
-            git.Run("-c", "user.name=Asset Index", "-c", "user.email=asset-index@users.noreply.github.com", "commit", "--quiet", "-m",
+            git.Run("-c", "user.name=alexbowe", "-c", "user.email=alex@alexbowe.com", "commit", "--quiet", "-m",
                 initialize ? "chore: initialize asset snapshot" : "chore: update asset snapshot");
             var commit = git.Run("rev-parse", "HEAD").Trim();
             var newTag = Tag(manifestId, commit);

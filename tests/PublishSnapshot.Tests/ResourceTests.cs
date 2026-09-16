@@ -54,7 +54,7 @@ public sealed partial class PublisherTests
             case "object-issues": ChangeLines("discovery/objects.jsonl.gz", rows => rows[0]!["issues"]!.AsArray().Add(new JsonObject { ["message"] = "failed" })); break;
             case "package-partial": ChangeLines("discovery/packages.jsonl.gz", rows => rows[0]!["status"] = "partial"); break;
             case "export-object-count": ChangeLines("discovery/packages.jsonl.gz", rows => rows[0]!["exports"] = 2); break;
-            case "object-count": ChangeJson("coverage.json", n => n["discovery"]!["objects"] = 3); break;
+            case "object-count": ChangeJson("coverage.json", n => n["discovery"]!["objects"] = 4); break;
             case "resource-count": ChangeJson("coverage.json", n => n["discovery"]!["resources"] = 2); break;
             case "old-image-field":
                 ChangeJson("assets.json", n =>
@@ -109,6 +109,7 @@ public sealed partial class PublisherTests
     [Theory]
     [InlineData("/Game/T_Unowned.T_Unowned", "Texture2D")]
     [InlineData("/Game/MI_Unowned.MI_Unowned", "MaterialInstanceConstant")]
+    [InlineData("/Game/M_Unowned.M_Unowned", "Material")]
     public void AnUnownedImageIsExcludedFromGitButStillValidated(string resource, string resourceClass)
     {
         WritePreview(preview, "Initial name");
@@ -141,6 +142,7 @@ public sealed partial class PublisherTests
             var evidence = rows[1]!.DeepClone();
             evidence["path"] = resource;
             evidence["class"] = resourceClass;
+            evidence["references"]![0]!["targetPath"] = "/Script/Fixture." + resourceClass;
             rows.Add(evidence);
         });
         var physical = "PioneerGame/Content/" + resource["/Game/".Length..].Split('.', 2)[0] + ".uasset";

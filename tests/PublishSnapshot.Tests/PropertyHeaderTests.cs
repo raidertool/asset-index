@@ -98,12 +98,14 @@ public sealed partial class PublisherTests
             case "index-outside-size": first["arrayIndex"] = 2; first["arraySize"] = 2; break;
             case "fractional-index": first["arrayIndex"] = 0.5; break;
             case "unknown-serialize-type": first["serializeType"] = "Unknown"; break;
-            case "dangling-value": row["values"]![0]!["pointer"] = "/Properties/99"; break;
+            case "dangling-value": row["values"]!.AsArray().Add(new JsonObject
+            { ["pointer"] = "/Properties/99", ["type"] = "Int64Property", ["kind"] = "integer", ["value"] = "42" }); break;
             case "dangling-text": row["texts"]![0]!["pointer"] = "/Properties/99"; break;
             case "dangling-reference": row["references"]![0]!["pointer"] = "/Properties/99"; break;
             case "dangling-nested-value":
                 headers.Add(PropertyHeader("/Properties/0/Properties/0"));
-                row["values"]![0]!["pointer"] = "/Properties/0/Properties/1";
+                row["values"]!.AsArray().Add(new JsonObject
+                { ["pointer"] = "/Properties/0/Properties/1", ["type"] = "Int64Property", ["kind"] = "integer", ["value"] = "42" });
                 break;
             default: throw new ArgumentOutOfRangeException(nameof(mutation));
         }

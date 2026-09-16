@@ -30,8 +30,11 @@ an explicit empty value require a null primary, with all candidates retained.
 Every rendered translation must match its selected reference and dictionary.
 Resolvable language rows, including Korean, cannot be omitted.
 Each text candidate must match its decoded field, template owner and FText value.
-Inventory-root and visual-slot relationships require recorded source objects;
-their full identity and membership semantics remain a separate production gate.
+Its role must match the source class's text-field contract.
+Catalog IDs must match decoded identity fields, overrides and persistence links.
+Container and visual-slot labels must follow the decoded references, category
+values and complete tag-query membership. Images must match their declared source
+fields. Class declarations are checked against the extraction's exact mapping.
 
 Every mounted package needs a complete export-header inventory, including exact
 superclass references. Each selected
@@ -53,8 +56,7 @@ byte length divisible by its element width. See [discovery](discovery.md) for th
 
 Validation reads a private copy on disk. Later changes to the input directory
 cannot change the validated payload; large images and evidence streams are not
-held together in memory. Identity and UI association semantics, plus complete
-game coverage, still require separate audits.
+held together in memory. Complete game coverage still requires a separate audit.
 
 `metadata.json` records:
 

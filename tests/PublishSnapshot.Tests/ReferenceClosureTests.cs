@@ -64,7 +64,7 @@ public sealed partial class PublisherTests
             duplicate["path"] = "/game/da_test.da_test";
             rows.Add(duplicate);
         });
-        ChangeJson("coverage.json", node => node["discovery"]!["objects"] = 3);
+        ChangeJson("coverage.json", node => node["discovery"]!["objects"] = 4);
 
         var error = Assert.Throws<InvalidDataException>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
 
@@ -96,7 +96,7 @@ public sealed partial class PublisherTests
                 ["error"] = null
             });
         });
-        ChangeJson("coverage.json", node => node["discovery"]!["objects"] = 4);
+        ChangeJson("coverage.json", node => node["discovery"]!["objects"] = 5);
         ChangeLines("discovery/packages.jsonl.gz", rows =>
         {
             rows[0]!["exports"] = 3;
@@ -105,8 +105,8 @@ public sealed partial class PublisherTests
         });
         ChangeLines("discovery/exports.jsonl.gz", rows =>
         {
-            rows.Add(ExportHeader("PioneerGame/Content/DA_Test.uasset", 1, "/Game/DA_Test.DA_Test:Parent", "PersistenceDataAsset", "DataAsset", "Object"));
-            rows.Add(ExportHeader("PioneerGame/Content/DA_Test.uasset", 2, "/Game/DA_Test.DA_Test:Parent.Leaf", "PersistenceDataAsset", "DataAsset", "Object"));
+            rows.Add(ExportHeader("PioneerGame/Content/DA_Test.uasset", 1, "/Game/DA_Test.DA_Test:Parent", "UIGameplayItemMetaDataItem", "UIMetaDataItem", "Object"));
+            rows.Add(ExportHeader("PioneerGame/Content/DA_Test.uasset", 2, "/Game/DA_Test.DA_Test:Parent.Leaf", "UIGameplayItemMetaDataItem", "UIMetaDataItem", "Object"));
         });
     }
 

@@ -26,6 +26,7 @@ internal sealed record Preview(SnapshotFiles Snapshot) : IDisposable
             var evidence = ResourceEvidence.Read(snapshot.Files, coverage.RootElement);
             ValidateRecords(assets.RootElement, coverage.RootElement, evidence);
             TextOriginChecks.Validate(assets.RootElement, snapshot.Files["discovery/objects.jsonl.gz"]);
+            SemanticChecks.Validate(assets.RootElement, snapshot.Files, coverage.RootElement);
             return new(snapshot);
         }
         catch { snapshot.Dispose(); throw; }
