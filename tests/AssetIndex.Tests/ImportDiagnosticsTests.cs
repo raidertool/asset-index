@@ -26,6 +26,7 @@ public sealed class ImportDiagnosticsTests
         Assert.Equal(-1, reference.PackageIndex);
         Assert.Contains("mapSlot=0; objectIndex=0x8000000000000000; type=PackageImport", reference.Error);
         Assert.Contains("packageSlot=0; hashSlot=0; expectedHash=0xFEDCBA9876543210", reference.Error);
+        Assert.Contains("packageIdentity=unavailable(untracked IoStore source)", reference.Error);
         Assert.Contains("winner={name=\"/Game/Imported\",exports=1}", reference.Error);
         Assert.Contains("alternatives=[{name=\"/Game/Imported\",exports=2}]", reference.Error);
         Assert.All(winner.ExportsLazy.Concat(older.ExportsLazy), export => Assert.False(export.IsValueCreated));

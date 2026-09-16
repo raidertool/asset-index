@@ -39,6 +39,8 @@ internal class PackageProvider(string directory) : TheiaFileProvider(directory, 
 
     public override Task<IPackage> LoadPackageAsync(GameFile file) => Task.Run(() => LoadPackage(file));
 
+    internal GameFile? SourceFile(IPackage package) => packageFiles.TryGetValue(package, out var file) ? file : null;
+
     internal ObjectLocation Locate(UObject source)
     {
         ObjectDisposedException.ThrowIf(disposed, this);

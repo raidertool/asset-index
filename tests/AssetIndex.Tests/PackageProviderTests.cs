@@ -40,6 +40,9 @@ public sealed class PackageProviderTests
         Assert.NotSame(first, second);
         Assert.Same(first, provider.LoadPackage(original));
         Assert.Same(second, provider.LoadPackage(update));
+        Assert.Same(original, provider.SourceFile(first));
+        Assert.Same(update, provider.SourceFile(second));
+        Assert.Null(provider.SourceFile(new FixturePackage()));
         Assert.Equal(2, provider.Reads);
     }
 
