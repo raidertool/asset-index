@@ -30,7 +30,7 @@ jobs:
         with:
           repository: raidertool/SteamDepotFS
           # Modern authentication: https://github.com/raidertool/SteamDepotFS/pull/3 (under review).
-          ref: e3e8baa02d1a66a67c48328d97ee7c7e6e03187c
+          ref: 5c1143e17a0c7d5742b1c8652bdb9df0ef974ab2
           path: .work/SteamDepotFS
           persist-credentials: false
 
