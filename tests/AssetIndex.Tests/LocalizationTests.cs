@@ -13,6 +13,7 @@ public sealed class LocalizationTests : IDisposable
     [InlineData("zh-Hans", "zh_hans")]
     [InlineData("zh-Hant", "zh_hant")]
     [InlineData("fr-CA", "fr_ca")]
+    [InlineData("ko-KR", "ko_kr")]
     [InlineData("EN", "en")]
     public void LoadsTheActualAvailableCultureAndNormalizesOnlyTheOutput(string culture, string locale)
     {
@@ -23,7 +24,7 @@ public sealed class LocalizationTests : IDisposable
         var row = Assert.Single(Text.Localize(provider, Assets, issues));
 
         Assert.Equal(culture, Assert.Single(provider.Internationalization.AvailableCultures));
-        Assert.Equal(culture, provider.Internationalization.Culture);
+        Assert.Null(provider.Internationalization.Culture);
         Assert.Equal(new LocalizedText(42, locale, "Translated name", ""), row);
         Assert.Empty(issues);
     }
@@ -76,12 +77,14 @@ public sealed class LocalizationTests : IDisposable
         Assert.Contains("No localization entries loaded for fr", Assert.Single(issues).Message);
     }
 
-    [Fact]
-    public void InvariantNamesSurviveEveryCultureWithoutFillingMissingTranslations()
+    [Theory]
+    [InlineData("fr", "fr")]
+    [InlineData("ko-KR", "ko_kr")]
+    public void InvariantNamesSurviveEveryCultureWithoutFillingMissingTranslations(string culture, string locale)
     {
         WriteTranslation("en", "An unrelated name");
-        WriteTranslation("fr", "An unrelated name");
-        using var provider = OpenProvider(["en", "fr"]);
+        WriteTranslation(culture, "An unrelated name");
+        using var provider = OpenProvider(["en", culture]);
         AssetText[] assets =
         [
             new(1, new("", "", "XP", CultureInvariant: true), null),
@@ -93,7 +96,7 @@ public sealed class LocalizationTests : IDisposable
 
         Assert.Equal(3, rows.Count);
         Assert.Contains(new LocalizedText(1, "en", "XP", ""), rows);
-        Assert.Contains(new LocalizedText(1, "fr", "XP", ""), rows);
+        Assert.Contains(new LocalizedText(1, locale, "XP", ""), rows);
         Assert.Contains(new LocalizedText(2, "en", "English source", ""), rows);
         Assert.Empty(issues);
     }

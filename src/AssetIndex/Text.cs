@@ -23,8 +23,10 @@ internal static class Text
         var candidates = asset.Metadata.SelectMany(source => source.Text.Select(candidate => candidate with { SourceKind = "metadata" }))
             .Concat(asset.Definitions.SelectMany(source => source.Text.Select(candidate => candidate with { SourceKind = "definition" })))
             .Concat(asset.PresentationNames.SelectMany(name => name.Text))
+            .Concat(asset.InventoryRootNames.SelectMany(name => name.Text))
             .Concat(asset.VisualSlotNames.SelectMany(name => name.Text)).ToArray();
         foreach (var issue in asset.PresentationNames.SelectMany(name => name.TextIssues).Distinct()) issues.Add(issue);
+        foreach (var issue in asset.InventoryRootNames.SelectMany(name => name.TextIssues).Distinct()) issues.Add(issue);
         foreach (var issue in asset.VisualSlotNames.SelectMany(name => name.TextIssues).Distinct()) issues.Add(issue);
 
         var distinct = candidates.Distinct().OrderBy(candidate => candidate.SourcePath, StringComparer.Ordinal)
@@ -95,13 +97,10 @@ internal static class Text
         foreach (var culture in cultures)
         {
             var locale = culture.Replace('-', '_').ToLowerInvariant();
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> translations;
             try
             {
-                provider.ChangeCulture(culture);
-                if (!string.Equals(provider.Internationalization.Culture, culture, StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidDataException($"Culture {culture} resolved to {provider.Internationalization.Culture}.");
-                if (provider.Internationalization.Count == 0)
-                    throw new InvalidDataException($"No localization entries loaded for {culture}.");
+                translations = Localization.Load(provider, culture);
             }
             catch (Exception error)
             {
@@ -109,11 +108,11 @@ internal static class Text
                 continue;
             }
 
-            observe?.Invoke(locale, provider.Internationalization);
+            observe?.Invoke(locale, translations);
             foreach (var asset in assets)
             {
-                var name = Resolve(asset.Name, provider.Internationalization, locale);
-                var description = Resolve(asset.Description, provider.Internationalization, locale);
+                var name = Resolve(asset.Name, translations, locale);
+                var description = Resolve(asset.Description, translations, locale);
                 if (name.Length > 0 || description.Length > 0)
                     rows.Add(new LocalizedText(asset.AssetId, locale, name, description));
             }

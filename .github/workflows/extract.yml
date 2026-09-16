@@ -12,6 +12,7 @@ concurrency:
 
 jobs:
   extract:
+    if: ${{ github.event.repository.private == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 160
     env:

@@ -28,7 +28,6 @@ internal static class GameFiles
             if (provider.Files.Count == 0)
                 throw new InvalidDataException("No game files were mounted.");
             provider.LoadVirtualPaths();
-            provider.ChangeCulture("en");
             return provider;
         }
         catch

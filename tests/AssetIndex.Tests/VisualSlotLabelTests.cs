@@ -264,14 +264,50 @@ public sealed class VisualSlotLabelTests
         Assert.Equal(expected, GameplayTagQueryMatch.Matches(new("Source", ["A", "B"], tokens), ["A"]));
     }
 
+    [Theory]
+    [InlineData("A", "A.Child", true)]
+    [InlineData("A", "A.Child.Grandchild", true)]
+    [InlineData("a.child", "A.Child.Grandchild", true)]
+    [InlineData("A.Child", "A", false)]
+    [InlineData("A", "AB.Child", false)]
+    [InlineData("A.Child", "A.Children", false)]
+    public void QueriesIncludeParentsWithDirectionalSegmentMatching(string queryTag, string tag, bool expected)
+    {
+        var query = new VisualSlotQuery("Source", [queryTag], [0, 1, 1, 1, 0]);
+
+        Assert.Equal(expected, GameplayTagQueryMatch.Matches(query, [tag]));
+    }
+
+    [Theory]
+    [InlineData(new byte[] { 0, 1, 2, 2, 0, 1 }, true)]
+    [InlineData(new byte[] { 0, 1, 3, 1, 0 }, false)]
+    [InlineData(new byte[] { 0, 1, 6, 1, 1, 1, 0 }, false)]
+    public void ParentMatchesApplyToAllAndNegativeExpressions(byte[] tokens, bool expected)
+    {
+        Assert.Equal(expected, GameplayTagQueryMatch.Matches(new("Source", ["A", "B"], tokens), ["A.Child", "B.Child"]));
+    }
+
     [Fact]
-    public void PossibleParentTagMatchesAreRejectedRatherThanInvented()
+    public void ParentMatchesDoNotSkipValidationOfUnusedBranches()
+    {
+        var query = new VisualSlotQuery("Source", ["A"], [0, 1, 4, 2, 1, 1, 0, 7, 0]);
+
+        Assert.Throws<InvalidDataException>(() => GameplayTagQueryMatch.Matches(query, ["A.Child"]));
+    }
+
+    [Theory]
+    [InlineData(" A.Child")]
+    [InlineData("A.Child ")]
+    [InlineData("A.Child\t")]
+    [InlineData("A.\nChild")]
+    [InlineData("A.\rChild")]
+    public void InvalidTagCharactersCannotProduceParentMatches(string invalid)
     {
         var query = new VisualSlotQuery("Source", ["A"], [0, 1, 1, 1, 0]);
 
-        Assert.Throws<InvalidDataException>(() => GameplayTagQueryMatch.Matches(query, ["A.Child"]));
-        Assert.True(GameplayTagQueryMatch.Matches(query, ["A", "A.Child"]));
-        Assert.False(GameplayTagQueryMatch.Matches(query, ["AB.Child"]));
+        Assert.Throws<InvalidDataException>(() => GameplayTagQueryMatch.Matches(query, [invalid]));
+        var unusedInvalid = query with { TagDictionary = ["A", invalid] };
+        Assert.Throws<InvalidDataException>(() => GameplayTagQueryMatch.Matches(unusedInvalid, ["A"]));
     }
 
     private static List<UObject> Fixture()

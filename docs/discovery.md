@@ -81,8 +81,8 @@ Binary native payloads and composite-curve evaluation are outside field discover
 Unsupported compound fields and failed reads are explicit diagnostics. A loaded
 package does not mean every export or every native payload was decoded. Selected
 object references must match their complete outer chain in the inspected headers.
-Followable targets also require decoded evidence; known noncandidate targets can
-remain header-only.
+Referenced widgets, widget trees, panel slots, class defaults and templates need
+decoded bodies. Known unrelated targets can remain header-only.
 
 ## Assign presentation
 
@@ -98,9 +98,14 @@ field declarations. Missing or conflicting schemas produce diagnostics.
   peers unresolved. `presentation` records chosen keys and defining objects.
   Valid conflicts keep a null primary and a coverage notice; failed reads remain errors.
   Unlock instructions remain `unlock-description` candidates, separate from an
-  item's description.
+  item's description. NPC-specific UI names take precedence; session modifiers
+  use their typed description when no name field exists.
 - `Presentation.cs` joins loadout container types and slot references to the
   corresponding UI container label; its full join path remains in each row.
+- `InventoryRootPresentation.cs` follows typed root slots, default containers, and
+  allowed-container queries to their Stash or Augment UI category labels.
+- `VisualSlotLabels.cs` joins a slot's tag query through matching skin identities
+  and UI type tags to its navigation label. Ambiguous joins stay unresolved.
 - `Images.cs` associates declared image fields, including class-specific clan and
   environmental images. `MapImages.cs` retains `MapAreas[n].HeaderImage` and
   `MapWidgetSettings.MapTexture`; local containers replace the whole template field.

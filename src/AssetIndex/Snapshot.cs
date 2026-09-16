@@ -9,12 +9,15 @@ internal sealed record Translation(string Locale, string DisplayName, string Des
 internal sealed record ContainerPresentation(string Role, string ContainerType, string FramePath,
     int ContainerIndex, string SlotPath, string? ContainerPath, string MetadataPath);
 internal sealed record VisualSlotMemberPresentation(string ItemPath, string MetadataPath);
+internal sealed record InventoryRootPresentation(string Role, string ContainerType, string RootPath,
+    string RootField, string SlotPath, string? ContainerPath, string MetadataPath);
 internal sealed record VisualSlotPresentation(string SlotPath, string TypeTag, string MetadataPath,
     IReadOnlyList<VisualSlotMemberPresentation> Members);
 internal sealed record AssetPresentation(TextReference? Name, TextReference? Description,
     IReadOnlyList<TextCandidate> Candidates, IReadOnlyList<ContainerPresentation> Containers)
 {
     public IReadOnlyList<VisualSlotPresentation> VisualSlots { get; init; } = [];
+    public IReadOnlyList<InventoryRootPresentation> InventoryRoots { get; init; } = [];
 }
 internal sealed record AssetRecord(
     [property: JsonNumberHandling(JsonNumberHandling.WriteAsString)] long Id,

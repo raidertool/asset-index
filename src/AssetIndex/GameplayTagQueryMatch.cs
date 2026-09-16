@@ -7,8 +7,8 @@ namespace AssetIndex;
 
 internal sealed record VisualSlotQuery(string DefinedAt, IReadOnlyList<string> TagDictionary, IReadOnlyList<byte> Tokens);
 
-// Upstream evaluates the six expression kinds, but does not validate skipped branches,
-// stream versions, or parent tags. Reject those uncertainties before using its result.
+// Validate the whole stream, including skipped branches. Unreal's non-exact queries
+// test HasTag, which includes parents; CUE4Parse's container only stores explicit tags.
 internal static class GameplayTagQueryMatch
 {
     public static VisualSlotQuery Capture(FStructFallback source, string definedAt)
@@ -26,11 +26,15 @@ internal static class GameplayTagQueryMatch
 
     public static bool Matches(VisualSlotQuery query, IReadOnlyList<string> tags)
     {
-        var referenced = Validate(query);
-        var present = new HashSet<string>(tags.Select(Tag), StringComparer.OrdinalIgnoreCase);
-        foreach (var tag in referenced.Select(index => query.TagDictionary[index]))
-            if (!present.Contains(tag) && present.Any(candidate => candidate.StartsWith(tag + ".", StringComparison.OrdinalIgnoreCase)))
-                throw new InvalidDataException("Gameplay-tag parent matching requires a verified evaluator.");
+        Validate(query);
+        var present = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var value in tags)
+        {
+            var tag = Tag(value);
+            present.Add(tag);
+            for (var end = tag.LastIndexOf('.'); end > 0; end = tag.LastIndexOf('.', end - 1))
+                present.Add(tag[..end]);
+        }
         var evaluator = new FGameplayTagQuery(new FStructFallback())
         {
             TokenStreamVersion = EGameplayTagQueryStreamVersion.InitialVersion,
@@ -42,7 +46,8 @@ internal static class GameplayTagQueryMatch
 
     internal static string Tag(string value)
     {
-        if (string.IsNullOrWhiteSpace(value) || value.Equals("None", StringComparison.OrdinalIgnoreCase) ||
+        if (string.IsNullOrWhiteSpace(value) || value != value.Trim(' ') || value.IndexOfAny(['\r', '\n', '\t']) >= 0 ||
+            value.Equals("None", StringComparison.OrdinalIgnoreCase) ||
             value.Split('.').Any(part => part.Length == 0))
             throw new InvalidDataException("Gameplay tag is empty or malformed.");
         return value;
@@ -59,16 +64,15 @@ internal static class GameplayTagQueryMatch
         return Tag(tag);
     }
 
-    private static HashSet<byte> Validate(VisualSlotQuery query)
+    private static void Validate(VisualSlotQuery query)
     {
-        var referenced = new HashSet<byte>();
+        foreach (var tag in query.TagDictionary) Tag(tag);
         var cursor = 0;
         if (Token() != 0) throw new InvalidDataException("Unsupported gameplay-tag query version.");
         var root = Token();
         if (root > 1) throw new InvalidDataException("Invalid gameplay-tag root marker.");
         if (root == 1) Expression(0);
         if (cursor != query.Tokens.Count) throw new InvalidDataException("Gameplay-tag query has trailing tokens.");
-        return referenced;
 
         byte Token() => cursor < query.Tokens.Count ? query.Tokens[cursor++]
             : throw new InvalidDataException("Gameplay-tag query is truncated.");
@@ -86,7 +90,6 @@ internal static class GameplayTagQueryMatch
                 {
                     var index = Token();
                     if (index >= query.TagDictionary.Count) throw new InvalidDataException("Gameplay-tag dictionary index is out of range.");
-                    referenced.Add(index);
                 }
             }
         }

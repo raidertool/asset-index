@@ -54,19 +54,10 @@ Partial output is diagnostic evidence. Retry into a new directory under `.work/`
 
 ## Manual preview
 
-The [Extract preview](.github/workflows/extract.yml) workflow is manual and uses
-an [unreleased SteamDepotFS auth change](https://github.com/raidertool/SteamDepotFS/pull/3).
-Maintainer review is pending; complete it before configuring credentials or running it.
-
-After review, set Actions secrets `STEAM_USERNAME` plus `STEAM_PASSWORD` or
-`STEAM_ACCESS_TOKEN` (a Steam client refresh token). Authentication must work
-without an interactive Guard prompt. Use **Actions → Extract preview → Run workflow**
-on the reviewed branch. PR tests need no Steam credentials.
-
-Download `asset-index-preview-<run ID>` from the run; artifacts last seven days.
-Failed runs also upload available output. Credentials, Steam logs, and depot
-caches are excluded. Keep the run URL: its summary records the extractor commit
-and depot manifest; the downloaded JSON does not yet record them.
+Run game-backed previews locally or in a private repository; keep their complete
+output and logs private. The [Extract preview](.github/workflows/extract.yml)
+workflow skips public repositories. Public CI runs offline tests without Steam
+credentials. A safe public snapshot handoff is not implemented yet.
 
 ## Versioning
 
