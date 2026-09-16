@@ -3,6 +3,8 @@
 Activation is pending. Normal publication requires an existing `data` branch with
 the published snapshot below, `metadata.json`, and its matching
 lightweight tag. Initialization is a separate explicit mode.
+Game-backed workflow jobs require a private repository. Public CI runs offline;
+the safe handoff from private validation to public publication is not implemented.
 
 - `assets.json`: catalog rows and presentation provenance.
 - `resources.json` and `images/`: every image referenced by the catalog.
@@ -10,7 +12,7 @@ lightweight tag. Initialization is a separate explicit mode.
 - `coverage.json`: extraction counts, errors, notices, mapping hash, and discovery scope.
 
 The complete preview is validated first. Discovery streams and extra UI images
-remain in the Actions artifact; they are excluded only from Git. Coverage retains
+remain private; they are excluded from Git. Coverage retains
 the full extraction counts. Every published file must be at most 100 MiB.
 
 ```sh
@@ -25,6 +27,11 @@ every PNG must belong to the resource inventory. Image filenames hash their
 declared resource paths, not their PNG bytes.
 Text selection must match candidate source/role precedence; conflicting peers or
 an explicit empty value require a null primary, with all candidates retained.
+Every rendered translation must match its selected reference and dictionary.
+Resolvable language rows, including Korean, cannot be omitted.
+Each text candidate must match its decoded field, template owner and FText value.
+Inventory-root and visual-slot relationships require recorded source objects;
+their full identity and membership semantics remain a separate production gate.
 
 Every mounted package needs a complete export-header inventory, including exact
 superclass references. Each selected
@@ -34,7 +41,8 @@ Unknown or conflicting export metadata blocks publication.
 
 Every non-native reference needs an inspected package. Named targets must match
 the complete object/outer path, case-insensitively; relevant classes and referenced
-class/struct declarations also need decoded evidence. Known unrelated classes can remain header-only. Registry aliases
+class/struct declarations, widgets, class defaults and templates also need decoded
+evidence. Known unrelated classes can remain header-only. Registry aliases
 prove package inspection, without rewriting object paths.
 
 Property headers require unique, contiguous ordinal slots and valid array metadata.
@@ -45,8 +53,8 @@ byte length divisible by its element width. See [discovery](discovery.md) for th
 
 Validation reads a private copy on disk. Later changes to the input directory
 cannot change the validated payload; large images and evidence streams are not
-held together in memory. Field-level text provenance, UI label choice, and
-complete game/API coverage require separate audits.
+held together in memory. Identity and UI association semantics, plus complete
+game coverage, still require separate audits.
 
 `metadata.json` records:
 

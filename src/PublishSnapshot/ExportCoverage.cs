@@ -8,12 +8,11 @@ namespace PublishSnapshot;
 internal sealed class ExportCoverage
 {
     private static readonly string[] Roots = ["DataAsset", "UIMetaDataItem", "DataTable", "CurveTable", "StringTable", "Blueprint", "BlueprintGeneratedClass"];
+    private static readonly string[] ReferenceRoots = ["Struct", "Texture", "MaterialInterface", "Widget", "WidgetTree", "PanelSlot"];
     private sealed record Header(string Path, string Class, string? SuperPath, string[] Ancestry)
     {
         public bool Candidate => Roots.Any(root => Ancestry.Contains(root, StringComparer.OrdinalIgnoreCase));
-        public bool Follow => Candidate || Ancestry.Contains("Struct", StringComparer.OrdinalIgnoreCase) ||
-            Ancestry.Contains("Texture", StringComparer.OrdinalIgnoreCase) ||
-            Ancestry.Contains("MaterialInterface", StringComparer.OrdinalIgnoreCase);
+        public bool Follow => Candidate || ReferenceRoots.Any(root => Ancestry.Contains(root, StringComparer.OrdinalIgnoreCase));
     }
     private sealed record Package(string Name, int Exports, HashSet<int> Selected);
 
@@ -24,7 +23,8 @@ internal sealed class ExportCoverage
     private readonly HashSet<string> names = new(StringComparer.OrdinalIgnoreCase);
 
     public static void Validate(IReadOnlyDictionary<string, SnapshotFile> files, JsonElement report, MountedInputs inputs,
-        IReadOnlyDictionary<string, string> objects, IEnumerable<string> targets, IReadOnlySet<string> uiTextures)
+        IReadOnlyDictionary<string, string> objects, IEnumerable<string> targets, IReadOnlySet<string> uiTextures,
+        IReadOnlySet<string> requiredBodies)
     {
         var coverage = new ExportCoverage();
         coverage.ReadPackages(files["discovery/packages.jsonl.gz"], inputs);
@@ -32,7 +32,7 @@ internal sealed class ExportCoverage
         Require(inputs.Paths.SetEquals(coverage.packages.Keys), "A mounted package was not inspected.");
         coverage.ReadHeaders(files["discovery/exports.jsonl.gz"]);
         coverage.CheckObjects(objects, uiTextures);
-        coverage.CheckReferences(targets.Concat(coverage.paths.Values.Select(header => header.SuperPath).OfType<string>()), inputs);
+        coverage.CheckReferences(targets.Concat(coverage.paths.Values.Select(header => header.SuperPath).OfType<string>()), inputs, requiredBodies);
     }
 
     private void ReadPackages(SnapshotFile file, MountedInputs inputs) => JsonLines.Read(file, row =>
@@ -100,7 +100,7 @@ internal sealed class ExportCoverage
         Require(uiTextures.IsSubsetOf(decoded), "A registry UI texture was not decoded.");
     }
 
-    private void CheckReferences(IEnumerable<string> targets, MountedInputs inputs)
+    private void CheckReferences(IEnumerable<string> targets, MountedInputs inputs, IReadOnlySet<string> requiredBodies)
     {
         foreach (var target in targets)
         {
@@ -111,7 +111,8 @@ internal sealed class ExportCoverage
             // Package aliases establish a read, never an invented object/outer path.
             if (!target.Contains('.')) continue;
             Require(paths.TryGetValue(target, out var header), $"Named reference target is absent from an inspected package: {target}.");
-            Require(!header!.Follow || decoded.Contains(target), $"Referenced export was not decoded: {target}.");
+            if (header!.Follow || requiredBodies.Contains(target))
+                Require(decoded.Contains(target), $"Referenced export was not decoded: {target}.");
         }
     }
 

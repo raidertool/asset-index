@@ -88,10 +88,13 @@ public sealed partial class PublisherTests
     [InlineData("Material", "MaterialInterface", "Referenced export was not decoded")]
     [InlineData("Class", "Struct", "Referenced export was not decoded")]
     [InlineData("UserDefinedStruct", "Struct", "Referenced export was not decoded")]
+    [InlineData("TextBlock", "Widget", "Referenced export was not decoded")]
+    [InlineData("WidgetTree", "Object", "Referenced export was not decoded")]
+    [InlineData("OverlaySlot", "PanelSlot", "Referenced export was not decoded")]
     public void RelevantSiblingCannotBeHiddenInHeaderOnlyInventory(string type, string parent, string expected)
     {
         var target = AddHeaderSibling(type, parent == "Object" ? [parent] : [parent, "Object"]);
-        if (type is "Texture2D" or "Material" or "Class" or "UserDefinedStruct") AddTarget(target);
+        if (expected == "Referenced export was not decoded") AddTarget(target);
 
         var error = Assert.Throws<InvalidDataException>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
 
@@ -105,6 +108,70 @@ public sealed partial class PublisherTests
         AddHeaderSibling("UserDefinedStruct", ["Struct", "Field", "Object"]);
 
         Assert.True(Publisher.Publish(preview, remote, NextExtractor, "456").Changed);
+    }
+
+    [Theory]
+    [InlineData("TextBlock", "Widget")]
+    [InlineData("WidgetTree", "Object")]
+    [InlineData("OverlaySlot", "PanelSlot")]
+    public void UnreferencedUiBodiesAreNotNewSeeds(string type, string parent)
+    {
+        AddHeaderSibling(type, parent == "Object" ? [parent] : [parent, "Object"]);
+
+        using var accepted = Preview.Read(preview);
+    }
+
+    [Theory]
+    [InlineData("TextBlock", "Widget")]
+    [InlineData("WidgetTree", "Object")]
+    [InlineData("OverlaySlot", "PanelSlot")]
+    public void DecodedUiBodiesSatisfyTheirExactReferences(string type, string parent)
+    {
+        var target = AddHeaderSibling(type, parent == "Object" ? [parent] : [parent, "Object"]);
+        AddTarget(target.ToLowerInvariant());
+        AddSiblingBody(target, type);
+
+        using var accepted = Preview.Read(preview);
+    }
+
+    [Theory]
+    [InlineData("class-default", "/Native/ClassDefaultObject")]
+    [InlineData("template", "/Template")]
+    public void RequiredBodiesCannotBeRemovedEvenIfOrdinaryReferencesSawTheirHeaders(string role, string pointer)
+    {
+        var target = AddHeaderSibling("Actor", ["Object"]);
+        AddTarget(target);
+        AddRequiredReference(target.ToLowerInvariant(), role, pointer);
+        AddSiblingBody(target, "Actor");
+        using (Preview.Read(preview)) { }
+        ChangeLines("discovery/objects.jsonl.gz", rows => rows.RemoveAt(rows.Count - 1));
+        ChangeJson("coverage.json", node => node["discovery"]!["objects"] = 2);
+        ChangeLines("discovery/packages.jsonl.gz", rows =>
+        {
+            rows[0]!["selected"] = new JsonArray(0);
+            rows[0]!["decoded"] = new JsonArray(0);
+        });
+        var references = remoteGit.Run("show-ref");
+        var inputs = HashFiles(preview);
+
+        var error = Assert.Throws<InvalidDataException>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
+
+        Assert.Contains("Referenced export was not decoded", error.Message);
+        Assert.Equal(references, remoteGit.Run("show-ref"));
+        Assert.Equal(inputs, HashFiles(preview));
+    }
+
+    [Theory]
+    [InlineData("property", "/Native/ClassDefaultObject")]
+    [InlineData("property", "/Template")]
+    [InlineData("class-default", "/Other")]
+    [InlineData("template", "/Other")]
+    public void ExactReferenceRolesCannotBeChangedToEvadeBodyRequirements(string role, string pointer)
+    {
+        var target = AddHeaderSibling("Actor", ["Object"]);
+        AddRequiredReference(target, role, pointer);
+
+        AssertRejected();
     }
 
     [Fact]
@@ -212,6 +279,41 @@ public sealed partial class PublisherTests
         ChangeLines("discovery/packages.jsonl.gz", rows => rows[0]!["exports"] = 2);
         return path;
     }
+
+    private void AddSiblingBody(string path, string type)
+    {
+        ChangeLines("discovery/objects.jsonl.gz", rows => rows.Add(new JsonObject
+        {
+            ["path"] = path,
+            ["class"] = type,
+            ["properties"] = new JsonArray(),
+            ["references"] = new JsonArray(),
+            ["texts"] = new JsonArray(),
+            ["values"] = new JsonArray(),
+            ["tableEntries"] = new JsonArray(),
+            ["issues"] = new JsonArray()
+        }));
+        ChangeJson("coverage.json", node => node["discovery"]!["objects"] = 3);
+        ChangeLines("discovery/packages.jsonl.gz", rows =>
+        {
+            rows[0]!["selected"] = new JsonArray(0, 1);
+            rows[0]!["decoded"] = new JsonArray(0, 1);
+        });
+    }
+
+    private void AddRequiredReference(string path, string role, string pointer) => ChangeLines("discovery/objects.jsonl.gz", rows =>
+        rows[0]!["references"]!.AsArray().Add(new JsonObject
+        {
+            ["pointer"] = pointer,
+            ["kind"] = "resolved",
+            ["role"] = role,
+            ["targetPath"] = path,
+            ["isNull"] = false,
+            ["package"] = null,
+            ["packageIndex"] = null,
+            ["exportIndex"] = null,
+            ["error"] = null
+        }));
 
     private void AddTarget(string path) => ChangeLines("discovery/objects.jsonl.gz", rows =>
     {

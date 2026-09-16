@@ -232,7 +232,9 @@ public sealed partial class PublisherTests : IDisposable
                     new { role = "display-name", sourceKind = "definition", sourcePath = "/Game/DA_Test.DA_Test", sourceClass = "PersistenceDataAsset", field = "ItemName", definedAt = "/Game/DA_Test.DA_Test", reference = new { @namespace = "", key = "", source = name, cultureInvariant = true } },
                     new { role = "description", sourceKind = "definition", sourcePath = "/Game/DA_Test.DA_Test", sourceClass = "PersistenceDataAsset", field = "Description", definedAt = "/Game/DA_Test.DA_Test", reference = new { @namespace = "", key = "", source = "Description", cultureInvariant = true } }
                 },
-                containers = Array.Empty<object>()
+                containers = Array.Empty<object>(),
+                visualSlots = Array.Empty<object>(),
+                inventoryRoots = Array.Empty<object>()
             }
         };
         File.WriteAllBytes(Path.Combine(directory, "assets.json"), JsonSerializer.SerializeToUtf8Bytes(new[] { asset }, Preview.Json));

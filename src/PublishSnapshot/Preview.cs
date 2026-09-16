@@ -25,6 +25,7 @@ internal sealed record Preview(SnapshotFiles Snapshot) : IDisposable
             Require(coverage.RootElement.GetProperty("issues").GetArrayLength() == 0, "Preview has diagnostics.");
             var evidence = ResourceEvidence.Read(snapshot.Files, coverage.RootElement);
             ValidateRecords(assets.RootElement, coverage.RootElement, evidence);
+            TextOriginChecks.Validate(assets.RootElement, snapshot.Files["discovery/objects.jsonl.gz"]);
             return new(snapshot);
         }
         catch { snapshot.Dispose(); throw; }
@@ -55,7 +56,7 @@ internal sealed record Preview(SnapshotFiles Snapshot) : IDisposable
             ValidateSources(asset.GetProperty("metadata"), sources, evidence.ObjectPaths);
             Require(sources.Count > 0, $"Asset {id} has no sources.");
             PresentationChecks.Validate(asset, sources, evidence.ObjectPaths);
-            var english = ValidateTranslations(asset.GetProperty("text"), evidence.Locales, asset.GetProperty("presentation"));
+            var english = LocalizedTextChecks.Validate(asset.GetProperty("text"), evidence.Localizations, asset.GetProperty("presentation"));
             if (english.Name) names++;
             if (english.Description) descriptions++;
             if (ValidateImages(asset.GetProperty("images"), sources, evidence.Resources)) illustrated++;
@@ -67,25 +68,6 @@ internal sealed record Preview(SnapshotFiles Snapshot) : IDisposable
         var candidates = report.GetProperty("candidates").GetInt32();
         Require(candidates > 0 && report.GetProperty("registeredAssets").GetInt32() > 0, "Discovery counts must be positive.");
         CheckCount(report, "loaded", candidates);
-    }
-
-    private static (bool Name, bool Description) ValidateTranslations(JsonElement text, HashSet<string> availableLocales, JsonElement presentation)
-    {
-        var locales = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var english = (Name: false, Description: false);
-        foreach (var translation in text.EnumerateArray())
-        {
-            Fields(translation, "locale", "displayName", "description");
-            var locale = String(translation, "locale");
-            Require(availableLocales.Contains(locale), $"Missing localization dictionary for {locale}.");
-            Require(locales.Add(locale), $"Duplicate locale: {locale}");
-            var name = String(translation, "displayName", allowEmpty: true);
-            var description = String(translation, "description", allowEmpty: true);
-            Require(name.Length == 0 || presentation.GetProperty("name").ValueKind != JsonValueKind.Null, "Display name lacks selected text provenance.");
-            Require(description.Length == 0 || presentation.GetProperty("description").ValueKind != JsonValueKind.Null, "Description lacks selected text provenance.");
-            if (locale == "en") english = (name.Length > 0, description.Length > 0);
-        }
-        return english;
     }
 
     private static void ValidateSources(JsonElement sources, HashSet<string> paths, HashSet<string> discovered)

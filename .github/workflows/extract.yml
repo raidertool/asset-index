@@ -221,7 +221,7 @@ jobs:
   publish:
     needs: extract
     if: >-
-      ${{ inputs.publish && needs.extract.result == 'success' &&
+      ${{ github.event.repository.private == true && inputs.publish && needs.extract.result == 'success' &&
           github.repository == 'raidertool/asset-index' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30

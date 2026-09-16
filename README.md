@@ -51,7 +51,7 @@ See [discovery rules](docs/discovery.md) before adding new associations.
 
 Planned `data` publication retains the catalog, all its images, localization,
 coverage and metadata. Full discovery evidence and extra UI images stay in the
-Actions artifact; the complete preview must pass validation before publication.
+private preview; the complete preview must pass validation before publication.
 
 Exit codes: `0` succeeded, `1` incomplete, `2` invalid input. Inspect coverage
 and affected images even after success: success does not prove completeness.
@@ -61,14 +61,10 @@ Partial output is diagnostic evidence. Retry into a new directory under `.work/`
 
 Run game-backed previews locally or in a private repository; keep their complete
 output and logs private. The [Extract preview](.github/workflows/extract.yml)
-workflow skips public repositories. Public CI runs offline tests without Steam
-credentials. A safe public snapshot handoff is not implemented yet.
-
-Publication is off by default and has no schedule. After the
-[activation review](docs/publication.md#activation), `publish=true` on this
-repository's `main` validates and publishes that run's successful preview.
-`initialize=true` also requires `publish=true` and creates the first `data`
-branch/tag; leave it off for later updates. Feature branches remain preview-only.
+workflow skips extraction, artifact upload and publication in public repositories,
+regardless of its inputs. Public CI runs offline tests without Steam credentials.
+A safe public snapshot handoff is not implemented yet; publication remains blocked
+pending that handoff and the [activation review](docs/publication.md#activation).
 
 ## Versioning
 

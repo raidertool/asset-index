@@ -10,8 +10,60 @@ public sealed class PresentationChecksTests
     private const string Container = "/Game/Container.Container";
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NpcSpecificNameOwnsTheSelectionEvenWhenEmpty(bool empty)
+    {
+        var generic = Candidate("metadata", "display-name", "Generic item");
+        var npc = Candidate("metadata", "display-name", empty ? "" : "NPC name");
+        npc["sourceClass"] = "UINPCMetaDataItem";
+        npc["field"] = "DisplayName";
+        var asset = Asset(generic, npc);
+        asset["definitions"]![0]!["class"] = "NPCItemDataAsset";
+        asset["presentation"]!["name"] = empty ? null : npc["reference"]!.DeepClone();
+        Validate(asset);
+
+        asset["presentation"]!["name"] = generic["reference"]!.DeepClone();
+        Assert.Throws<InvalidDataException>(() => Validate(asset));
+    }
+
+    [Theory]
+    [InlineData("SessionModifierDataAsset", true)]
+    [InlineData("UnrelatedDataAsset", false)]
+    public void OnlyModifierDefinitionsUseTypedDescriptionsAsLabels(string definition, bool label)
+    {
+        var description = Candidate("definition", "description", "Modifier label");
+        description["sourceClass"] = "SessionModifierDataAsset";
+        description["field"] = "Description";
+        var asset = Asset(description);
+        asset["definitions"]![0]!["class"] = definition;
+        asset["presentation"]!["description"] = description["reference"]!.DeepClone();
+        asset["presentation"]!["name"] = label ? description["reference"]!.DeepClone() : null;
+        Validate(asset);
+
+        asset["presentation"]!["name"] = label ? null : description["reference"]!.DeepClone();
+        Assert.Throws<InvalidDataException>(() => Validate(asset));
+    }
+
+    [Fact]
+    public void ModifierDescriptionDoesNotReplaceAnExplicitEmptyName()
+    {
+        var description = Candidate("definition", "description", "Modifier label");
+        description["sourceClass"] = "SessionModifierDataAsset";
+        description["field"] = "Description";
+        var asset = Asset(description, Candidate("metadata", "display-name", ""));
+        asset["definitions"]![0]!["class"] = "SessionModifierDataAsset";
+        asset["presentation"]!["description"] = description["reference"]!.DeepClone();
+        Validate(asset);
+
+        asset["presentation"]!["name"] = description["reference"]!.DeepClone();
+        Assert.Throws<InvalidDataException>(() => Validate(asset));
+    }
+
+    [Theory]
     [InlineData("metadata", "short-name", "definition", "display-name", "name")]
     [InlineData("definition", "short-name", "container", "display-name", "name")]
+    [InlineData("container", "short-name", "visual-slot", "display-name", "name")]
     [InlineData("metadata", "display-name", "metadata", "title", "name")]
     [InlineData("metadata", "title", "metadata", "short-name", "name")]
     [InlineData("metadata", "tooltip", "definition", "description", "description")]
@@ -98,6 +150,8 @@ public sealed class PresentationChecksTests
     [InlineData("metadata", "definition")]
     [InlineData("container", "metadata")]
     [InlineData("metadata", "container")]
+    [InlineData("visual-slot", "metadata")]
+    [InlineData("metadata", "visual-slot")]
     public void CandidateOwnershipMustMatchItsDeclaredKind(string kind, string forgedKind)
     {
         var candidate = Candidate(kind, "display-name", "Name");
@@ -121,13 +175,21 @@ public sealed class PresentationChecksTests
 
     private static JsonObject Asset(params JsonNode[] candidates) => new()
     {
-        ["definitions"] = new JsonArray(new JsonObject { ["path"] = Definition }),
-        ["metadata"] = new JsonArray(new JsonObject { ["path"] = Metadata }),
+        ["definitions"] = new JsonArray(new JsonObject { ["path"] = Definition, ["class"] = "Fixture" }),
+        ["metadata"] = new JsonArray(new JsonObject { ["path"] = Metadata, ["class"] = "Fixture" }),
         ["presentation"] = new JsonObject
         {
             ["name"] = null,
             ["description"] = null,
             ["candidates"] = new JsonArray(candidates.Select(candidate => candidate.DeepClone()).ToArray()),
+            ["inventoryRoots"] = new JsonArray(),
+            ["visualSlots"] = new JsonArray(new JsonObject
+            {
+                ["slotPath"] = Definition,
+                ["typeTag"] = "UI.Category",
+                ["metadataPath"] = Container,
+                ["members"] = new JsonArray(new JsonObject { ["itemPath"] = Definition, ["metadataPath"] = Metadata })
+            }),
             ["containers"] = new JsonArray(new JsonObject
             {
                 ["role"] = "container-slot",

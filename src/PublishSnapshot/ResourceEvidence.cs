@@ -9,7 +9,7 @@ using static PublishSnapshot.Preview;
 namespace PublishSnapshot;
 
 internal sealed record ResourceImage(string File, int Width, int Height);
-internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, HashSet<string> Locales,
+internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, IReadOnlyList<LocalizationEvidence> Localizations,
     IReadOnlyDictionary<string, ResourceImage> Resources)
 {
     public static ResourceEvidence Read(IReadOnlyDictionary<string, SnapshotFile> files, JsonElement report)
@@ -24,7 +24,8 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, HashSet<str
             foreach (var field in new[] { "stage", "path", "message" }) String(notice, field);
         }
         var targets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var objectTypes = ReadObjects(files["discovery/objects.jsonl.gz"], targets);
+        var requiredBodies = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var objectTypes = ReadObjects(files["discovery/objects.jsonl.gz"], targets, requiredBodies);
         var objects = objectTypes.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
         CheckCount(discovery, "objects", objects.Count);
         var registry = new HashSet<string>(StringComparer.Ordinal);
@@ -44,7 +45,7 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, HashSet<str
         });
         CheckCount(report, "registeredAssets", registry.Count);
         var inputs = MountedInputs.Read(files["discovery/files.jsonl.gz"], registryPackages);
-        ExportCoverage.Validate(files, report, inputs, objectTypes, targets, uiTextures);
+        ExportCoverage.Validate(files, report, inputs, objectTypes, targets, uiTextures, requiredBodies);
         var locales = ReadLocalizations(files);
         var resources = ReadResources(files, objects);
         Require(uiTextures.IsSubsetOf(resources.Keys), "A registry UI texture lacks a published resource.");
@@ -52,7 +53,8 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, HashSet<str
         return new(objects, locales, resources);
     }
 
-    private static Dictionary<string, string> ReadObjects(SnapshotFile file, HashSet<string> targets)
+    private static Dictionary<string, string> ReadObjects(SnapshotFile file, HashSet<string> targets,
+        HashSet<string> requiredBodies)
     {
         var objects = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         JsonLines.Read(file, row =>
@@ -64,11 +66,20 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, HashSet<str
             foreach (var reference in row.GetProperty("references").EnumerateArray())
             {
                 Fields(reference, "pointer", "kind", "role", "targetPath", "isNull", "package", "packageIndex", "exportIndex", "error");
-                properties.ValidatePointer(String(reference, "pointer")); String(reference, "kind"); String(reference, "role");
+                var pointer = String(reference, "pointer");
+                var role = String(reference, "role");
+                properties.ValidatePointer(pointer); String(reference, "kind");
+                Require((pointer == "/Native/ClassDefaultObject") == (role == "class-default") &&
+                    (pointer == "/Template") == (role == "template"), "Reference role differs from its native field.");
                 Require(reference.GetProperty("error").ValueKind == JsonValueKind.Null, "Object reference failed to resolve.");
                 var isNull = reference.GetProperty("isNull").GetBoolean();
                 Require(isNull == (reference.GetProperty("targetPath").ValueKind == JsonValueKind.Null), "Inconsistent null reference.");
-                if (!isNull) targets.Add(ObjectPath(reference, "targetPath"));
+                if (!isNull)
+                {
+                    var target = ObjectPath(reference, "targetPath");
+                    targets.Add(target);
+                    if (role is "class-default" or "template") requiredBodies.Add(target);
+                }
                 NullableString(reference, "package");
                 foreach (var field in new[] { "packageIndex", "exportIndex" })
                     if (reference.GetProperty(field).ValueKind != JsonValueKind.Null) reference.GetProperty(field).GetInt32();
@@ -102,20 +113,20 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, HashSet<str
         return objects;
     }
 
-    private static HashSet<string> ReadLocalizations(IReadOnlyDictionary<string, SnapshotFile> files)
+    private static IReadOnlyList<LocalizationEvidence> ReadLocalizations(IReadOnlyDictionary<string, SnapshotFile> files)
     {
-        var locales = new HashSet<string>(StringComparer.Ordinal);
+        var locales = new List<LocalizationEvidence>();
         foreach (var (path, file) in files.Where(pair => SnapshotFiles.LocalePath.IsMatch(pair.Key)))
         {
-            var entries = new HashSet<(string, string)>();
+            var entries = new Dictionary<(string Namespace, string Key), string>();
             JsonLines.Read(file, row =>
             {
                 Fields(row, "namespace", "key", "value");
-                Require(entries.Add((String(row, "namespace", allowEmpty: true), String(row, "key", allowEmpty: true))), "Duplicate localization entry.");
-                String(row, "value", allowEmpty: true);
+                Require(entries.TryAdd((String(row, "namespace", allowEmpty: true), String(row, "key", allowEmpty: true)),
+                    String(row, "value", allowEmpty: true)), "Duplicate localization entry.");
             });
             Require(entries.Count > 0, "Empty localization dictionary.");
-            locales.Add(path["localization/".Length..^".jsonl.gz".Length]);
+            locales.Add(new(path["localization/".Length..^".jsonl.gz".Length], entries));
         }
         return locales;
     }

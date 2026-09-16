@@ -13,6 +13,12 @@ public sealed partial class PublisherTests
         AddCatalogImage("AlternateIcon", Texture, Image);
         var unowned = AddUnownedImage("/Game/T_Unowned.T_Unowned", "Texture2D");
         WriteLines(preview, "localization/ko.jsonl.gz", new[] { new { @namespace = "Shared", key = "KOREAN", value = "한국어" } });
+        ChangeJson("assets.json", rows =>
+        {
+            var korean = rows[0]!["text"]![0]!.DeepClone();
+            korean["locale"] = "ko";
+            rows[0]!["text"]!.AsArray().Add(korean);
+        });
         var input = HashFiles(preview);
 
         var result = Publisher.Publish(preview, remote, NextExtractor, "456");
