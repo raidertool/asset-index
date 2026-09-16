@@ -35,6 +35,7 @@ internal static class Publisher
         // Capture and validate private files before any Git operation.
         var metadata = Metadata.Create(extractorCommit, manifestId);
         using var preview = Preview.Read(previewDirectory);
+        using var snapshot = DataSnapshot.Create(preview);
         var directory = Path.Combine(Path.GetTempPath(), "asset-index-publish-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         try
@@ -46,7 +47,7 @@ internal static class Publisher
             var parent = git.Run("rev-parse", "FETCH_HEAD").Trim();
             var paths = ValidateTree(git, parent);
             git.Run("checkout", "--quiet", "--detach", parent);
-            if (SameContent(directory, paths, preview.Files))
+            if (SameContent(directory, paths, snapshot.Files))
             {
                 var previous = Metadata.Read(Path.Combine(directory, "metadata.json"));
                 var tag = Tag(previous.Steam.ManifestId, parent);
@@ -55,7 +56,7 @@ internal static class Publisher
                 return new(false, parent, tag);
             }
             git.Run("rm", "--quiet", "-r", "--ignore-unmatch", "--", ".");
-            foreach (var (path, file) in preview.Files)
+            foreach (var (path, file) in snapshot.Files)
             {
                 var target = Path.Combine(directory, path);
                 Directory.CreateDirectory(Path.GetDirectoryName(target)!);
@@ -85,17 +86,17 @@ internal static class Publisher
             var parts = entry.Split('\t', 2);
             Preview.Require(parts.Length == 2 && parts[0].StartsWith("100644 blob ", StringComparison.Ordinal), "Data branch must contain ordinary generated files only.");
             var path = parts[1];
-            Preview.Require(path == "metadata.json" || SnapshotFiles.Allowed(path), "Data branch contains a file outside the generated snapshot.");
+            Preview.Require(path == "metadata.json" || DataSnapshot.Allowed(path), "Data branch contains a file outside the published snapshot.");
             paths.Add(path);
         }
-        Preview.Require(SnapshotFiles.Required.Append("metadata.json").All(paths.Contains), "Existing data branch is not an initialized snapshot.");
+        Preview.Require(DataSnapshot.Required.Append("metadata.json").All(paths.Contains), "Existing data branch is not an initialized snapshot.");
         return paths.ToArray();
     }
 
     private static bool SameContent(string directory, IEnumerable<string> existing, IReadOnlyDictionary<string, SnapshotFile> incoming)
     {
-        var paths = existing.Where(SnapshotFiles.Payload).ToHashSet(StringComparer.Ordinal);
-        return paths.SetEquals(incoming.Keys.Where(SnapshotFiles.Payload)) && paths.All(path => incoming[path].Matches(Path.Combine(directory, path)));
+        var paths = existing.Where(DataSnapshot.Payload).ToHashSet(StringComparer.Ordinal);
+        return paths.SetEquals(incoming.Keys.Where(DataSnapshot.Payload)) && paths.All(path => incoming[path].Matches(Path.Combine(directory, path)));
     }
 
     internal static string Tag(string manifest, string commit) => $"arc-{manifest}-{commit[..12]}";

@@ -9,11 +9,11 @@ public sealed partial class PublisherTests
     [InlineData(1)]
     [InlineData(2)]
     [InlineData(256)]
-    public void BinaryEvidencePublishesWithoutChangingItsBytes(int length)
+    public void BinaryEvidenceIsValidatedWithoutChangingItsBytes(int length)
     {
         var bytes = Enumerable.Range(0, length).Select(index => (byte)index).ToArray();
         AddEncodedEvidence(Convert.ToBase64String(bytes));
-        AssertEvidencePublishesUnchanged();
+        AssertEvidenceValidatedAndUnchanged();
     }
 
     [Theory]
@@ -32,15 +32,14 @@ public sealed partial class PublisherTests
         AssertEvidenceRejectedBeforeGit();
     }
 
-    private void AssertEvidencePublishesUnchanged()
+    private void AssertEvidenceValidatedAndUnchanged()
     {
         var before = HashFiles(preview);
         var result = Publisher.Publish(preview, remote, NextExtractor, "456");
 
         Assert.True(result.Changed);
         Assert.Equal(before, HashFiles(preview));
-        Assert.Equal(remoteGit.Run("hash-object", Path.Combine(preview, "discovery/objects.jsonl.gz")).Trim(),
-            remoteGit.Run("rev-parse", result.Commit + ":discovery/objects.jsonl.gz").Trim());
+        Assert.DoesNotContain("discovery/", remoteGit.Run("ls-tree", "-r", "--name-only", result.Commit));
         Assert.False(Publisher.Publish(preview, remote, NextExtractor, "456").Changed);
     }
 

@@ -16,7 +16,7 @@ public sealed partial class PublisherTests
     public void NumericEvidencePreservesTypedPayloadAndIsRetryable(string type, string hex)
     {
         AddEncodedEvidence(Convert.ToBase64String(Convert.FromHexString(hex)), type, "numeric-le-base64");
-        AssertEvidencePublishesUnchanged();
+        AssertEvidenceValidatedAndUnchanged();
     }
 
     [Theory]

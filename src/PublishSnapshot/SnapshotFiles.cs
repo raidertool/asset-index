@@ -29,8 +29,6 @@ internal sealed class SnapshotFiles : IDisposable
     internal static readonly string[] Required = ["assets.json", "coverage.json", "resources.json", "discovery/objects.jsonl.gz", "discovery/exports.jsonl.gz", "discovery/files.jsonl.gz", "discovery/registry.jsonl.gz", "discovery/packages.jsonl.gz", "localization/en.jsonl.gz"];
 
     public static bool Allowed(string path) => Required.Contains(path) || ImagePath.IsMatch(path) || LocalePath.IsMatch(path);
-    public static bool Payload(string path) => path is not ("coverage.json" or "metadata.json");
-
     public static SnapshotFiles Capture(string source)
     {
         var snapshot = new SnapshotFiles();

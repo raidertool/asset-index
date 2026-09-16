@@ -80,10 +80,10 @@ public sealed partial class PublisherTests
     }
 
     [Theory]
-    [InlineData("localization")]
-    [InlineData("object")]
-    [InlineData("registry")]
-    public void EvidenceChangesCreateAVersionEvenWhenCatalogBytesAreIdentical(string kind)
+    [InlineData("localization", true)]
+    [InlineData("object", false)]
+    [InlineData("registry", false)]
+    public void OnlyPublishedEvidenceChangesCreateAVersionWhenCatalogBytesAreIdentical(string kind, bool changed)
     {
         WritePreview(preview, "Initial name");
         var original = File.ReadAllBytes(Path.Combine(preview, "assets.json"));
@@ -100,8 +100,8 @@ public sealed partial class PublisherTests
             case "registry": ChangeLines("discovery/registry.jsonl.gz", rows => rows[0]!["tags"]!["NewTag"] = "New evidence"); break;
         }
         var result = Publisher.Publish(preview, remote, NextExtractor, "456");
-        Assert.True(result.Changed);
-        Assert.NotEqual(initialCommit, result.Commit);
+        Assert.Equal(changed, result.Changed);
+        Assert.Equal(changed, initialCommit != result.Commit);
         Assert.Equal(original, File.ReadAllBytes(Path.Combine(preview, "assets.json")));
         Assert.False(Publisher.Publish(preview, remote, NextExtractor, "456").Changed);
     }
@@ -109,9 +109,23 @@ public sealed partial class PublisherTests
     [Theory]
     [InlineData("/Game/T_Unowned.T_Unowned", "Texture2D")]
     [InlineData("/Game/MI_Unowned.MI_Unowned", "MaterialInstanceConstant")]
-    public void AnUnownedImageIsPublishedThroughTheResourceInventory(string resource, string resourceClass)
+    public void AnUnownedImageIsExcludedFromGitButStillValidated(string resource, string resourceClass)
     {
         WritePreview(preview, "Initial name");
+        var file = AddUnownedImage(resource, resourceClass);
+
+        var result = Publisher.Publish(preview, remote, NextExtractor, "456");
+
+        Assert.False(result.Changed);
+        Assert.Equal(initialCommit, result.Commit);
+        Assert.DoesNotContain(file, remoteGit.Run("ls-tree", "-r", "--name-only", result.Commit));
+        Assert.DoesNotContain(resource, remoteGit.Run("show", result.Commit + ":resources.json"));
+        File.WriteAllText(Path.Combine(preview, file), "broken unowned image");
+        AssertRejected();
+    }
+
+    private string AddUnownedImage(string resource, string resourceClass)
+    {
         var file = "images/" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(resource))) + ".png";
         File.Copy(Path.Combine(preview, Image), Path.Combine(preview, file));
         ChangeJson("resources.json", rows => rows.AsArray().Add(new JsonObject
@@ -133,14 +147,13 @@ public sealed partial class PublisherTests
         AddUnindexedPackage(physical, loaded: true, exports: 1);
         ChangeLines("discovery/exports.jsonl.gz", rows => rows.Add(ExportHeader(physical, 0, resource, resourceClass,
             resourceClass == "Texture2D" ? "Texture" : "MaterialInterface", "Object")));
-        ChangeJson("coverage.json", n => { n["discovery"]!["objects"] = 3; n["discovery"]!["resources"] = 2; });
+        ChangeJson("coverage.json", n =>
+        {
+            n["discovery"]!["objects"] = n["discovery"]!["objects"]!.GetValue<int>() + 1;
+            n["discovery"]!["resources"] = n["discovery"]!["resources"]!.GetValue<int>() + 1;
+        });
 
-        var result = Publisher.Publish(preview, remote, NextExtractor, "456");
-
-        Assert.True(result.Changed);
-        Assert.Equal("blob", remoteGit.Run("cat-file", "-t", result.Commit + ":" + file).Trim());
-        File.WriteAllText(Path.Combine(preview, file), "broken unowned image");
-        AssertRejected();
+        return file;
     }
 
     [Fact]

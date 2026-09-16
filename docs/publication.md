@@ -1,14 +1,17 @@
 # Snapshot publication
 
 Activation is pending. The publisher requires an existing `data` branch with
-the complete generated snapshot below, `metadata.json`, and its matching
+the published snapshot below, `metadata.json`, and its matching
 lightweight tag. It does not create the initial branch or tag.
 
 - `assets.json`: catalog rows and presentation provenance.
-- `resources.json` and `images/`: every exported image resource, including unowned UI images.
-- `discovery/{objects,exports,files,registry,packages}.jsonl.gz`: typed source evidence and coverage.
+- `resources.json` and `images/`: every image referenced by the catalog.
 - `localization/<locale>.jsonl.gz`: merged localization dictionaries, including English.
 - `coverage.json`: extraction counts, errors, notices, mapping hash, and discovery scope.
+
+The complete preview is validated first. Discovery streams and extra UI images
+remain in the Actions artifact; they are excluded only from Git. Coverage retains
+the full extraction counts. Every published file must be at most 100 MiB.
 
 ```sh
 dotnet run --project src/PublishSnapshot -c Release -- \
@@ -58,11 +61,11 @@ The data Git commit identifies the snapshot. Its lightweight tag is
 Changed snapshots push `data` and the tag atomically, without force. A rejected
 push applies neither update; a concurrent writer is never overwritten.
 
-Identical catalog, resource, discovery, localization, and PNG bytes keep the
-existing commit, metadata and tag. Only metadata and coverage are excluded from
-payload equality. Unowned text or resource changes therefore create a snapshot;
-source-only edits with unchanged output do not. New run provenance stays in its
-logs/artifacts. Retrying identical input creates no revision.
+Identical catalog, filtered resources, localization, and catalog PNG bytes keep
+the existing commit, metadata and tag. Coverage, source-only edits and excluded
+evidence cannot create a snapshot on their own. All localization changes remain
+versioned. New run provenance stays in its logs/artifacts; identical retries
+create no revision.
 
 ## Activation
 

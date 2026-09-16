@@ -48,6 +48,10 @@ conditions. Unsupported materials remain marked; missing text is not filled
 from an older snapshot.
 See [discovery rules](docs/discovery.md) before adding new associations.
 
+Planned `data` publication retains the catalog, all its images, localization,
+coverage and metadata. Full discovery evidence and extra UI images stay in the
+Actions artifact; the complete preview must pass validation before publication.
+
 Exit codes: `0` succeeded, `1` incomplete, `2` invalid input. Inspect coverage
 and affected images even after success: success does not prove completeness.
 Partial output is diagnostic evidence. Retry into a new directory under `.work/`.
@@ -75,7 +79,7 @@ The planned source/data split is not active:
 | Database import | Data commit; private normalization version tracked separately |
 
 Publish the data commit and tag atomically. Once the importer follows `data`,
-identical output creates no snapshot or database version, provided normalization
+identical published output creates no snapshot or database version, provided normalization
 is unchanged. Historical tags stay unchanged. No data branch or extractor release
 has been created.
 

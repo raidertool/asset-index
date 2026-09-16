@@ -28,7 +28,7 @@ public sealed partial class PublisherTests : IDisposable
         seed = Path.Combine(root, "seed");
         new Git(root).Run("init", "--bare", "--quiet", remote);
         remoteGit = new Git(remote);
-        WritePreview(seed, "Initial name");
+        WriteSeed(seed, "Initial name");
         File.WriteAllBytes(Path.Combine(seed, "metadata.json"), JsonSerializer.SerializeToUtf8Bytes(Metadata.Create(InitialExtractor, "123"), Preview.Json));
         var git = new Git(seed);
         git.Run("init", "--quiet");
@@ -50,7 +50,7 @@ public sealed partial class PublisherTests : IDisposable
         Assert.Equal("arc-456-" + result.Commit[..12], result.Tag);
         Assert.Equal(result.Commit, RemoteRef("refs/tags/" + result.Tag));
         Assert.Equal("commit", remoteGit.Run("cat-file", "-t", "refs/tags/" + result.Tag).Trim());
-        Assert.Equal(SnapshotFiles.Required.Append(Image).Append("metadata.json").Order(),
+        Assert.Equal(DataSnapshot.Required.Append(Image).Append("metadata.json").Order(),
             remoteGit.Run("ls-tree", "-r", "--name-only", result.Commit).Split('\n', StringSplitOptions.RemoveEmptyEntries).Order());
         using var metadata = JsonDocument.Parse(remoteGit.Run("show", result.Commit + ":metadata.json"));
         Assert.Equal(1, metadata.RootElement.GetProperty("formatVersion").GetInt32());
@@ -150,7 +150,7 @@ public sealed partial class PublisherTests : IDisposable
     [Fact]
     public void ConcurrentDataWriterIsNeverOverwritten()
     {
-        WritePreview(seed, "Concurrent writer");
+        WriteSeed(seed, "Concurrent writer");
         var seedGit = new Git(seed);
         Commit(seedGit);
         var competing = seedGit.Run("rev-parse", "HEAD").Trim();
@@ -306,6 +306,20 @@ public sealed partial class PublisherTests : IDisposable
             ExportHeader("PioneerGame/Content/T_Test.uasset", 0, Texture, "Texture2D", "Texture", "Object")
         });
         WriteLines(directory, "localization/en.jsonl.gz", new[] { new { @namespace = "Shared", key = "UNCHANGED", value = "Unowned text" } });
+    }
+
+    private static void WriteSeed(string directory, string name)
+    {
+        var input = Path.Combine(Path.GetDirectoryName(directory)!, "seed-preview");
+        WritePreview(input, name);
+        using var captured = Preview.Read(input);
+        using var snapshot = DataSnapshot.Create(captured);
+        foreach (var (path, file) in snapshot.Files)
+        {
+            var target = Path.Combine(directory, path);
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(file.Path, target, overwrite: true);
+        }
     }
 
     private static JsonObject ExportHeader(string package, int index, string path, string type, params string[] ancestors) => new()
