@@ -12,6 +12,7 @@ internal sealed record TextCandidate(string Role, string SourceKind, string Sour
 internal sealed record AssetText(long AssetId, TextReference? Name, TextReference? Description)
 {
     public IReadOnlyList<TextCandidate> Candidates { get; init; } = [];
+    public IReadOnlyList<ExtractionIssue> Notices { get; init; } = [];
 }
 internal sealed record LocalizedText(long AssetId, string Locale, string DisplayName, string Description);
 
@@ -26,9 +27,10 @@ internal static class Text
 
         var distinct = candidates.Distinct().OrderBy(candidate => candidate.SourcePath, StringComparer.Ordinal)
             .ThenBy(candidate => candidate.Field, StringComparer.Ordinal).ToArray();
-        return new AssetText(asset.Id, Select(distinct, ["display-name", "title", "short-name"], issues),
-            Select(distinct, ["description", "tooltip"], issues))
-        { Candidates = distinct };
+        var notices = new List<ExtractionIssue>();
+        return new AssetText(asset.Id, Select(distinct, ["display-name", "title", "short-name"], notices),
+            Select(distinct, ["description", "tooltip"], notices))
+        { Candidates = distinct, Notices = notices };
     }
 
     public static IReadOnlyList<TextCandidate> Capture(UObject source, TypeMappings? mappings,
@@ -118,7 +120,7 @@ internal static class Text
     }
 
     private static TextReference? Select(IReadOnlyList<TextCandidate> candidates, string[] roles,
-        ICollection<ExtractionIssue> issues)
+        ICollection<ExtractionIssue> notices)
     {
         // UI presentation owns its labels. Definition text and contextual container labels
         // remain candidates with provenance even when the UI supplies the primary value.
@@ -131,7 +133,7 @@ internal static class Text
                 if (references.Length == 1)
                     return references[0].Key.Length == 0 && references[0].Source.Length == 0 ? null : references[0];
                 var paths = string.Join(", ", peers.Select(candidate => $"{candidate.SourcePath}.{candidate.Field}"));
-                issues.Add(new("text", paths, $"Conflicting {role} references; no primary value selected. Candidates: {paths}."));
+                notices.Add(new("text", paths, $"Conflicting {role} references; no primary value selected. Candidates: {paths}."));
                 return null;
             }
         return null;

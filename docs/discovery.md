@@ -96,6 +96,7 @@ field declarations. Missing or conflicting schemas produce diagnostics.
 - `TextRoles.cs` assigns meaning to fields on specific UI/definition classes.
   `Text.cs` prefers UI presentation, retains alternatives, and leaves conflicting
   peers unresolved. `presentation` records chosen keys and defining objects.
+  Valid conflicts keep a null primary and a coverage notice; failed reads remain errors.
   Unlock instructions remain `unlock-description` candidates, separate from an
   item's description.
 - `Presentation.cs` joins loadout container types and slot references to the

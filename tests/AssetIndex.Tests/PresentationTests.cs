@@ -54,8 +54,10 @@ public sealed class PresentationTests
         Assert.Null(right.Name);
         Assert.Equal(left.Candidates, right.Candidates);
         Assert.Equal(2, forward.PresentationNames.Count);
-        Assert.Contains("no primary value", Assert.Single(forwardIssues).Message);
-        Assert.Single(reverseIssues);
+        Assert.Empty(forwardIssues);
+        Assert.Empty(reverseIssues);
+        Assert.Contains("no primary value", Assert.Single(left.Notices).Message);
+        Assert.Equal(left.Notices, right.Notices);
     }
 
     [Fact]
@@ -86,9 +88,12 @@ public sealed class PresentationTests
         var issues = new List<ExtractionIssue>();
         var asset = Assets.Collect(objects, Mappings.Value, issues).Single(asset => asset.Id == 42);
 
-        Assert.Null(Text.Read(asset, issues).Name);
+        var text = Text.Read(asset, issues);
+
+        Assert.Null(text.Name);
         Assert.Equal(2, asset.PresentationNames.Count);
-        Assert.Contains("Conflicting display-name", Assert.Single(issues).Message);
+        Assert.Empty(issues);
+        Assert.Contains("Conflicting display-name", Assert.Single(text.Notices).Message);
     }
 
     [Fact]

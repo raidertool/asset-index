@@ -188,6 +188,7 @@ public sealed class TextTests
 
         Assert.Null(text.Name);
         Assert.Contains("NamedFormat", Assert.Single(issues).Message);
+        Assert.Empty(text.Notices);
     }
 
     [Fact]
@@ -201,7 +202,7 @@ public sealed class TextTests
     [Theory]
     [InlineData("ItemName")]
     [InlineData("Description")]
-    public void DifferentKeysOnTwoDefinitionsReportBothPaths(string field)
+    public void DifferentKeysOnTwoDefinitionsPreserveCandidatesAndNoticeBothPaths(string field)
     {
         var first = WithText(field, new FText("items", "first", "Shared source"));
         first.Name = "DA_First";
@@ -213,10 +214,70 @@ public sealed class TextTests
 
         Assert.Null(field == "ItemName" ? text.Name : text.Description);
         Assert.Equal(2, text.Candidates.Count);
-        var issue = Assert.Single(issues);
-        Assert.Equal("text", issue.Stage);
-        Assert.Contains($"{first.GetPathName()}.{field}", issue.Message);
-        Assert.Contains($"{second.GetPathName()}.{field}", issue.Message);
+        Assert.Empty(issues);
+        var notice = Assert.Single(text.Notices);
+        Assert.Equal("text", notice.Stage);
+        Assert.Contains($"{first.GetPathName()}.{field}", notice.Message);
+        Assert.Contains($"{second.GetPathName()}.{field}", notice.Message);
+        Assert.Equal(new[] { "first", "second" }, text.Candidates.Select(candidate => candidate.Reference.Key));
+    }
+
+    [Fact]
+    public void ConflictingNpcNamesKeepTheirProvenanceWithoutChoosingADefinitionFallback()
+    {
+        var gameplay = WithText("ItemName", new FText("ST_NPC", "ID_JUANITO_NAME", "Juanito"));
+        gameplay.Name = "Gameplay";
+        var npc = WithText("DisplayName", new FText("ST_Trades", "ID_TRADES_JUANITO_NAME_ALT3", "Ermal"), "UINPCMetaDataItem");
+        npc.Name = "Npc";
+        var definition = WithText("Title", new FText("Fallback name"), "QuestDefinition");
+        definition.Name = "Definition";
+        var issues = new List<ExtractionIssue>();
+
+        var text = Text.Read(Asset([definition], [gameplay, npc], issues), issues);
+
+        Assert.Null(text.Name);
+        Assert.Empty(issues);
+        Assert.Single(text.Notices);
+        Assert.Equal(3, text.Candidates.Count);
+        Assert.Contains(text.Candidates, candidate => candidate.SourcePath == "Gameplay" && candidate.DefinedAt == "Gameplay"
+            && candidate.Field == "ItemName" && candidate.Reference == new TextReference("ST_NPC", "ID_JUANITO_NAME", "Juanito"));
+        Assert.Contains(text.Candidates, candidate => candidate.SourcePath == "Npc" && candidate.DefinedAt == "Npc"
+            && candidate.Field == "DisplayName" && candidate.Reference == new TextReference("ST_Trades", "ID_TRADES_JUANITO_NAME_ALT3", "Ermal"));
+    }
+
+    [Fact]
+    public void EmptyPrimaryMetadataDoesNotSelectALowerRoleOrDefinition()
+    {
+        var metadata = WithText("LongName", new FText(string.Empty), "UICurrencyMetaDataItem");
+        var shortName = WithText("ShortName", new FText("XP"), "UICurrencyMetaDataItem");
+        shortName.Name = "Short";
+        var definition = WithText("Title", new FText("Definition name"), "QuestDefinition");
+        var issues = new List<ExtractionIssue>();
+
+        var text = Text.Read(Asset([definition], [metadata, shortName], issues), issues);
+
+        Assert.Null(text.Name);
+        Assert.Empty(issues);
+        Assert.Empty(text.Notices);
+        Assert.Equal(3, text.Candidates.Count);
+    }
+
+    [Fact]
+    public void InvalidTextPropertyRemainsAnErrorRatherThanASelectionNotice()
+    {
+        var metadata = WithText("ItemName", new FText("Placeholder"));
+        metadata.Properties[0] = new FPropertyTag(new FName("StrProperty"), new StrProperty("Not FText"))
+        {
+            Name = new FName("ItemName")
+        };
+        var issues = new List<ExtractionIssue>();
+
+        var text = Text.Read(Asset(metadata, issues), issues);
+
+        Assert.Null(text.Name);
+        Assert.Empty(text.Candidates);
+        Assert.Empty(text.Notices);
+        Assert.Equal("text", Assert.Single(issues).Stage);
     }
 
     [Fact]
@@ -232,6 +293,7 @@ public sealed class TextTests
 
         Assert.Equal(new TextReference("items", "name", "Shared name"), text.Name);
         Assert.Empty(issues);
+        Assert.Empty(text.Notices);
     }
 
     [Fact]

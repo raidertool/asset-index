@@ -48,6 +48,7 @@ internal static class Program
         CUE4Parse.Globals.FatalObjectSerializationErrors = true;
         TextureDecoder.UseAssetRipperTextureDecoder = true;
         var issues = new List<ExtractionIssue>();
+        var notices = new List<ExtractionIssue>();
         DiscoveryResult? discovery = null;
         var records = new List<AssetRecord>();
         var resourceCount = 0;
@@ -80,7 +81,7 @@ internal static class Program
             var resources = new ImageResources(options.OutputDirectory, issues, materials);
             Console.WriteLine("Exporting registry UI textures...");
             foreach (var texture in discovery.UiTextures) resources.Export(texture, provider.Load);
-            records = ExportAssets(discovery.Assets, provider, options.OutputDirectory, resources, issues);
+            records = ExportAssets(discovery.Assets, provider, options.OutputDirectory, resources, issues, notices);
             Snapshot.Write(options.OutputDirectory, "resources.json", resources.Entries);
             resourceCount = resources.Entries.Count;
             if (records.Count == 0)
@@ -91,12 +92,13 @@ internal static class Program
             issues.Add(new("fatal", "extraction", error.Message));
         }
         issues.AddRange(diagnostics.Issues.Distinct());
+        notices.AddRange(diagnostics.Notices);
         var report = new RunReport(issues.Count == 0 ? "succeeded" : "incomplete",
             discovery?.RegisteredAssets ?? 0, discovery?.Candidates ?? 0, discovery?.Loaded ?? 0, records.Count,
             records.Count(asset => asset.Text.Any(text => text.Locale == "en" && text.DisplayName.Length > 0)),
             records.Count(asset => asset.Text.Any(text => text.Locale == "en" && text.Description.Length > 0)),
             records.Count(asset => asset.Images.Any(image => image.Status == "exported")), issues,
-            diagnostics.Notices.Distinct().ToArray(), new(Discovery.EvidenceReader.NativeScope,
+            notices.Distinct().ToArray(), new(Discovery.EvidenceReader.NativeScope,
                 Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(options.Usmap))), discovery?.Objects.Count ?? 0, resourceCount));
         Snapshot.Write(options.OutputDirectory, "assets.json", records);
         Snapshot.Write(options.OutputDirectory, "coverage.json", report);
@@ -105,10 +107,11 @@ internal static class Program
     }
 
     private static List<AssetRecord> ExportAssets(IReadOnlyList<CatalogAsset> assets, PackageProvider provider,
-        string output, ImageResources resources, List<ExtractionIssue> issues)
+        string output, ImageResources resources, List<ExtractionIssue> issues, List<ExtractionIssue> notices)
     {
         Console.WriteLine($"Found {assets.Count:N0} IDs. Reading text...");
         var texts = assets.Select(asset => Text.Read(asset, issues)).ToArray();
+        notices.AddRange(texts.SelectMany(text => text.Notices));
         var textById = texts.ToDictionary(text => text.AssetId);
         var localized = Text.Localize(provider, texts, issues, (locale, entries) =>
             Snapshot.WriteLines(output, $"localization/{locale}.jsonl.gz", entries
