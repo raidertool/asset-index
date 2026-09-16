@@ -8,6 +8,7 @@ public sealed class PresentationChecksTests
     private const string Definition = "/Game/Definition.Definition";
     private const string Metadata = "/Game/Metadata.Metadata";
     private const string Container = "/Game/Container.Container";
+    private const string RootLabel = "/Game/RootLabel.RootLabel";
 
     [Theory]
     [InlineData(false)]
@@ -60,10 +61,23 @@ public sealed class PresentationChecksTests
         Assert.Throws<InvalidDataException>(() => Validate(asset));
     }
 
+    [Fact]
+    public void RootCategoryCannotReplaceAnExplicitEmptyName()
+    {
+        var category = Candidate("inventory-root", "display-name", "Stash");
+        var asset = Asset(Candidate("metadata", "display-name", ""), category);
+        Validate(asset);
+
+        asset["presentation"]!["name"] = category["reference"]!.DeepClone();
+        Assert.Throws<InvalidDataException>(() => Validate(asset));
+    }
+
     [Theory]
     [InlineData("metadata", "short-name", "definition", "display-name", "name")]
     [InlineData("definition", "short-name", "container", "display-name", "name")]
     [InlineData("container", "short-name", "visual-slot", "display-name", "name")]
+    [InlineData("visual-slot", "short-name", "inventory-root", "display-name", "name")]
+    [InlineData("metadata", "display-name", "inventory-root", "display-name", "name")]
     [InlineData("metadata", "display-name", "metadata", "title", "name")]
     [InlineData("metadata", "title", "metadata", "short-name", "name")]
     [InlineData("metadata", "tooltip", "definition", "description", "description")]
@@ -152,6 +166,10 @@ public sealed class PresentationChecksTests
     [InlineData("metadata", "container")]
     [InlineData("visual-slot", "metadata")]
     [InlineData("metadata", "visual-slot")]
+    [InlineData("inventory-root", "metadata")]
+    [InlineData("metadata", "inventory-root")]
+    [InlineData("container", "inventory-root")]
+    [InlineData("inventory-root", "container")]
     public void CandidateOwnershipMustMatchItsDeclaredKind(string kind, string forgedKind)
     {
         var candidate = Candidate(kind, "display-name", "Name");
@@ -166,7 +184,7 @@ public sealed class PresentationChecksTests
     {
         ["role"] = role,
         ["sourceKind"] = kind,
-        ["sourcePath"] = kind == "definition" ? Definition : kind == "metadata" ? Metadata : Container,
+        ["sourcePath"] = kind == "definition" ? Definition : kind == "metadata" ? Metadata : kind == "inventory-root" ? RootLabel : Container,
         ["sourceClass"] = "Fixture",
         ["field"] = "Name",
         ["definedAt"] = Definition,
@@ -182,6 +200,16 @@ public sealed class PresentationChecksTests
             ["name"] = null,
             ["description"] = null,
             ["candidates"] = new JsonArray(candidates.Select(candidate => candidate.DeepClone()).ToArray()),
+            ["inventoryRoots"] = new JsonArray(new JsonObject
+            {
+                ["role"] = "container-slot",
+                ["containerType"] = "ENewInventoryContainerType::Stash",
+                ["rootPath"] = Container,
+                ["rootField"] = "StashSlot",
+                ["slotPath"] = Definition,
+                ["containerPath"] = null,
+                ["metadataPath"] = RootLabel
+            }),
             ["visualSlots"] = new JsonArray(new JsonObject
             {
                 ["slotPath"] = Definition,
@@ -205,7 +233,7 @@ public sealed class PresentationChecksTests
     private static void Validate(JsonNode asset)
     {
         using var json = JsonDocument.Parse(asset.ToJsonString());
-        PresentationChecks.Validate(json.RootElement, [Definition, Metadata], [Definition, Metadata, Container]);
+        PresentationChecks.Validate(json.RootElement, [Definition, Metadata], [Definition, Metadata, Container, RootLabel]);
     }
 }
 
@@ -227,6 +255,10 @@ public sealed partial class PublisherTests
             candidate["definedAt"] = other;
             candidate["reference"]!["source"] = "Other name";
             presentation["candidates"]!.AsArray().Add(candidate);
+            var description = presentation["candidates"]![1]!.DeepClone();
+            description["sourcePath"] = other;
+            description["definedAt"] = other;
+            presentation["candidates"]!.AsArray().Add(description);
             presentation["name"] = null;
             rows[0]!["text"]![0]!["displayName"] = "";
         });

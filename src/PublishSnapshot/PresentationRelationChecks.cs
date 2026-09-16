@@ -14,7 +14,7 @@ internal sealed class PresentationRelationChecks(DecodedEvidence evidence, Ident
     public static readonly string[] RootFields =
     [
         "Containers", "ContainerType", "DefaultContainer", "Tags", "ItemsQuery", "PersistenceDataAsset",
-        "TypeTag", "CharacterCustomizationTypeTag"
+        "TypeTag", "CharacterCustomizationTypeTag", "AllowedContainersQuery", .. InventoryRootPolicy.Categories.Keys
     ];
 
     private sealed record Skin(string Path, string Persistence, long Id, string[] Tags);
@@ -30,7 +30,50 @@ internal sealed class PresentationRelationChecks(DecodedEvidence evidence, Ident
             var presentation = asset.GetProperty("presentation");
             foreach (var relation in presentation.GetProperty("containers").EnumerateArray()) Container(id, relation);
             foreach (var relation in presentation.GetProperty("visualSlots").EnumerateArray()) VisualSlot(id, relation);
+            foreach (var relation in presentation.GetProperty("inventoryRoots").EnumerateArray()) InventoryRoot(id, relation);
         }
+    }
+
+    private void InventoryRoot(long id, JsonElement relation)
+    {
+        var root = ObjectPath(relation, "rootPath");
+        var field = String(relation, "rootField");
+        Require(InventoryRootPolicy.Categories.TryGetValue(field, out var category) &&
+            category == String(relation, "containerType"), "Inventory root category differs from its approved field policy.");
+        Instance(root, "InventoryTreeRootAsset");
+        var slot = ObjectPath(relation, "slotPath");
+        Same(RequiredReference(root, field), slot, "Inventory root field refers to a different slot.");
+        Instance(slot, "InventoryContainerSlotDataAsset");
+        RequiredId(slot);
+        Category(ObjectPath(relation, "metadataPath"), category!);
+        var role = String(relation, "role");
+        if (role == "container-slot")
+        {
+            Require(relation.GetProperty("containerPath").ValueKind == JsonValueKind.Null, "Inventory root slot has a container path.");
+            Identity(id, slot);
+            return;
+        }
+        var container = ObjectPath(relation, "containerPath");
+        Instance(container, "InventoryContainerItemDataAsset");
+        Identity(id, container);
+        var defaultContainer = Reference(slot, "DefaultContainer");
+        if (role == "default-container")
+            Same(defaultContainer, container, "Inventory root default reference differs from presentation.");
+        else
+        {
+            Require(role == "allowed-container" && !Equal(defaultContainer, container), "Invalid inventory root container role.");
+            var query = Query(Structure(slot, "AllowedContainersQuery", "GameplayTagQuery")
+                ?? throw new InvalidDataException("Inventory root slot has no decoded allowed-container query."));
+            var tags = Tags(Structure(container, "Tags", "GameplayTagContainer"));
+            Require(GameplayTagQueryMatch.Matches(query, tags), "Inventory root container does not match its slot query.");
+        }
+    }
+
+    private EvidenceField? Structure(string path, string field, string expected)
+    {
+        Require(Equal(identities.Schema(path).Property(field, "StructProperty")?.Mapping?.StructType, expected),
+            "Inventory root property has the wrong mapped structure.");
+        return OptionalField(path, field, "StructProperty");
     }
 
     private void Container(long id, JsonElement relation)

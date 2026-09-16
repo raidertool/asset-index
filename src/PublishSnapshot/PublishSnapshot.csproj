@@ -11,6 +11,7 @@
     <None Include="../../mappings/ArcRaiders.usmap" Link="mappings/ArcRaiders.usmap" CopyToOutputDirectory="PreserveNewest" />
     <Compile Include="../AssetIndex/GameplayTagQueryPolicy.cs" Link="GameplayTagQueryPolicy.cs" />
     <Compile Include="../AssetIndex/ImageFields.cs" Link="ImageFields.cs" />
+    <Compile Include="../AssetIndex/InventoryRootPolicy.cs" Link="InventoryRootPolicy.cs" />
     <Compile Include="../AssetIndex/TextRolePolicy.cs" Link="TextRolePolicy.cs" />
     <PackageReference Include="SkiaSharp" Version="2.88.9" />
     <PackageReference Include="Microsoft.Bcl.Memory" Version="10.0.4" />

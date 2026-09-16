@@ -96,15 +96,17 @@ public sealed class TextRoleChecksTests
         Assert.Throws<InvalidDataException>(() => Validate(fixture, "UINPCMetaDataItem", "ItemName", "display-name"));
     }
 
-    [Fact]
-    public void ContainerLabelRequiresItsSeparateContextualContract()
+    [Theory]
+    [InlineData("container")]
+    [InlineData("inventory-root")]
+    public void ContainerLabelRequiresItsSeparateContextualContract(string kind)
     {
         using var fixture = new IdentityFixture();
         fixture.AddClass("UIInventoryContainerMetaDataItem", "UIMetaDataItem", ("ContainerName", "TextProperty"));
         Header(fixture.Object(Source, "UIInventoryContainerMetaDataItem"), "ContainerName", "TextProperty");
-        Validate(fixture, "UIInventoryContainerMetaDataItem", "ContainerName", "display-name", kind: "container");
+        Validate(fixture, "UIInventoryContainerMetaDataItem", "ContainerName", "display-name", kind: kind);
         Assert.Throws<InvalidDataException>(() => Validate(fixture, "UIInventoryContainerMetaDataItem", "ContainerName", "display-name"));
-        Assert.Throws<InvalidDataException>(() => Validate(fixture, "UIInventoryContainerMetaDataItem", "ContainerName", "description", kind: "container"));
+        Assert.Throws<InvalidDataException>(() => Validate(fixture, "UIInventoryContainerMetaDataItem", "ContainerName", "description", kind: kind));
     }
 
     [Fact]
@@ -116,6 +118,7 @@ public sealed class TextRoleChecksTests
         Validate(fixture, "UICharacterCustomizationQuickNavTabMetaDataItem", "DisplayName", "display-name", kind: "visual-slot");
         Assert.Throws<InvalidDataException>(() => Validate(fixture, "UICharacterCustomizationQuickNavTabMetaDataItem", "DisplayName", "description", kind: "visual-slot"));
         Assert.Throws<InvalidDataException>(() => Validate(fixture, "UICharacterCustomizationQuickNavTabMetaDataItem", "DisplayName", "display-name", kind: "container"));
+        Assert.Throws<InvalidDataException>(() => Validate(fixture, "UICharacterCustomizationQuickNavTabMetaDataItem", "DisplayName", "display-name", kind: "inventory-root"));
     }
 
     private static IdentityFixture SlotFixture()
@@ -130,11 +133,27 @@ public sealed class TextRoleChecksTests
         var context = fixture.Read(TextRoleChecks.RootFields.ToArray()).Context;
         using var document = JsonDocument.Parse(new JsonArray(new JsonObject
         {
-            ["presentation"] = new JsonObject { ["candidates"] = new JsonArray(new JsonObject
+            ["definitions"] = kind == "definition" ? new JsonArray(new JsonObject { ["path"] = Source }) : new JsonArray(),
+            ["metadata"] = kind == "metadata" ? new JsonArray(new JsonObject { ["path"] = Source }) : new JsonArray(),
+            ["presentation"] = new JsonObject
             {
-                ["sourcePath"] = Source, ["sourceClass"] = type, ["field"] = field, ["role"] = role, ["definedAt"] = definedAt, ["sourceKind"] = kind
-            }) }
+                ["containers"] = Context("container"),
+                ["visualSlots"] = Context("visual-slot"),
+                ["inventoryRoots"] = Context("inventory-root"),
+                ["candidates"] = new JsonArray(new JsonObject
+                {
+                    ["sourcePath"] = Source,
+                    ["sourceClass"] = type,
+                    ["field"] = field,
+                    ["role"] = role,
+                    ["definedAt"] = definedAt,
+                    ["sourceKind"] = kind
+                })
+            }
         }).ToJsonString());
         TextRoleChecks.Validate(document.RootElement, context);
+
+        JsonArray Context(string expectedKind) => kind == expectedKind
+            ? new JsonArray(new JsonObject { ["metadataPath"] = Source }) : new JsonArray();
     }
 }

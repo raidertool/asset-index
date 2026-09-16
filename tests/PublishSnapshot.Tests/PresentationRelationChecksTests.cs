@@ -84,7 +84,8 @@ public sealed class PresentationRelationChecksTests
         var relation = fixture.Visual();
         relation["members"]!.AsArray().Add(new JsonObject
         {
-            ["itemPath"] = skin["path"]!.GetValue<string>(), ["metadataPath"] = ui["path"]!.GetValue<string>()
+            ["itemPath"] = skin["path"]!.GetValue<string>(),
+            ["metadataPath"] = ui["path"]!.GetValue<string>()
         });
 
         fixture.Validate("50", "visualSlots", relation);
@@ -221,21 +222,27 @@ public sealed class PresentationRelationChecksTests
 
         public JsonObject Container(string role) => new()
         {
-            ["role"] = role, ["containerType"] = "ENewInventoryContainerType::Armor", ["framePath"] = Frame,
-            ["containerIndex"] = 0, ["slotPath"] = Slot, ["containerPath"] = role == "container-slot" ? null : Item,
+            ["role"] = role,
+            ["containerType"] = "ENewInventoryContainerType::Armor",
+            ["framePath"] = Frame,
+            ["containerIndex"] = 0,
+            ["slotPath"] = Slot,
+            ["containerPath"] = role == "container-slot" ? null : Item,
             ["metadataPath"] = "/Game/Category.Category"
         };
 
         public JsonObject Visual() => new()
         {
-            ["slotPath"] = VisualSlot, ["typeTag"] = UiType, ["metadataPath"] = Label,
+            ["slotPath"] = VisualSlot,
+            ["typeTag"] = UiType,
+            ["metadataPath"] = Label,
             ["members"] = new JsonArray(new JsonObject { ["itemPath"] = Skin, ["metadataPath"] = SkinUi })
         };
 
         public void Validate(string id, string family, JsonObject relation)
         {
             var (evidence, _, context) = Fixture.Read(PresentationRelationChecks.RootFields);
-            var presentation = new JsonObject { ["containers"] = new JsonArray(), ["visualSlots"] = new JsonArray() };
+            var presentation = new JsonObject { ["containers"] = new JsonArray(), ["visualSlots"] = new JsonArray(), ["inventoryRoots"] = new JsonArray() };
             presentation[family]!.AsArray().Add(relation.DeepClone());
             using var json = JsonDocument.Parse(new JsonArray(new JsonObject { ["id"] = id, ["presentation"] = presentation }).ToJsonString());
             new PresentationRelationChecks(evidence, context).Validate(json.RootElement);

@@ -234,7 +234,8 @@ public sealed partial class PublisherTests : IDisposable
                     new { role = "description", sourceKind = "metadata", sourcePath = "/Game/DA_Test.DA_Test", sourceClass = "UIGameplayItemMetaDataItem", field = "Description", definedAt = "/Game/DA_Test.DA_Test", reference = new { @namespace = "", key = "", source = "Description", cultureInvariant = true } }
                 },
                 containers = Array.Empty<object>(),
-                visualSlots = Array.Empty<object>()
+                visualSlots = Array.Empty<object>(),
+                inventoryRoots = Array.Empty<object>()
             }
         };
         File.WriteAllBytes(Path.Combine(directory, "assets.json"), JsonSerializer.SerializeToUtf8Bytes(new[] { asset }, Preview.Json));

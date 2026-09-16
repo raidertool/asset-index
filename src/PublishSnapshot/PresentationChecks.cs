@@ -12,14 +12,15 @@ internal static class PresentationChecks
     public static void Validate(JsonElement asset, HashSet<string> sources, HashSet<string> discovered)
     {
         var presentation = asset.GetProperty("presentation");
-        Fields(presentation, "name", "description", "candidates", "containers", "visualSlots");
+        Fields(presentation, "name", "description", "candidates", "containers", "visualSlots", "inventoryRoots");
         var containerSources = ReadContainers(presentation.GetProperty("containers"), sources, discovered);
         var owners = new Dictionary<string, HashSet<string>>
         {
             ["definition"] = asset.GetProperty("definitions").EnumerateArray().Select(source => ObjectPath(source, "path")).ToHashSet(StringComparer.Ordinal),
             ["metadata"] = asset.GetProperty("metadata").EnumerateArray().Select(source => ObjectPath(source, "path")).ToHashSet(StringComparer.Ordinal),
             ["container"] = containerSources,
-            ["visual-slot"] = VisualSlotChecks.Read(presentation.GetProperty("visualSlots"), sources, discovered)
+            ["visual-slot"] = VisualSlotChecks.Read(presentation.GetProperty("visualSlots"), sources, discovered),
+            ["inventory-root"] = InventoryRootChecks.Read(presentation.GetProperty("inventoryRoots"), sources, discovered)
         };
         var candidates = new List<Candidate>();
         foreach (var candidate in presentation.GetProperty("candidates").EnumerateArray())
@@ -66,7 +67,7 @@ internal static class PresentationChecks
 
     private static Reference? Select(IReadOnlyList<Candidate> candidates, string[] roles)
     {
-        foreach (var kind in new[] { "metadata", "definition", "container", "visual-slot" })
+        foreach (var kind in new[] { "metadata", "definition", "container", "visual-slot", "inventory-root" })
             foreach (var role in roles)
             {
                 var references = candidates.Where(candidate => candidate.Kind == kind && candidate.Role == role)
