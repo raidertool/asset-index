@@ -1,9 +1,12 @@
+using CUE4Parse.Compression;
+using CUE4Parse.FileProvider.Objects;
 using CUE4Parse.UE4.Assets;
 using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Assets.Exports.Texture;
 using CUE4Parse.UE4.Assets.Objects;
 using CUE4Parse.UE4.Assets.Objects.Properties;
 using CUE4Parse.UE4.Objects.UObject;
+using CUE4Parse.UE4.Readers;
 using CUE4Parse_Conversion.Textures;
 using SkiaSharp;
 
@@ -67,7 +70,11 @@ public sealed class ImagesTests
         try
         {
             var resources = new ImageResources(output, issues);
-            var image = Assert.Single(Images.Export(new CatalogAsset(42, metadata ? [] : [definition], metadata ? [definition] : []), resources, issues));
+            var location = new ObjectLocation(new ImageFixtureFile("KnownTexture.uasset"), 0, texture.GetPathName());
+            var source = new CatalogSource(new(definition.Name, definition.ExportType, definition.GetPathName()), [],
+                Images.Capture(definition, _ => location, issues));
+            var image = Assert.Single(Images.Export(new CatalogAsset(42, metadata ? [] : [source], metadata ? [source] : []),
+                resources, _ => texture, issues));
             Assert.Equal(image.Resource, Assert.Single(resources.Entries).Path);
             Assert.Equal(texture.GetPathName(), image.Resource);
             Assert.Equal(field, image.Field);
@@ -104,12 +111,21 @@ public sealed class ImagesTests
             : null;
     }
 
-    private sealed class CompressedTexture : UTexture2D
+    internal sealed class CompressedTexture : UTexture2D
     {
-        public CompressedTexture()
+        public CompressedTexture(ushort color = 0xf800)
         {
             Format = EPixelFormat.PF_DXT1;
-            PlatformData.Mips = [new FTexture2DMipMap(new FByteArrayData([0, 248, 224, 7, 0, 0, 0, 0]), 4, 4, 1)];
+            PlatformData.Mips = [new FTexture2DMipMap(new FByteArrayData([(byte)color, (byte)(color >> 8), 224, 7, 0, 0, 0, 0]), 4, 4, 1)];
         }
     }
+}
+
+internal sealed class ImageFixtureFile(string path, ushort color = 0xf800) : GameFile(path, 0)
+{
+    public ushort Color { get; } = color;
+    public override bool IsEncrypted => false;
+    public override CompressionMethod CompressionMethod => CompressionMethod.None;
+    public override byte[] Read(FByteBulkDataHeader? header = null) => throw new NotSupportedException();
+    public override FArchive CreateReader(FByteBulkDataHeader? header = null) => throw new NotSupportedException();
 }

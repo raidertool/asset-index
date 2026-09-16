@@ -17,27 +17,38 @@ internal sealed record LocalizedText(long AssetId, string Locale, string Display
 
 internal static class Text
 {
-    public static AssetText Read(CatalogAsset asset, ICollection<ExtractionIssue> issues, TypeMappings? mappings = null)
+    public static AssetText Read(CatalogAsset asset, ICollection<ExtractionIssue> issues)
     {
-        var candidates = new List<TextCandidate>();
-        foreach (var (sources, kind) in new[] { (asset.Metadata, "metadata"), (asset.Definitions, "definition") })
-            foreach (var source in sources)
-            {
-                try
-                {
-                    foreach (var field in TextRoles.For(source, mappings ?? source.Owner?.Mappings))
-                        ReadCandidate(source, field, kind, candidates, issues);
-                }
-                catch (Exception error) { issues.Add(new("text", source.GetPathName(), error.Message)); }
-            }
-        foreach (var presentation in asset.PresentationNames)
-            ReadCandidate(presentation.Metadata, new("ContainerName", "display-name"), "container", candidates, issues);
+        var candidates = asset.Metadata.SelectMany(source => source.Text.Select(candidate => candidate with { SourceKind = "metadata" }))
+            .Concat(asset.Definitions.SelectMany(source => source.Text.Select(candidate => candidate with { SourceKind = "definition" })))
+            .Concat(asset.PresentationNames.SelectMany(name => name.Text)).ToArray();
+        foreach (var issue in asset.PresentationNames.SelectMany(name => name.TextIssues).Distinct()) issues.Add(issue);
 
         var distinct = candidates.Distinct().OrderBy(candidate => candidate.SourcePath, StringComparer.Ordinal)
             .ThenBy(candidate => candidate.Field, StringComparer.Ordinal).ToArray();
         return new AssetText(asset.Id, Select(distinct, ["display-name", "title", "short-name"], issues),
             Select(distinct, ["description", "tooltip"], issues))
         { Candidates = distinct };
+    }
+
+    public static IReadOnlyList<TextCandidate> Capture(UObject source, TypeMappings? mappings,
+        ICollection<ExtractionIssue> issues)
+    {
+        var candidates = new List<TextCandidate>();
+        try
+        {
+            foreach (var field in TextRoles.For(source, mappings ?? source.Owner?.Mappings))
+                ReadCandidate(source, field, "", candidates, issues);
+        }
+        catch (Exception error) { issues.Add(new("text", ObjectMetadata.Path(source), error.Message)); }
+        return candidates;
+    }
+
+    public static IReadOnlyList<TextCandidate> CaptureContainer(UObject source, ICollection<ExtractionIssue> issues)
+    {
+        var candidates = new List<TextCandidate>();
+        ReadCandidate(source, new("ContainerName", "display-name"), "container", candidates, issues);
+        return candidates;
     }
 
     public static IReadOnlyList<LocalizedText> Localize(IFileProvider provider, IReadOnlyList<AssetText> assets,
@@ -92,7 +103,7 @@ internal static class Text
     private static void ReadCandidate(UObject source, TextField field, string kind,
         ICollection<TextCandidate> candidates, ICollection<ExtractionIssue> issues)
     {
-        var path = $"{source.GetPathName()}.{field.Name}";
+        var path = $"{ObjectMetadata.Path(source)}.{field.Name}";
         try
         {
             if (Properties.Find(source, field.Name, out var definedAt) is not { } property) return;
@@ -100,8 +111,8 @@ internal static class Text
                 throw new InvalidDataException($"Cannot read {path} as FText.");
             var reference = ReadReference(text, source.Owner?.Provider, path, issues);
             if (reference is not null)
-                candidates.Add(new(field.Role, kind, source.GetPathName(), source.ExportType, property.Name.Text,
-                    definedAt!.GetPathName(), reference));
+                candidates.Add(new(field.Role, kind, ObjectMetadata.Path(source), source.ExportType, property.Name.Text,
+                    ObjectMetadata.Path(definedAt!), reference));
         }
         catch (Exception error) { issues.Add(new("text", path, error.Message)); }
     }

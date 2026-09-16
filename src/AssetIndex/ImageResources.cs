@@ -12,11 +12,41 @@ internal sealed record ImageResource(string Path, string Status, string? File = 
 internal sealed class ImageResources(string output, ICollection<ExtractionIssue> issues, MaterialIcons? materials = null)
 {
     private readonly SortedDictionary<string, ImageResource> resources = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ObjectLocation> locations = new(StringComparer.OrdinalIgnoreCase);
     public IReadOnlyCollection<ImageResource> Entries => resources.Values;
 
-    public ImageResource Export(UObject source)
+    public ImageResource Export(ObjectLocation location, Func<ObjectLocation, UObject> load)
     {
-        var path = source.GetPathName();
+        if (locations.TryGetValue(location.Path, out var original))
+        {
+            if (ReferenceEquals(original.File, location.File) && original.ExportIndex == location.ExportIndex)
+                return resources[original.Path];
+            issues.Add(new("image", location.Path, "Image path refers to conflicting physical exports."));
+            return new(location.Path, "failed");
+        }
+        locations.Add(location.Path, location);
+        if (resources.TryGetValue(location.Path, out var existing)) return existing;
+        UObject source;
+        try
+        {
+            source = load(location);
+            if (!ObjectMetadata.Path(source).Equals(location.Path, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException($"Reloaded image does not match {location.Path}.");
+        }
+        catch (Exception error)
+        {
+            issues.Add(new("image", location.Path, error.Message));
+            var failed = new ImageResource(location.Path, "failed");
+            resources.Add(location.Path, failed);
+            return failed;
+        }
+        return Export(source, location.Path);
+    }
+
+    public ImageResource Export(UObject source) => Export(source, ObjectMetadata.Path(source));
+
+    private ImageResource Export(UObject source, string path)
+    {
         if (resources.TryGetValue(path, out var existing)) return existing;
         ImageResource result;
         try

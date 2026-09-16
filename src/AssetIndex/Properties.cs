@@ -17,9 +17,9 @@ internal static class Properties
         for (UObject? current = source; current is not null; current = current.Template?.Object?.Value)
         {
             if (!visited.Add(current))
-                throw new InvalidDataException($"Template cycle while reading {source.GetPathName()}.{name}.");
+                throw new InvalidDataException($"Template cycle while reading {ObjectMetadata.Path(source)}.{name}.");
 
-            var property = FindDirect(current.Properties, name, current.GetPathName());
+            var property = FindDirect(current.Properties, name, ObjectMetadata.Path(current));
             if (property is not null)
             {
                 definedAt = current;
@@ -68,7 +68,7 @@ internal static class Properties
             return true;
         }
 
-        throw new InvalidDataException($"Cannot read {source.GetPathName()}.{name} as {typeof(T).Name}.");
+        throw new InvalidDataException($"Cannot read {ObjectMetadata.Path(source)}.{name} as {typeof(T).Name}.");
     }
 
     public static UObject? Reference(UObject source, string name)
@@ -81,10 +81,10 @@ internal static class Properties
         {
             FPackageIndex { IsNull: true } => null,
             FPackageIndex hard => hard.Load()
-                ?? throw new InvalidDataException($"Cannot load {source.GetPathName()}.{name}."),
+                ?? throw new InvalidDataException($"Cannot load {ObjectMetadata.Path(source)}.{name}."),
             FSoftObjectPath soft when soft.AssetPathName.IsNone => null,
             FSoftObjectPath soft => LoadSoftReference(soft),
-            _ => throw new InvalidDataException($"Unsupported reference at {source.GetPathName()}.{name}.")
+            _ => throw new InvalidDataException($"Unsupported reference at {ObjectMetadata.Path(source)}.{name}.")
         };
     }
 
@@ -109,12 +109,23 @@ internal static class Properties
                 // Export names are only unique within an outer. A package-wide name
                 // lookup can silently return another asset's identically named child.
                 if (candidate is null || !candidate.Name.Text.Equals(name, StringComparison.OrdinalIgnoreCase)
-                    || !ReferenceEquals(candidate.Outer?.Object?.Value, target)) continue;
+                    || !IsLoadedOwner(candidate.Outer, target)) continue;
                 if (match is not null) throw new InvalidDataException($"Ambiguous subobject {subpath}.");
                 match = candidate;
             }
             target = match?.Object?.Value ?? throw new InvalidDataException($"Cannot resolve subobject {subpath}.");
         }
         return target;
+    }
+
+    private static bool IsLoadedOwner(ResolvedObject? outer, UObject target)
+    {
+        // ResolvedLoadedObject wraps an existing object; other references must not
+        // evaluate a lazy sibling body just to establish its identity.
+        if (outer is ResolvedLoadedObject loaded) return ReferenceEquals(loaded.Object.Value, target);
+        if (outer is null || outer.ExportIndex < 0) return false;
+        var exports = outer.Package.ExportsLazy;
+        return outer.ExportIndex < exports.Length && exports[outer.ExportIndex].IsValueCreated &&
+            ReferenceEquals(exports[outer.ExportIndex].Value, target);
     }
 }

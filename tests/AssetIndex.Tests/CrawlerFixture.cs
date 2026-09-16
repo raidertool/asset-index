@@ -1,6 +1,5 @@
 using CUE4Parse.Compression;
 using CUE4Parse.FileProvider.Objects;
-using CUE4Parse.GameTypes.Theia.FileProvider;
 using CUE4Parse.MappingsProvider.Usmap;
 using CUE4Parse.UE4.Assets;
 using CUE4Parse.UE4.Assets.Exports;
@@ -8,7 +7,6 @@ using CUE4Parse.UE4.Assets.Objects;
 using CUE4Parse.UE4.Assets.Objects.Properties;
 using CUE4Parse.UE4.Objects.UObject;
 using CUE4Parse.UE4.Readers;
-using CUE4Parse.UE4.Versions;
 
 namespace AssetIndex.Tests;
 
@@ -81,22 +79,21 @@ internal sealed class CrawlerPackage : AbstractUePackage
     }
 }
 
-internal sealed class CrawlerProvider : TheiaFileProvider
+internal sealed class CrawlerProvider : PackageProvider
 {
     private readonly Dictionary<string, CrawlerPackage> packages;
     public Action<CrawlerPackage>? BeforeLoad { get; set; }
     public List<string> PackageReads { get; } = [];
     public List<GameFile> PackageFiles { get; } = [];
 
-    public CrawlerProvider(params CrawlerPackage[] inputs) : base(Path.GetTempPath(), SearchOption.TopDirectoryOnly,
-        new VersionContainer(EGame.GAME_ArcRaiders), StringComparer.OrdinalIgnoreCase)
+    public CrawlerProvider(params CrawlerPackage[] inputs) : base(Path.GetTempPath())
     {
         packages = inputs.ToDictionary(package => package.PhysicalPath, StringComparer.OrdinalIgnoreCase);
         MappingsContainer = new FileUsmapTypeMappingsProvider(Path.Combine(AppContext.BaseDirectory, "mappings", "ArcRaiders.usmap"));
         Files.AddFiles(packages.Keys.ToDictionary(path => path, path => (GameFile)new InputFile(path), StringComparer.OrdinalIgnoreCase));
     }
 
-    public override IPackage LoadPackage(GameFile file)
+    protected override IPackage ReadPackage(GameFile file)
     {
         PackageReads.Add(file.Path);
         PackageFiles.Add(file);

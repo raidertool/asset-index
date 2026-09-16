@@ -41,8 +41,8 @@ public sealed class AssetsTests
         var asset = Assert.Single(Assets.Collect([persistence, metadata], Mappings.Value, issues));
 
         Assert.Equal(-42, asset.Id);
-        Assert.Same(persistence, Assert.Single(asset.Definitions));
-        Assert.Same(metadata, Assert.Single(asset.Metadata));
+        Assert.Equal(persistence.GetPathName(), Assert.Single(asset.Definitions).Reference.Path);
+        Assert.Equal(metadata.GetPathName(), Assert.Single(asset.Metadata).Reference.Path);
         Assert.Empty(issues);
     }
 
@@ -90,7 +90,7 @@ public sealed class AssetsTests
         var asset = Assert.Single(Assets.Collect([persistence, item], Mappings.Value, issues));
 
         Assert.Equal(42, asset.Id);
-        Assert.Equal(["Persistence", "ReadableItem"], asset.Definitions.Select(source => source.Name));
+        Assert.Equal(["Persistence", "ReadableItem"], asset.Definitions.Select(source => source.Reference.Name));
         Assert.Empty(issues);
     }
 
@@ -105,8 +105,8 @@ public sealed class AssetsTests
 
         var asset = Assert.Single(Assets.Collect([metadata], Mappings.Value, issues));
 
-        Assert.Same(target, Assert.Single(asset.Definitions));
-        Assert.Same(metadata, Assert.Single(asset.Metadata));
+        Assert.Equal(target.GetPathName(), Assert.Single(asset.Definitions).Reference.Path);
+        Assert.Equal(metadata.GetPathName(), Assert.Single(asset.Metadata).Reference.Path);
         Assert.Empty(issues);
     }
 
@@ -123,8 +123,8 @@ public sealed class AssetsTests
         var forward = Assert.Single(Assets.Collect([first, second, first], Mappings.Value, forwardIssues));
         var reverse = Assert.Single(Assets.Collect([second, first], Mappings.Value, reverseIssues));
 
-        Assert.Equal(["First", "Second"], forward.Definitions.Select(source => source.Name));
-        Assert.Equal(forward.Definitions, reverse.Definitions);
+        Assert.Equal(["First", "Second"], forward.Definitions.Select(source => source.Reference.Name));
+        Assert.Equal(forward.Definitions.Select(source => source.Reference), reverse.Definitions.Select(source => source.Reference));
         Assert.Empty(forwardIssues);
         Assert.Empty(reverseIssues);
     }
@@ -148,7 +148,7 @@ public sealed class AssetsTests
         var asset = Assert.Single(Assets.Collect([definition], Mappings.Value, issues));
 
         Assert.Equal(42, asset.Id);
-        Assert.Equal(["Definition", "Identity"], asset.Definitions.Select(source => source.Name));
+        Assert.Equal(["Definition", "Identity"], asset.Definitions.Select(source => source.Reference.Name));
         Assert.Empty(issues);
     }
 
@@ -167,8 +167,8 @@ public sealed class AssetsTests
         var asset = Assert.Single(Assets.Collect([metadata], Mappings.Value, issues));
 
         Assert.Equal(42, asset.Id);
-        Assert.Equal(["Identity", "Quest"], asset.Definitions.Select(source => source.Name));
-        Assert.Same(metadata, Assert.Single(asset.Metadata));
+        Assert.Equal(["Identity", "Quest"], asset.Definitions.Select(source => source.Reference.Name));
+        Assert.Equal(metadata.GetPathName(), Assert.Single(asset.Metadata).Reference.Path);
         Assert.Empty(issues);
     }
 
@@ -185,7 +185,7 @@ public sealed class AssetsTests
 
         Assert.Equal(-42, asset.Id);
         Assert.Empty(asset.Definitions);
-        Assert.Same(metadata, Assert.Single(asset.Metadata));
+        Assert.Equal(metadata.GetPathName(), Assert.Single(asset.Metadata).Reference.Path);
         Assert.Contains("retaining its explicit ID", Assert.Single(issues).Message);
     }
 
@@ -314,6 +314,97 @@ public sealed class AssetsTests
     {
         Assert.Null(Assets.IsA(Mappings.Value, "UnmappedNewClass", "DataAsset"));
         Assert.False(Assets.IsA(Mappings.Value, "Texture2D", "DataAsset"));
+    }
+
+    [Fact]
+    public void NestedCatalogProjectionDoesNotDecodeOuterBodies()
+    {
+        var package = new CrawlerPackage("Plugin/Map.umap", "/Plugin/Map", new CrawlerExport("Map", "World"),
+            new CrawlerExport("Actor", "Actor") { OuterIndex = 0 },
+            new CrawlerExport("Quest", "QuestDefinition")
+            {
+                OuterIndex = 1,
+                OnLoad = value =>
+                {
+                    value.Properties.Add(new FPropertyTag
+                    {
+                        Name = "PersistenceDataAsset",
+                        Tag = new ObjectProperty(new FPackageIndex(
+                        new FixturePackage(Object("Identity", "PersistenceDataAsset", ("AssetId", new Int64Property(42)))), 1))
+                    });
+                    value.Properties.Add(new FPropertyTag { Name = "Title", Tag = new TextProperty(new CUE4Parse.UE4.Objects.Core.i18N.FText("Nested quest")) });
+                }
+            });
+        var source = package.ResolvePackageIndex(new FPackageIndex(package, 3))!.Object!.Value;
+        var issues = new List<ExtractionIssue>();
+
+        var asset = Assert.Single(Assets.Collect([source], Mappings.Value, issues));
+
+        Assert.Equal("Nested quest", Text.Read(asset, issues).Name?.Source);
+        Assert.Contains(asset.Definitions, value => value.Reference.Path == "/Plugin/Map.Map:Actor.Quest");
+        Assert.Equal([2], package.BodyReads);
+        Assert.Empty(issues);
+    }
+
+    [Fact]
+    public void UnassociatedSourcesDoNotProduceTextOrImageFailures()
+    {
+        var source = Object("LocalQuest", "QuestDefinition", ("Title", new Int64Property(12)),
+            ("Icon", new ObjectProperty(new FPackageIndex((IPackage)null!, 1))));
+        var issues = new List<ExtractionIssue>();
+
+        Assert.Empty(Assets.Collect([source], Mappings.Value, issues));
+
+        Assert.Empty(issues);
+    }
+
+    [Fact]
+    public void ExplicitlyReferencedClassDefaultsStillSupplyIdentityAndText()
+    {
+        var identity = Object("DefaultIdentity", "PersistenceDataAsset", ("AssetId", new Int64Property(42)));
+        identity.Flags |= EObjectFlags.RF_ClassDefaultObject;
+        var source = Object("Quest", "QuestDefinition", ("PersistenceDataAsset", new ObjectProperty(new FPackageIndex(new FixturePackage(identity), 1))),
+            ("Title", new TextProperty(new CUE4Parse.UE4.Objects.Core.i18N.FText("Quest label"))));
+        var issues = new List<ExtractionIssue>();
+
+        var asset = Assert.Single(Assets.Collect([identity, source], Mappings.Value, issues));
+
+        Assert.Equal(42, asset.Id);
+        Assert.Contains(asset.Definitions, value => value.Reference.Path == identity.GetPathName());
+        Assert.Equal("Quest label", Text.Read(asset, issues).Name?.Source);
+        Assert.Empty(issues);
+    }
+
+    [Fact]
+    public void CollectorDoesNotRetainDecodedSourcesTemplatesOrRuntimeDeclarations()
+    {
+        var issues = new List<ExtractionIssue>();
+        var (collector, references) = ObserveDetached(issues);
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        Assert.All(references, reference => Assert.False(reference.IsAlive));
+        var asset = Assert.Single(collector.Complete());
+        Assert.Equal("Inherited title", Text.Read(asset, issues).Name?.Source);
+        Assert.Equal("Template", Assert.Single(Text.Read(asset, issues).Candidates).DefinedAt);
+        Assert.Empty(issues);
+        GC.KeepAlive(collector);
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static (CatalogCollector Collector, WeakReference[] References) ObserveDetached(List<ExtractionIssue> issues)
+    {
+        var identity = Object("Identity", "PersistenceDataAsset", ("AssetId", new Int64Property(42)));
+        var template = Object("Template", "QuestDefinition",
+            ("Title", new TextProperty(new CUE4Parse.UE4.Objects.Core.i18N.FText("Inherited title"))));
+        var source = Object("Quest", "QuestDefinition",
+            ("PersistenceDataAsset", new ObjectProperty(new FPackageIndex(new FixturePackage(identity), 1))));
+        source.Template = new ResolvedLoadedObject(template);
+        var declaration = RuntimeClassFixture.Derive(source);
+        var collector = new CatalogCollector(Mappings.Value, _ => throw new InvalidOperationException("No images expected."), issues);
+        collector.Observe(source);
+        return (collector, [new(source), new(identity), new(template), new(declaration)]);
     }
 
     private static UObject Object(string name, string type, params (string Name, FPropertyTagType Value)[] properties)

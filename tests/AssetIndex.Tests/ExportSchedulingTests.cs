@@ -60,7 +60,7 @@ public sealed class ExportSchedulingTests
         Assert.Empty(result.Issues);
         Assert.Equal([3, 5], map.BodyReads.Order());
         Assert.Equal([3, 5], Assert.Single(result.Packages, package => package.Name == "/Plugin/Map").Selected);
-        Assert.Contains(result.Objects, value => value.GetPathName() == "/Plugin/Map.Inline");
+        Assert.Contains(result.Objects, value => value.Path == "/Plugin/Map.Inline");
     }
 
     [Fact]

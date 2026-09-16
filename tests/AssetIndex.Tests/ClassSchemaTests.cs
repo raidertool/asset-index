@@ -24,7 +24,7 @@ public sealed class ClassSchemaTests
         var asset = Assert.Single(Assets.Collect([source], Mappings.Value, issues));
 
         Assert.Equal(42, asset.Id);
-        Assert.Same(source, Assert.Single(asset.Definitions));
+        Assert.Equal(source.GetPathName(), Assert.Single(asset.Definitions).Reference.Path);
         Assert.Empty(issues);
         Assert.False(Mappings.Value.Types.ContainsKey(source.ExportType));
     }
@@ -39,9 +39,9 @@ public sealed class ClassSchemaTests
         var issues = new List<ExtractionIssue>();
 
         var asset = Assert.Single(Assets.Collect([source, ui], Mappings.Value, issues));
-        var text = Text.Read(asset, issues, Mappings.Value);
+        var text = Text.Read(asset, issues);
 
-        Assert.Same(ui, Assert.Single(asset.Metadata));
+        Assert.Equal(ui.GetPathName(), Assert.Single(asset.Metadata).Reference.Path);
         Assert.Equal("Experience points", text.Name?.Source);
         Assert.Empty(issues);
     }
@@ -58,8 +58,8 @@ public sealed class ClassSchemaTests
         var asset = Assert.Single(Assets.Collect([source], Mappings.Value, issues));
 
         Assert.Equal(42, asset.Id);
-        Assert.Contains(source, asset.Definitions);
-        Assert.Contains(identity, asset.Definitions);
+        Assert.Contains(asset.Definitions, value => value.Reference.Path == source.GetPathName());
+        Assert.Contains(asset.Definitions, value => value.Reference.Path == identity.GetPathName());
         Assert.Empty(issues);
     }
 
@@ -146,7 +146,8 @@ public sealed class ClassSchemaTests
         var valid = Object("Valid", "UICurrencyMetaDataItem", ("LongName", new TextProperty(new FText("Valid name"))));
         var issues = new List<ExtractionIssue>();
 
-        var text = Text.Read(new CatalogAsset(42, [], [broken, valid]), issues, Mappings.Value);
+        var text = Text.Read(new CatalogAsset(42, [], new[] { broken, valid }.Select(source => new CatalogSource(
+            new(source.Name, source.ExportType, source.GetPathName()), Text.Capture(source, Mappings.Value, issues), [])).ToArray()), issues);
 
         Assert.Equal("Valid name", text.Name?.Source);
         Assert.Equal("Broken", Assert.Single(issues).Path);

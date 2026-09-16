@@ -25,13 +25,13 @@ public sealed class PresentationTests
         {
             var asset = Assert.Single(assets, asset => asset.Id == id);
             var presentation = Assert.Single(asset.PresentationNames);
-            Assert.Equal("Quick Use", Text.Read(asset, issues, Mappings.Value).Name?.Source);
+            Assert.Equal("Quick Use", Text.Read(asset, issues).Name?.Source);
             Assert.Equal(frame.GetPathName(), presentation.FramePath);
             Assert.Equal(slot.GetPathName(), presentation.SlotPath);
             Assert.Equal(id == 43 ? container.GetPathName() : null, presentation.ContainerPath);
-            Assert.Same(label, presentation.Metadata);
-            Assert.DoesNotContain(frame, asset.Definitions);
-            Assert.DoesNotContain(label, asset.Metadata);
+            Assert.Equal(label.GetPathName(), presentation.Metadata.Path);
+            Assert.DoesNotContain(asset.Definitions, source => source.Reference.Path == frame.GetPathName());
+            Assert.DoesNotContain(asset.Metadata, source => source.Reference.Path == label.GetPathName());
         }
         Assert.Empty(issues);
     }
@@ -47,8 +47,8 @@ public sealed class PresentationTests
         objects.Reverse();
         var reverse = Assets.Collect(objects, Mappings.Value, reverseIssues).Single(asset => asset.Id == 42);
 
-        var left = Text.Read(forward, forwardIssues, Mappings.Value);
-        var right = Text.Read(reverse, reverseIssues, Mappings.Value);
+        var left = Text.Read(forward, forwardIssues);
+        var right = Text.Read(reverse, reverseIssues);
 
         Assert.Null(left.Name);
         Assert.Null(right.Name);
@@ -68,7 +68,7 @@ public sealed class PresentationTests
         var issues = new List<ExtractionIssue>();
         var asset = Assets.Collect(objects, Mappings.Value, issues).Single(asset => asset.Id == 43);
 
-        var text = Text.Read(asset, issues, Mappings.Value);
+        var text = Text.Read(asset, issues);
 
         Assert.Equal("Special carrier", text.Name?.Source);
         Assert.Single(asset.PresentationNames);
@@ -86,7 +86,7 @@ public sealed class PresentationTests
         var issues = new List<ExtractionIssue>();
         var asset = Assets.Collect(objects, Mappings.Value, issues).Single(asset => asset.Id == 42);
 
-        Assert.Null(Text.Read(asset, issues, Mappings.Value).Name);
+        Assert.Null(Text.Read(asset, issues).Name);
         Assert.Equal(2, asset.PresentationNames.Count);
         Assert.Contains("Conflicting display-name", Assert.Single(issues).Message);
     }
@@ -112,7 +112,7 @@ public sealed class PresentationTests
         var issues = new List<ExtractionIssue>();
         var asset = Assets.Collect(objects, Mappings.Value, issues).Single(asset => asset.Id == 42);
 
-        Assert.Equal("Quick Use", Text.Read(asset, issues, Mappings.Value).Name?.Source);
+        Assert.Equal("Quick Use", Text.Read(asset, issues).Name?.Source);
         Assert.Single(asset.PresentationNames);
         Assert.Empty(issues);
     }
@@ -139,7 +139,7 @@ public sealed class PresentationTests
         {
             var asset = Assert.Single(assets, asset => asset.Id == id);
             Assert.Single(asset.PresentationNames);
-            Assert.Equal("Quick Use", Text.Read(asset, issues, Mappings.Value).Name?.Source);
+            Assert.Equal("Quick Use", Text.Read(asset, issues).Name?.Source);
         }
         Assert.Empty(issues);
     }
@@ -203,6 +203,49 @@ public sealed class PresentationTests
 
         Assert.Contains("Ambiguous property", Assert.Single(issues).Message);
         Assert.Equal(frame.GetPathName() + ".Containers[0]", issues[0].Path);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MalformedContainerTextIsReportedOnlyForAUsedLabel(bool joined)
+    {
+        var (objects, _, _, _, label) = Fixture();
+        label.Properties.Single(property => property.Name.Text == "ContainerName").Tag = new Int64Property(123);
+        var issues = new List<ExtractionIssue>();
+        var input = joined ? objects : [label];
+
+        var assets = Assets.Collect(input, Mappings.Value, issues);
+        Assert.Empty(issues);
+        foreach (var asset in assets) Text.Read(asset, issues);
+
+        if (joined)
+        {
+            Assert.NotEmpty(issues);
+            Assert.All(issues, issue => Assert.Equal("text", issue.Stage));
+        }
+        else Assert.Empty(issues);
+    }
+
+    [Fact]
+    public void ContainerObservationsSurvivePackageMutationAndArrivalOrder()
+    {
+        var (objects, slot, container, frame, label) = Fixture();
+        var issues = new List<ExtractionIssue>();
+        var collector = new CatalogCollector(Mappings.Value, _ => throw new InvalidOperationException("No images expected."), issues);
+        collector.Observe(frame);
+        foreach (var source in objects.Where(source => source != frame)) collector.Observe(source);
+        foreach (var source in new[] { slot, container, frame, label }) source.Properties.Clear();
+
+        var assets = collector.Complete();
+
+        foreach (var id in new long[] { 42, 43 })
+        {
+            var asset = Assert.Single(assets, asset => asset.Id == id);
+            Assert.Equal("Quick Use", Text.Read(asset, issues).Name?.Source);
+            Assert.Single(asset.PresentationNames);
+        }
+        Assert.Empty(issues);
     }
 
     private static (List<UObject> Objects, UObject Slot, UObject Container, UObject Frame, UObject Label) Fixture()

@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
-using CUE4Parse.FileProvider;
 using CUE4Parse.UE4.Assets.Exports.Texture;
 using CUE4Parse.UE4.Objects.Engine;
 using CUE4Parse_Conversion.Textures;
@@ -59,8 +58,7 @@ internal static class Program
             Console.WriteLine($"Mounted {provider.Files.Count:N0} files. Reading typed object fields and references...");
             var storage = PackageStorage.Read(provider.Files.Values);
             Console.WriteLine($"Mounted IoStore packages including shadowed versions: {storage.Packages:N0} distinct entries, {storage.Bytes:N0} raw bytes.");
-            if (provider is PackageProvider packages)
-                Console.WriteLine($"Package spool volume: {packages.PackageSpoolAvailableBytes:N0} bytes currently available.");
+            Console.WriteLine($"Package spool volume: {provider.PackageSpoolAvailableBytes:N0} bytes currently available.");
             using (var evidence = new JsonLinesFile<Discovery.ObjectEvidence>(options.OutputDirectory, "discovery/objects.jsonl.gz"))
             using (var headers = new JsonLinesFile<Discovery.ExportHeader>(options.OutputDirectory, "discovery/exports.jsonl.gz"))
             using (var progress = new ExtractionProgress(Console.Error))
@@ -81,7 +79,7 @@ internal static class Program
                 new(TextureAddress.TA_Clamp, TextureAddress.TA_Clamp, TextureFilter.TF_Bilinear));
             var resources = new ImageResources(options.OutputDirectory, issues, materials);
             Console.WriteLine("Exporting registry UI textures...");
-            foreach (var texture in UiTextures(discovery)) resources.Export(texture);
+            foreach (var texture in discovery.UiTextures) resources.Export(texture, provider.Load);
             records = ExportAssets(discovery.Assets, provider, options.OutputDirectory, resources, issues);
             Snapshot.Write(options.OutputDirectory, "resources.json", resources.Entries);
             resourceCount = resources.Entries.Count;
@@ -106,14 +104,7 @@ internal static class Program
         return issues.Count == 0 ? 0 : 1;
     }
 
-    internal static IEnumerable<UTexture2D> UiTextures(DiscoveryResult discovery)
-    {
-        var paths = discovery.Registry.Where(Discovery.Registry.IsUiTexture).Select(entry => entry.Path)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return discovery.Objects.OfType<UTexture2D>().Where(texture => paths.Contains(texture.GetPathName()));
-    }
-
-    private static List<AssetRecord> ExportAssets(IReadOnlyList<CatalogAsset> assets, IFileProvider provider,
+    private static List<AssetRecord> ExportAssets(IReadOnlyList<CatalogAsset> assets, PackageProvider provider,
         string output, ImageResources resources, List<ExtractionIssue> issues)
     {
         Console.WriteLine($"Found {assets.Count:N0} IDs. Reading text...");
@@ -129,14 +120,14 @@ internal static class Program
         foreach (var asset in assets)
         {
             records.Add(new(asset.Id,
-                asset.Definitions.Select(source => new ObjectReference(source.Name, source.ExportType, source.GetPathName())).ToArray(),
-                asset.Metadata.Select(source => new ObjectReference(source.Name, source.ExportType, source.GetPathName())).ToArray(),
+                asset.Definitions.Select(source => source.Reference).ToArray(),
+                asset.Metadata.Select(source => source.Reference).ToArray(),
                 localized[asset.Id].Select(text => new Translation(text.Locale, text.DisplayName, text.Description)).ToArray(),
-                Images.Export(asset, resources, issues))
+                Images.Export(asset, resources, provider.Load, issues))
             {
                 Presentation = new(textById[asset.Id].Name, textById[asset.Id].Description, textById[asset.Id].Candidates,
                     asset.PresentationNames.Select(name => new ContainerPresentation(name.Role, name.ContainerType,
-                        name.FramePath, name.ContainerIndex, name.SlotPath, name.ContainerPath, name.Metadata.GetPathName())).ToArray())
+                        name.FramePath, name.ContainerIndex, name.SlotPath, name.ContainerPath, name.Metadata.Path)).ToArray())
             });
             if (records.Count % 250 == 0)
                 Console.WriteLine($"Processed {records.Count:N0}/{assets.Count:N0} assets.");

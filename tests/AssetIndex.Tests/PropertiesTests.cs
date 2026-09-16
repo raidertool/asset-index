@@ -91,6 +91,41 @@ public class PropertiesTests
         Assert.Contains("Ambiguous", Assert.Throws<InvalidDataException>(() => Properties.ResolveSubobject(parent, "Child")).Message);
     }
 
+    [Fact]
+    public void SubobjectLookupNeverDecodesAnUncreatedSiblingOuter()
+    {
+        var package = new CrawlerPackage("Plugin/Parents.uasset", "/Plugin/Parents",
+            new CrawlerExport("Wrong", "Object") { OnLoad = _ => throw new InvalidOperationException("Sibling outer was decoded.") },
+            new CrawlerExport("Right", "Object"),
+            new CrawlerExport("Child", "Object") { OuterIndex = 0 },
+            new CrawlerExport("Child", "Object") { OuterIndex = 1 },
+            new CrawlerExport("Leaf", "Object") { OuterIndex = 2 },
+            new CrawlerExport("Leaf", "Object") { OuterIndex = 3 });
+        var parent = package.ExportsLazy[1].Value;
+
+        var leaf = Properties.ResolveSubobject(parent, "child.LEAF");
+
+        Assert.Same(package.ExportsLazy[5].Value, leaf);
+        Assert.Equal([1, 3, 5], package.BodyReads);
+    }
+
+    [Fact]
+    public void LoadedOutersWithTheSamePathRemainDifferentIdentities()
+    {
+        var package = new CrawlerPackage("Plugin/Parents.uasset", "/Plugin/Parents",
+            new CrawlerExport("Parent", "Object"), new CrawlerExport("Parent", "Object"),
+            new CrawlerExport("Child", "Object") { OuterIndex = 0 },
+            new CrawlerExport("Child", "Object") { OuterIndex = 1 });
+        var wrong = package.ExportsLazy[0].Value;
+        var right = package.ExportsLazy[1].Value;
+        Assert.Equal(ObjectMetadata.Path(wrong), ObjectMetadata.Path(right));
+
+        var child = Properties.ResolveSubobject(right, "Child");
+
+        Assert.Same(package.ExportsLazy[3].Value, child);
+        Assert.Equal([0, 1, 3], package.BodyReads);
+    }
+
     private static FPropertyTag Integer(string name, int value) =>
         new("IntProperty", new IntProperty(value)) { Name = name };
 }

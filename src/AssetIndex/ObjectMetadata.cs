@@ -1,10 +1,13 @@
 using System.Text;
 using CUE4Parse.UE4.Assets;
+using CUE4Parse.UE4.Assets.Exports;
 
 namespace AssetIndex;
 
 internal static class ObjectMetadata
 {
+    public static string Path(UObject source) => source.Outer is null ? source.Name : Path(new ResolvedLoadedObject(source));
+
     public static string Path(ResolvedObject reference)
     {
         var chain = new List<ResolvedObject>();

@@ -11,7 +11,7 @@ internal static class GameFiles
     // Public game-content key: https://github.com/ARC-Data-Raiders/DataRaiders/blob/main/aes.txt
     private const string DefaultKey = "0x047A8AC14396604CE1BAB46366C0A7FDBE40F66264D4625E2E6D11FF17272D7F";
 
-    public static TheiaFileProvider Open(Options options)
+    public static PackageProvider Open(Options options)
     {
         // Package imports are not evidence that a particular material uses a texture.
         var provider = new PackageProvider(options.GameDirectory) { SkipReferencedTextures = true };

@@ -16,7 +16,10 @@ ambiguity is a diagnostic, never a silent exclusion.
 IoStore reads fetch decoded package pages on demand, with a 256 MiB memory cache.
 Fetched pages remain in a temporary disk spool until the provider closes, so lazy
 readers can revisit evicted bytes. Upstream handles compressed-block reads;
-decoded objects and image pixels use separate memory.
+decoded objects and image pixels use separate memory. Package bodies are weakly
+cached: the crawler writes evidence and retains detached catalog facts, so unused
+object graphs can be collected. Deferred image rendering reloads the exact physical
+file and export index. An active package can still retain its imported dependencies.
 
 `EvidenceReader` visits CUE4Parse property tags, arrays, sets, map keys/values,
 structs and text histories directly. Small native adapters cover data/curve/string
@@ -29,7 +32,7 @@ Homogeneous fixed-width numeric arrays use one `numeric-le-base64` value: canoni
 property type plus `[]`, little-endian scalar bytes, and count inferred from byte
 length. Signed integers and IEEE float bits (including NaNs and negative zero) are
 lossless. Plain bytes retain `binary-base64`; enums, booleans and mixed arrays keep
-element evidence. This limits evidence expansion; CUE still retains decoded objects.
+element evidence. This limits evidence expansion while preserving decoded values.
 
 Material references come from serialized properties and cached bindings. Unrelated
 package imports do not become material edges; registry and mounted-file inventories

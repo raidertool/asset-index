@@ -6,80 +6,121 @@ using CUE4Parse.UE4.Objects.UObject;
 namespace AssetIndex;
 
 internal sealed record PresentationName(long AssetId, string Role, string ContainerType,
-    string FramePath, int ContainerIndex, string SlotPath, string? ContainerPath, UObject Metadata);
+    string FramePath, int ContainerIndex, string SlotPath, string? ContainerPath, ObjectReference Metadata)
+{
+    public IReadOnlyList<TextCandidate> Text { get; init; } = [];
+    public IReadOnlyList<ExtractionIssue> TextIssues { get; init; } = [];
+}
 
 internal static class Presentation
 {
-    public static IReadOnlyList<PresentationName> Read(IReadOnlyList<UObject> objects,
+    public static IReadOnlyList<PresentationName> Read(IEnumerable<UObject> objects,
         TypeMappings mappings, ICollection<ExtractionIssue> issues)
     {
-        var names = new List<PresentationName>();
-        var metadata = new Dictionary<string, List<UObject>>(StringComparer.OrdinalIgnoreCase);
-        var instances = objects.Where(source => !source.Flags.HasFlag(EObjectFlags.RF_ClassDefaultObject)).ToArray();
-        var frames = new List<UObject>();
-        foreach (var source in instances)
-        {
-            try
-            {
-                var schema = ClassSchema.Read(source, mappings);
-                if (schema.IsA("LoadoutFrameItemDataAsset")) frames.Add(source);
-                if (schema.IsA("UIInventoryContainerMetaDataItem") && schema.HasProperty("ContainerType", "EnumProperty", "ByteProperty") &&
-                    Properties.TryGet<FName>(source, "ContainerType", out var type))
-                {
-                    if (!metadata.TryGetValue(type.Text, out var entries)) metadata[type.Text] = entries = [];
-                    entries.Add(source);
-                }
-            }
-            catch (Exception error) { issues.Add(new("presentation", source.GetPathName(), error.Message)); }
-        }
-        foreach (var frame in frames)
-        {
-            try
-            {
-                if (!ClassSchema.Read(frame, mappings).HasProperty("Containers", "ArrayProperty") ||
-                    !Properties.TryGet<FStructFallback[]>(frame, "Containers", out var containers)) continue;
-                for (var index = 0; index < containers.Length; index++)
-                    ReadContainer(frame, index, containers[index], metadata, mappings, names, issues);
-            }
-            catch (Exception error) { issues.Add(new("presentation", frame.GetPathName(), error.Message)); }
-        }
-        return names.Distinct().OrderBy(name => name.AssetId).ThenBy(name => name.FramePath, StringComparer.Ordinal)
-            .ThenBy(name => name.ContainerIndex).ThenBy(name => name.Metadata.GetPathName(), StringComparer.Ordinal).ToArray();
+        var collector = new PresentationCollector(mappings, issues);
+        foreach (var source in objects) collector.Observe(source);
+        return collector.Complete();
     }
+}
 
-    private static void ReadContainer(UObject frame, int index, FStructFallback entry,
-        IReadOnlyDictionary<string, List<UObject>> metadata, TypeMappings mappings,
-        List<PresentationName> names, ICollection<ExtractionIssue> issues)
+internal sealed class PresentationCollector(TypeMappings mappings, ICollection<ExtractionIssue> issues)
+{
+    private sealed record Label(ObjectReference Reference, IReadOnlyList<TextCandidate> Text,
+        IReadOnlyList<ExtractionIssue> Issues);
+    private sealed record Link(long Id, string Role, string SlotPath, string? ContainerPath);
+    private sealed record Container(string FramePath, int Index, string Type, IReadOnlyList<Link> Links,
+        IReadOnlyList<ExtractionIssue> Issues);
+
+    private readonly Dictionary<string, Dictionary<string, Label>> metadata = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<Container> containers = [];
+    private readonly HashSet<string> observed = new(StringComparer.Ordinal);
+
+    public void Observe(UObject source)
     {
-        var path = $"{frame.GetPathName()}.Containers[{index}]";
+        if (source.Flags.HasFlag(EObjectFlags.RF_ClassDefaultObject) || !observed.Add(ObjectMetadata.Path(source))) return;
         try
         {
-            var type = Properties.Get<FName>(entry, "Type", path).Text;
-            if (!metadata.TryGetValue(type, out var labels))
-                throw new InvalidDataException($"No container presentation metadata for {type}.");
-            var slot = Properties.Get<FPackageIndex>(entry, "ContainerSlotDataAsset", path).Load()
-                ?? throw new InvalidDataException("ContainerSlotDataAsset could not be loaded.");
-            RequireType(slot, "InventoryContainerSlotDataAsset", mappings);
-            var slotId = Assets.DefinitionId(slot, mappings, out _)
-                ?? throw new InvalidDataException("Container slot identity could not be resolved.");
-            foreach (var label in labels)
-                names.Add(new(slotId, "container-slot", type, frame.GetPathName(), index, slot.GetPathName(), null, label));
-
-            var container = Properties.Reference(slot, "DefaultContainer");
-            if (container is null) return;
-            RequireType(container, "InventoryContainerItemDataAsset", mappings);
-            var containerId = Assets.DefinitionId(container, mappings, out _)
-                ?? throw new InvalidDataException("Default container identity could not be resolved.");
-            foreach (var label in labels)
-                names.Add(new(containerId, "default-container", type, frame.GetPathName(), index,
-                    slot.GetPathName(), container.GetPathName(), label));
+            var schema = ClassSchema.Read(source, mappings);
+            if (schema.IsA("LoadoutFrameItemDataAsset")) ReadFrame(source, schema);
+            if (schema.IsA("UIInventoryContainerMetaDataItem") && schema.HasProperty("ContainerType", "EnumProperty", "ByteProperty") &&
+                Properties.TryGet<FName>(source, "ContainerType", out var type))
+            {
+                if (!metadata.TryGetValue(type.Text, out var entries)) metadata[type.Text] = entries = new(StringComparer.Ordinal);
+                var textIssues = new List<ExtractionIssue>();
+                var text = Text.CaptureContainer(source, textIssues);
+                entries.TryAdd(ObjectMetadata.Path(source), new(new(source.Name, source.ExportType, ObjectMetadata.Path(source)), text, textIssues));
+            }
         }
-        catch (Exception error) { issues.Add(new("presentation", path, error.Message)); }
+        catch (Exception error) { issues.Add(new("presentation", ObjectMetadata.Path(source), error.Message)); }
     }
 
-    private static void RequireType(UObject source, string expected, TypeMappings mappings)
+    public IReadOnlyList<PresentationName> Complete()
+    {
+        var names = new List<PresentationName>();
+        foreach (var container in containers)
+        {
+            if (!metadata.TryGetValue(container.Type, out var labels))
+            {
+                issues.Add(new("presentation", EntryPath(container.FramePath, container.Index),
+                    $"No container presentation metadata for {container.Type}."));
+                continue;
+            }
+            foreach (var issue in container.Issues) issues.Add(issue);
+            foreach (var link in container.Links)
+                foreach (var label in labels.Values)
+                    names.Add(new(link.Id, link.Role, container.Type, container.FramePath, container.Index,
+                        link.SlotPath, link.ContainerPath, label.Reference)
+                    { Text = label.Text, TextIssues = label.Issues });
+        }
+        return names.Distinct().OrderBy(name => name.AssetId).ThenBy(name => name.FramePath, StringComparer.Ordinal)
+            .ThenBy(name => name.ContainerIndex).ThenBy(name => name.Metadata.Path, StringComparer.Ordinal).ToArray();
+    }
+
+    private void ReadFrame(UObject frame, ClassSchema schema)
+    {
+        if (!schema.HasProperty("Containers", "ArrayProperty") ||
+            !Properties.TryGet<FStructFallback[]>(frame, "Containers", out var entries)) return;
+        for (var index = 0; index < entries.Length; index++)
+        {
+            var path = EntryPath(ObjectMetadata.Path(frame), index);
+            string type;
+            try { type = Properties.Get<FName>(entries[index], "Type", path).Text; }
+            catch (Exception error)
+            {
+                issues.Add(new("presentation", path, error.Message));
+                continue;
+            }
+            var links = new List<Link>();
+            var pending = new List<ExtractionIssue>();
+            try { ReadLinks(entries[index], path, links); }
+            catch (Exception error) { pending.Add(new("presentation", path, error.Message)); }
+            // Type labels may arrive after this frame; preserve the typed facts, never the package objects.
+            containers.Add(new(ObjectMetadata.Path(frame), index, type, links, pending));
+        }
+    }
+
+    private void ReadLinks(FStructFallback entry, string path, List<Link> links)
+    {
+        var slot = Properties.Get<FPackageIndex>(entry, "ContainerSlotDataAsset", path).Load()
+            ?? throw new InvalidDataException("ContainerSlotDataAsset could not be loaded.");
+        RequireType(slot, "InventoryContainerSlotDataAsset");
+        var slotId = Assets.DefinitionId(slot, mappings, out _)
+            ?? throw new InvalidDataException("Container slot identity could not be resolved.");
+        links.Add(new(slotId, "container-slot", ObjectMetadata.Path(slot), null));
+
+        var container = Properties.Reference(slot, "DefaultContainer");
+        if (container is null) return;
+        RequireType(container, "InventoryContainerItemDataAsset");
+        var containerId = Assets.DefinitionId(container, mappings, out _)
+            ?? throw new InvalidDataException("Default container identity could not be resolved.");
+        links.Add(new(containerId, "default-container", ObjectMetadata.Path(slot), ObjectMetadata.Path(container)));
+    }
+
+    private void RequireType(UObject source, string expected)
     {
         if (!ClassSchema.Read(source, mappings).IsA(expected))
-            throw new InvalidDataException($"Expected {expected}, found {source.ExportType} at {source.GetPathName()}.");
+            throw new InvalidDataException($"Expected {expected}, found {source.ExportType} at {ObjectMetadata.Path(source)}.");
     }
+
+    private static string EntryPath(string frame, int index) => $"{frame}.Containers[{index}]";
 }

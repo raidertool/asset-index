@@ -18,7 +18,7 @@ internal sealed class ClassSchema
     public static ClassSchema Read(UObject source, TypeMappings mappings)
     {
         var result = Read(source.Class
-            ?? throw new InvalidDataException($"Class metadata is missing for {source.GetPathName()}."), mappings);
+            ?? throw new InvalidDataException($"Class metadata is missing for {ObjectMetadata.Path(source)}."), mappings);
         if (result.Error is not null) return result;
         try { result.ValidateRuntimeBodies(); }
         catch (Exception error) { result.Error = AssetDiscovery.DescribeError(error); }

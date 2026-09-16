@@ -1,10 +1,12 @@
 using CUE4Parse.MappingsProvider;
 using CUE4Parse.UE4.Assets.Exports;
-using CUE4Parse.UE4.Objects.UObject;
 
 namespace AssetIndex;
 
-internal sealed record CatalogAsset(long Id, IReadOnlyList<UObject> Definitions, IReadOnlyList<UObject> Metadata)
+internal sealed record CatalogSource(ObjectReference Reference, IReadOnlyList<TextCandidate> Text,
+    IReadOnlyList<ImageRequest> Images);
+
+internal sealed record CatalogAsset(long Id, IReadOnlyList<CatalogSource> Definitions, IReadOnlyList<CatalogSource> Metadata)
 {
     public IReadOnlyList<PresentationName> PresentationNames { get; init; } = [];
 }
@@ -21,44 +23,31 @@ internal static class Assets
     };
 
     public static IReadOnlyList<CatalogAsset> Collect(
-        IEnumerable<UObject> objects, TypeMappings mappings, List<ExtractionIssue> issues)
+        IEnumerable<UObject> objects, TypeMappings mappings, ICollection<ExtractionIssue> issues,
+        Func<UObject, ObjectLocation>? locate = null)
     {
-        var sourceObjects = objects.ToArray();
-        var definitions = new Dictionary<long, Dictionary<string, UObject>>();
-        var metadata = new Dictionary<long, Dictionary<string, UObject>>();
-        foreach (var source in sourceObjects)
+        var collector = new CatalogCollector(mappings, locate ?? (_ =>
+            throw new InvalidDataException("Image export requires a package location resolver.")), issues);
+        foreach (var source in objects) collector.Observe(source);
+        return collector.Complete();
+    }
+
+    internal static void Associate(UObject source, TypeMappings mappings, Action<long, UObject, bool> add)
+    {
+        var schema = ClassSchema.Read(source, mappings);
+        if (schema.IsA("UIMetaDataItem"))
+            AssociateMetadata(source, schema, mappings, add);
+        else
         {
-            if (source.Flags.HasFlag(EObjectFlags.RF_ClassDefaultObject))
-                continue;
-
-            try
-            {
-                var schema = ClassSchema.Read(source, mappings);
-                if (schema.IsA("UIMetaDataItem"))
-                    AssociateMetadata(source, schema, mappings, definitions, metadata);
-                else
-                {
-                    var id = DefinitionId(source, schema, mappings, out var persistence);
-                    if (id is null)
-                        continue;
-                    Add(definitions, id.Value, source);
-                    if (persistence is not null)
-                        Add(definitions, id.Value, persistence);
-                }
-            }
-            catch (Exception exception)
-            {
-                issues.Add(new("asset", source.GetPathName(), exception.Message));
-            }
+            var id = DefinitionId(source, schema, mappings, out var persistence);
+            if (id is null) return;
+            add(id.Value, source, false);
+            if (persistence is not null) add(id.Value, persistence, false);
         }
-
-        var presentation = Presentation.Read(sourceObjects, mappings, issues).ToLookup(name => name.AssetId);
-        return BuildCatalog(definitions, metadata, issues)
-            .Select(asset => asset with { PresentationNames = presentation[asset.Id].ToArray() }).ToArray();
     }
 
     private static void AssociateMetadata(UObject source, ClassSchema schema, TypeMappings mappings,
-        Dictionary<long, Dictionary<string, UObject>> definitions, Dictionary<long, Dictionary<string, UObject>> metadata)
+        Action<long, UObject, bool> add)
     {
         var referenceName = MetadataReferences.FirstOrDefault(pair =>
             schema.IsA(pair.Key)).Value ?? "PersistenceDataAsset";
@@ -74,30 +63,9 @@ internal static class Assets
         if (id is null)
             throw new InvalidDataException($"UI metadata has no resolvable {referenceName} or enabled asset ID override.");
 
-        Add(metadata, id.Value, source);
-        if (target is not null)
-            Add(definitions, id.Value, target);
-        if (persistence is not null)
-            Add(definitions, id.Value, persistence);
-    }
-
-    private static IReadOnlyList<CatalogAsset> BuildCatalog(
-        Dictionary<long, Dictionary<string, UObject>> definitions, Dictionary<long, Dictionary<string, UObject>> metadata,
-        List<ExtractionIssue> issues)
-    {
-        var result = new List<CatalogAsset>();
-        foreach (var id in definitions.Keys.Union(metadata.Keys).Order())
-        {
-            var sources = definitions.GetValueOrDefault(id)?.Values
-                .OrderBy(source => source.GetPathName(), StringComparer.Ordinal).ToArray() ?? [];
-            var associated = metadata.GetValueOrDefault(id)?.Values
-                .OrderBy(source => source.GetPathName(), StringComparer.Ordinal).ToArray() ?? [];
-            if (sources.Length == 0)
-                issues.Add(new("asset", id.ToString(), "UI metadata has no matching asset definition; retaining its explicit ID."));
-            result.Add(new(id, sources, associated));
-        }
-
-        return result;
+        add(id.Value, source, true);
+        if (target is not null) add(id.Value, target, false);
+        if (persistence is not null) add(id.Value, persistence, false);
     }
 
     public static long? ReadId(UObject source)
@@ -173,10 +141,4 @@ internal static class Assets
         ? id
         : throw new InvalidDataException("Asset ID is zero; no game identity was resolved.");
 
-    private static void Add(Dictionary<long, Dictionary<string, UObject>> rows, long id, UObject source)
-    {
-        if (!rows.TryGetValue(id, out var group))
-            rows[id] = group = new(StringComparer.Ordinal);
-        group.TryAdd(source.GetPathName(), source);
-    }
 }

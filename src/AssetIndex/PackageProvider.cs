@@ -1,7 +1,10 @@
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using CUE4Parse.FileProvider.Objects;
 using CUE4Parse.GameTypes.Theia.FileProvider;
 using CUE4Parse.UE4.Assets;
+using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Assets.Objects;
 using CUE4Parse.UE4.IO.Objects;
 using CUE4Parse.UE4.Readers;
@@ -12,18 +15,61 @@ namespace AssetIndex;
 internal class PackageProvider(string directory) : TheiaFileProvider(directory, SearchOption.AllDirectories,
     new VersionContainer(EGame.GAME_ArcRaiders), StringComparer.OrdinalIgnoreCase)
 {
-    // Import resolution also loads through this provider. Reuse each mounted file,
-    // while keeping different archive versions of the same path distinct.
-    private readonly ConcurrentDictionary<GameFile, Lazy<IPackage>> packages = new(ReferenceEqualityComparer.Instance);
+    // Imports reuse live packages without retaining decoded graphs. Exact file
+    // identity keeps shadowed archive versions distinct; their page spool survives reloads.
+    private readonly ConcurrentDictionary<GameFile, PackageEntry> packages = new(ReferenceEqualityComparer.Instance);
+    private readonly ConditionalWeakTable<IPackage, GameFile> packageFiles = new();
     private readonly PackageArchiveStore archives = new();
+    private bool disposed;
     internal long CachedPackageBytes => archives.CachedBytes;
     internal long SpooledPackageBytes => archives.SpooledBytes;
     internal long PackageSpoolAvailableBytes => new DriveInfo(archives.DirectoryPath).AvailableFreeSpace;
 
-    public override IPackage LoadPackage(GameFile file) =>
-        packages.GetOrAdd(file, source => new Lazy<IPackage>(() => ReadPackage(source))).Value;
+    public override IPackage LoadPackage(GameFile file)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        return packages.GetOrAdd(file, _ => new PackageEntry()).Load(() =>
+        {
+            var package = ReadPackage(file);
+            if (!ReferenceEquals(packageFiles.GetValue(package, _ => file), file))
+                throw new InvalidDataException("Package instance maps to multiple physical files.");
+            return package;
+        });
+    }
 
     public override Task<IPackage> LoadPackageAsync(GameFile file) => Task.Run(() => LoadPackage(file));
+
+    internal ObjectLocation Locate(UObject source)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        var owner = source.Owner;
+        if (owner is null || !packageFiles.TryGetValue(owner, out var file))
+            throw new InvalidDataException("Object does not belong to a package loaded by this provider.");
+        var index = -1;
+        for (var candidate = 0; candidate < owner.ExportsLazy.Length; candidate++)
+        {
+            var export = owner.ExportsLazy[candidate];
+            if (export is null || !export.IsValueCreated || !ReferenceEquals(export.Value, source)) continue;
+            if (index >= 0) throw new InvalidDataException("Object occurs at multiple export indices.");
+            index = candidate;
+        }
+        if (index < 0 || index >= owner.ExportMapLength)
+            throw new InvalidDataException("Object has no unique decoded export index in its package.");
+        return new(file, index, ObjectMetadata.Path(new ResolvedLoadedObject(source)));
+    }
+
+    internal UObject Load(ObjectLocation location)
+    {
+        var package = LoadPackage(location.File);
+        var index = location.ExportIndex;
+        if (index < 0 || index >= package.ExportMapLength || index >= package.ExportsLazy.Length || package.ExportsLazy[index] is null)
+            throw new InvalidDataException("Object locator export index is outside its package.");
+        var source = package.ExportsLazy[index].Value;
+        if (!ReferenceEquals(source.Owner, package) ||
+            !ObjectMetadata.Path(new ResolvedLoadedObject(source)).Equals(location.Path, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Object locator does not match the loaded export path.");
+        return source;
+    }
 
     protected virtual IPackage ReadPackage(GameFile file)
     {
@@ -51,8 +97,40 @@ internal class PackageProvider(string directory) : TheiaFileProvider(directory, 
 
     public override void Dispose()
     {
+        disposed = true;
         packages.Clear();
+        packageFiles.Clear();
         try { archives.Dispose(); }
         finally { base.Dispose(); }
+    }
+
+    private sealed class PackageEntry
+    {
+        private WeakReference<IPackage>? package;
+        private ExceptionDispatchInfo? failure;
+        private bool loading;
+
+        public IPackage Load(Func<IPackage> read)
+        {
+            lock (this)
+            {
+                failure?.Throw();
+                if (package is not null && package.TryGetTarget(out var existing)) return existing;
+                if (loading) throw new InvalidOperationException("Recursive construction of the same package.");
+                loading = true;
+                try
+                {
+                    var result = read();
+                    package = new(result);
+                    return result;
+                }
+                catch (Exception error)
+                {
+                    failure = ExceptionDispatchInfo.Capture(error);
+                    throw;
+                }
+                finally { loading = false; }
+            }
+        }
     }
 }

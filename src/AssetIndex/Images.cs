@@ -1,3 +1,4 @@
+using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse_Conversion.Options;
 using CUE4Parse_Conversion.Textures;
 
@@ -5,6 +6,9 @@ namespace AssetIndex;
 
 internal sealed record AssetImage(string Field, string Source, string? Resource, string Status,
     string? File = null, int? Width = null, int? Height = null);
+
+internal sealed record ImageRequest(string Field, string Source, string? Resource, string Status,
+    ObjectLocation? Location = null);
 
 internal static class Images
 {
@@ -17,35 +21,59 @@ internal static class Images
         "ModifierIcon", "ObscuredPreviewImage", "OptionalLocationIcon", "UnlockVideoPreviewImage"
     ];
 
-    public static IReadOnlyList<AssetImage> Export(CatalogAsset asset, ImageResources resources, ICollection<ExtractionIssue> issues)
+    public static IReadOnlyList<ImageRequest> Capture(UObject source, Func<UObject, ObjectLocation> locate,
+        ICollection<ExtractionIssue> issues)
+    {
+        var images = new List<ImageRequest>();
+        var path = ObjectMetadata.Path(source);
+        foreach (var requestedField in Fields)
+        {
+            var field = requestedField;
+            string? resourcePath = null;
+            try
+            {
+                if (Properties.Find(source, field) is not { } property) continue;
+                field = property.Name.Text;
+                var reference = Properties.Reference(source, field);
+                if (reference is null)
+                {
+                    images.Add(new(field, path, null, "absent"));
+                    continue;
+                }
+                resourcePath = ObjectMetadata.Path(reference);
+                images.Add(new(field, path, resourcePath, "pending", locate(reference)));
+            }
+            catch (Exception error)
+            {
+                issues.Add(new("image", $"{path}.{field}", error.Message));
+                images.Add(new(field, path, resourcePath, "failed"));
+            }
+        }
+        return images;
+    }
+
+    public static IReadOnlyList<AssetImage> Export(CatalogAsset asset, ImageResources resources,
+        Func<ObjectLocation, UObject> load, ICollection<ExtractionIssue> issues)
     {
         var images = new List<AssetImage>();
-        foreach (var source in asset.Definitions.Concat(asset.Metadata))
+        foreach (var request in asset.Definitions.Concat(asset.Metadata).SelectMany(source => source.Images))
         {
-            foreach (var requestedField in Fields)
+            if (request.Status != "pending")
             {
-                var field = requestedField;
-                var path = source.GetPathName();
-                string? resourcePath = null;
-                try
-                {
-                    if (Properties.Find(source, field) is not { } property) continue;
-                    field = property.Name.Text;
-                    var reference = Properties.Reference(source, field);
-                    if (reference is null)
-                    {
-                        images.Add(new(field, path, null, "absent"));
-                        continue;
-                    }
-                    resourcePath = reference.GetPathName();
-                    var resource = resources.Export(reference);
-                    images.Add(new(field, path, resourcePath, resource.Status, resource.File, resource.Width, resource.Height));
-                }
-                catch (Exception error)
-                {
-                    issues.Add(new("image", $"{path}.{field}", error.Message));
-                    images.Add(new(field, path, resourcePath, "failed"));
-                }
+                images.Add(new(request.Field, request.Source, request.Resource, request.Status));
+                continue;
+            }
+            try
+            {
+                var location = request.Location ?? throw new InvalidDataException("Image request has no export location.");
+                var resource = resources.Export(location, load);
+                images.Add(new(request.Field, request.Source, resource.Path, resource.Status,
+                    resource.File, resource.Width, resource.Height));
+            }
+            catch (Exception error)
+            {
+                issues.Add(new("image", $"{request.Source}.{request.Field}", error.Message));
+                images.Add(new(request.Field, request.Source, request.Resource, "failed"));
             }
         }
         return images;
