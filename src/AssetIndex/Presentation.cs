@@ -34,6 +34,7 @@ internal sealed class PresentationCollector(TypeMappings mappings, ICollection<E
     private readonly Dictionary<string, Dictionary<string, Label>> metadata = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<Container> containers = [];
     private readonly HashSet<string> observed = new(StringComparer.Ordinal);
+    private readonly InventoryRootCollector roots = new(mappings, issues);
 
     public void Observe(UObject source)
     {
@@ -41,10 +42,13 @@ internal sealed class PresentationCollector(TypeMappings mappings, ICollection<E
         try
         {
             var schema = ClassSchema.Read(source, mappings);
+            roots.Observe(source, schema);
             if (schema.IsA("LoadoutFrameItemDataAsset")) ReadFrame(source, schema);
             if (schema.IsA("UIInventoryContainerMetaDataItem") && schema.HasProperty("ContainerType", "EnumProperty", "ByteProperty") &&
                 Properties.TryGet<FName>(source, "ContainerType", out var type))
             {
+                if (!schema.HasProperty("ContainerName", "TextProperty"))
+                    throw new InvalidDataException("Container presentation metadata has no ContainerName declaration.");
                 if (!metadata.TryGetValue(type.Text, out var entries)) metadata[type.Text] = entries = new(StringComparer.Ordinal);
                 var textIssues = new List<ExtractionIssue>();
                 var text = Text.CaptureContainer(source, textIssues);
@@ -74,6 +78,27 @@ internal sealed class PresentationCollector(TypeMappings mappings, ICollection<E
         }
         return names.Distinct().OrderBy(name => name.AssetId).ThenBy(name => name.FramePath, StringComparer.Ordinal)
             .ThenBy(name => name.ContainerIndex).ThenBy(name => name.Metadata.Path, StringComparer.Ordinal).ToArray();
+    }
+
+    public IReadOnlyList<InventoryRootName> CompleteRoots()
+    {
+        var names = new List<InventoryRootName>();
+        foreach (var match in roots.Complete())
+        {
+            if (!metadata.TryGetValue(match.ContainerType, out var labels))
+            {
+                issues.Add(new("presentation", match.RootPath + "." + match.RootField,
+                    $"No container presentation metadata for {match.ContainerType}."));
+                continue;
+            }
+            foreach (var label in labels.Values.OrderBy(label => label.Reference.Path, StringComparer.Ordinal))
+                names.Add(new(match, label.Reference)
+                {
+                    Text = label.Text.Select(candidate => candidate with { SourceKind = "inventory-root" }).ToArray(),
+                    TextIssues = label.Issues
+                });
+        }
+        return names;
     }
 
     private void ReadFrame(UObject frame, ClassSchema schema)

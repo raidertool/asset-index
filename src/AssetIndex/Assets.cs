@@ -10,6 +10,7 @@ internal sealed record CatalogAsset(long Id, IReadOnlyList<CatalogSource> Defini
 {
     public IReadOnlyList<PresentationName> PresentationNames { get; init; } = [];
     public IReadOnlyList<VisualSlotName> VisualSlotNames { get; init; } = [];
+    public IReadOnlyList<InventoryRootName> InventoryRootNames { get; init; } = [];
 }
 
 internal static class Assets

@@ -23,8 +23,10 @@ internal static class Text
         var candidates = asset.Metadata.SelectMany(source => source.Text.Select(candidate => candidate with { SourceKind = "metadata" }))
             .Concat(asset.Definitions.SelectMany(source => source.Text.Select(candidate => candidate with { SourceKind = "definition" })))
             .Concat(asset.PresentationNames.SelectMany(name => name.Text))
+            .Concat(asset.InventoryRootNames.SelectMany(name => name.Text))
             .Concat(asset.VisualSlotNames.SelectMany(name => name.Text)).ToArray();
         foreach (var issue in asset.PresentationNames.SelectMany(name => name.TextIssues).Distinct()) issues.Add(issue);
+        foreach (var issue in asset.InventoryRootNames.SelectMany(name => name.TextIssues).Distinct()) issues.Add(issue);
         foreach (var issue in asset.VisualSlotNames.SelectMany(name => name.TextIssues).Distinct()) issues.Add(issue);
 
         var distinct = candidates.Distinct().OrderBy(candidate => candidate.SourcePath, StringComparer.Ordinal)
@@ -40,7 +42,7 @@ internal static class Text
     {
         if (asset.Definitions.Any(source => source.Reference.Class == "NPCItemDataAsset"))
         {
-            // NPC presentation owns the visible NPC label; generic item metadata remains evidence.
+            // Prefer the NPC-specific UI name; retain generic item text as another candidate.
             var npcNames = candidates.Where(candidate => candidate.SourceKind == "metadata" &&
                 candidate.SourceClass == "UINPCMetaDataItem" && candidate.Field == "DisplayName" &&
                 candidate.Role == "display-name").ToArray();
@@ -51,7 +53,7 @@ internal static class Text
         if (candidates.Any(candidate => roles.Contains(candidate.Role)))
             return Select(candidates, roles, notices);
 
-        // Modifiers use their Description as a presentation label. Keep its original role/field.
+        // With no name field, use the modifier's typed description as its label; preserve its original role.
         if (asset.Definitions.Any(source => source.Reference.Class == "SessionModifierDataAsset") &&
             candidates.Any(candidate => candidate.Reference == description && IsModifierDescription(candidate)))
             return description;
@@ -151,7 +153,7 @@ internal static class Text
     {
         // UI presentation owns its labels. Definition text and contextual container labels
         // remain candidates with provenance even when the UI supplies the primary value.
-        foreach (var kind in new[] { "metadata", "definition", "container", "visual-slot" })
+        foreach (var kind in new[] { "metadata", "definition", "container", "visual-slot", "inventory-root" })
             foreach (var role in roles)
             {
                 var peers = candidates.Where(candidate => candidate.SourceKind == kind && candidate.Role == role).ToArray();

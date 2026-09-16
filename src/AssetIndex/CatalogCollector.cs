@@ -28,6 +28,7 @@ internal sealed class CatalogCollector(TypeMappings mappings, Func<UObject, Obje
     {
         var names = presentation.Complete().ToLookup(name => name.AssetId);
         var slotNames = visualSlots.Complete().ToLookup(name => name.AssetId);
+        var rootNames = presentation.CompleteRoots().ToLookup(name => name.AssetId);
         var result = new List<CatalogAsset>();
         foreach (var id in definitions.Keys.Union(metadata.Keys).Order())
         {
@@ -36,7 +37,10 @@ internal sealed class CatalogCollector(TypeMappings mappings, Func<UObject, Obje
             if (defined.Length == 0)
                 issues.Add(new("asset", id.ToString(), "UI metadata has no matching asset definition; retaining its explicit ID."));
             result.Add(new(id, defined, associated)
-            { PresentationNames = names[id].ToArray(), VisualSlotNames = slotNames[id].ToArray() });
+            {
+                PresentationNames = names[id].ToArray(), VisualSlotNames = slotNames[id].ToArray(),
+                InventoryRootNames = rootNames[id].ToArray()
+            });
         }
         return result;
     }
