@@ -133,11 +133,12 @@ internal sealed partial class EvidenceReader
             var target = reference.ResolvedObject;
             references.Add(new(pointer, "hard", role, target is null ? null : ObjectMetadata.Path(target), false,
                 reference.Owner?.Name, reference.Index, target?.ExportIndex,
-                target is null ? "Package index has no resolved target." : null));
+                target is null ? ImportDiagnostics.Describe(reference, "Package index has no resolved target.") : null));
         }
         catch (Exception error)
         {
-            references.Add(new(pointer, "hard", role, null, false, reference.Owner?.Name, reference.Index, null, AssetDiscovery.DescribeError(error)));
+            references.Add(new(pointer, "hard", role, null, false, reference.Owner?.Name, reference.Index, null,
+                ImportDiagnostics.Describe(reference, AssetDiscovery.DescribeError(error))));
         }
     }
 
