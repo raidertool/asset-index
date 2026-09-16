@@ -63,6 +63,12 @@ output and logs private. The [Extract preview](.github/workflows/extract.yml)
 workflow skips public repositories. Public CI runs offline tests without Steam
 credentials. A safe public snapshot handoff is not implemented yet.
 
+Publication is off by default and has no schedule. After the
+[activation review](docs/publication.md#activation), `publish=true` on this
+repository's `main` validates and publishes that run's successful preview.
+`initialize=true` also requires `publish=true` and creates the first `data`
+branch/tag; leave it off for later updates. Feature branches remain preview-only.
+
 ## Versioning
 
 The current published CSVs use `schema.json` v4 and legacy
@@ -91,7 +97,7 @@ See [snapshot publication](docs/publication.md) for the command and validation c
 
 ```text
 src/AssetIndex/                Extractor
-src/PublishSnapshot/           Snapshot validator and publisher (inactive)
+src/PublishSnapshot/           Snapshot validator and publisher
 tests/AssetIndex.Tests/        Offline extractor tests
 tests/PublishSnapshot.Tests/   Offline publisher and Git atomicity tests
 mappings/                     Game property mapping

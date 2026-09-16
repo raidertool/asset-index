@@ -30,7 +30,13 @@ internal sealed record Metadata(int FormatVersion, string ExtractorCommit, Steam
 
 internal static class Publisher
 {
-    public static Publication Publish(string previewDirectory, string remote, string extractorCommit, string manifestId)
+    public static Publication Publish(string previewDirectory, string remote, string extractorCommit, string manifestId) =>
+        Run(previewDirectory, remote, extractorCommit, manifestId, initialize: false);
+
+    public static Publication Initialize(string previewDirectory, string remote, string extractorCommit, string manifestId) =>
+        Run(previewDirectory, remote, extractorCommit, manifestId, initialize: true);
+
+    private static Publication Run(string previewDirectory, string remote, string extractorCommit, string manifestId, bool initialize)
     {
         // Capture and validate private files before any Git operation.
         var metadata = Metadata.Create(extractorCommit, manifestId);
@@ -43,19 +49,28 @@ internal static class Publisher
             var git = new Git(directory);
             git.Run("init", "--quiet");
             git.Run("remote", "add", "origin", remote);
-            git.Run("fetch", "--quiet", "--no-tags", "--depth", "1", "origin", "refs/heads/data");
-            var parent = git.Run("rev-parse", "FETCH_HEAD").Trim();
-            var paths = ValidateTree(git, parent);
-            git.Run("checkout", "--quiet", "--detach", parent);
-            if (SameContent(directory, paths, snapshot.Files))
+            if (initialize)
             {
-                var previous = Metadata.Read(Path.Combine(directory, "metadata.json"));
-                var tag = Tag(previous.Steam.ManifestId, parent);
-                var reference = git.Run("ls-remote", "--refs", "origin", "refs/tags/" + tag).Split('\t', '\n');
-                Preview.Require(reference.Length >= 2 && reference[0] == parent && reference[1] == "refs/tags/" + tag, "Unchanged snapshot lacks its exact lightweight tag.");
-                return new(false, parent, tag);
+                Preview.Require(git.Run("ls-remote", "--refs", "origin", "refs/heads/data").Length == 0,
+                    "Data branch already exists; use normal publication.");
+                git.Run("symbolic-ref", "HEAD", "refs/heads/data");
             }
-            git.Run("rm", "--quiet", "-r", "--ignore-unmatch", "--", ".");
+            else
+            {
+                git.Run("fetch", "--quiet", "--no-tags", "--depth", "1", "origin", "refs/heads/data");
+                var parent = git.Run("rev-parse", "FETCH_HEAD").Trim();
+                var paths = ValidateTree(git, parent);
+                git.Run("checkout", "--quiet", "--detach", parent);
+                if (SameContent(directory, paths, snapshot.Files))
+                {
+                    var previous = Metadata.Read(Path.Combine(directory, "metadata.json"));
+                    var tag = Tag(previous.Steam.ManifestId, parent);
+                    var reference = git.Run("ls-remote", "--refs", "origin", "refs/tags/" + tag).Split('\t', '\n');
+                    Preview.Require(reference.Length >= 2 && reference[0] == parent && reference[1] == "refs/tags/" + tag, "Unchanged snapshot lacks its exact lightweight tag.");
+                    return new(false, parent, tag);
+                }
+                git.Run("rm", "--quiet", "-r", "--ignore-unmatch", "--", ".");
+            }
             foreach (var (path, file) in snapshot.Files)
             {
                 var target = Path.Combine(directory, path);
@@ -64,11 +79,17 @@ internal static class Publisher
             }
             File.WriteAllBytes(Path.Combine(directory, "metadata.json"), JsonSerializer.SerializeToUtf8Bytes(metadata, Preview.Json));
             git.Run("add", "--all", "--", ".");
-            git.Run("-c", "user.name=Asset Index", "-c", "user.email=asset-index@users.noreply.github.com", "commit", "--quiet", "-m", "chore: update asset snapshot");
+            git.Run("-c", "user.name=Asset Index", "-c", "user.email=asset-index@users.noreply.github.com", "commit", "--quiet", "-m",
+                initialize ? "chore: initialize asset snapshot" : "chore: update asset snapshot");
             var commit = git.Run("rev-parse", "HEAD").Trim();
             var newTag = Tag(manifestId, commit);
-            // Atomic, ordinary ref updates: a competing data commit or tag rejects the whole push.
-            git.Run("push", "--atomic", "origin", $"{commit}:refs/heads/data", $"{commit}:refs/tags/{newTag}");
+            if (initialize)
+                // Empty expected values reject conflicting ref creation. Git may
+                // safely complete the tag if a racer created this exact commit.
+                git.Run("push", "--atomic", "--force-with-lease=refs/heads/data:", $"--force-with-lease=refs/tags/{newTag}:",
+                    "origin", $"{commit}:refs/heads/data", $"{commit}:refs/tags/{newTag}");
+            else
+                git.Run("push", "--atomic", "origin", $"{commit}:refs/heads/data", $"{commit}:refs/tags/{newTag}");
             return new(true, commit, newTag);
         }
         finally

@@ -1,8 +1,8 @@
 # Snapshot publication
 
-Activation is pending. The publisher requires an existing `data` branch with
+Activation is pending. Normal publication requires an existing `data` branch with
 the published snapshot below, `metadata.json`, and its matching
-lightweight tag. It does not create the initial branch or tag.
+lightweight tag. Initialization is a separate explicit mode.
 
 - `assets.json`: catalog rows and presentation provenance.
 - `resources.json` and `images/`: every image referenced by the catalog.
@@ -66,6 +66,22 @@ the existing commit, metadata and tag. Coverage, source-only edits and excluded
 evidence cannot create a snapshot on their own. All localization changes remain
 versioned. New run provenance stays in its logs/artifacts; identical retries
 create no revision.
+
+## Initialization
+
+For the approved first snapshot, `--init` writes an orphan `data` commit and its
+lightweight tag to the remote. It performs the same complete preview validation:
+
+```sh
+dotnet run --project src/PublishSnapshot -c Release -- \
+  --init <preview-directory> <remote> <extractor-commit> <manifest-id>
+```
+
+Initialization rejects a `data` branch found by its initial check. Atomic push
+and empty expected-ref leases reject conflicting creations after that check;
+they never overwrite a different commit or tag. If a racing initializer creates
+the identical commit, Git may safely complete its matching tag. Repeated `--init`
+is rejected once `data` exists; verify an identical retry with normal publication.
 
 ## Activation
 
