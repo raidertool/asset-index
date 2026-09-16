@@ -39,7 +39,8 @@ mapping metadata or schema-diff report is needed.
 Keep CUE4Parse pinned to an upstream commit. For any dependency update, run the
 offline tests and report relevant live coverage changes when available.
 
-Submit source, tests, docs, or mappings. Preview output is not a publication.
+Submit source, tests, docs, or mappings. Generated files belong on `data`, not the
+source branch; preview output is not a publication.
 See the README for [manual runs](README.md#manual-preview) and the proposed
 [versioning](README.md#versioning). Retire and drain the old publisher before
 merging the source layout; it still rewrites the root metadata, schema, and README.

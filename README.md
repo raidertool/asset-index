@@ -5,8 +5,9 @@ Extract game asset IDs, localized text, and images with
 
 **Preview:** coverage and the JSON format are still under review. Preview runs
 write local files without publishing or importing them.
-The root CSVs, [images](images/), [metadata](metadata.json), and
-[schema](schema.json) describe the existing published dataset.
+Legacy CSVs, images, metadata and schema remain available in the
+[preserved legacy snapshot](https://github.com/raidertool/asset-index/tree/6a68cb6608e9d2eaf802ad239172038c6596b21f).
+This source branch contains code, mappings and tests; generated snapshots belong on `data`.
 
 ## Run locally
 
