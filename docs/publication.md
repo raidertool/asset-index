@@ -23,12 +23,14 @@ and pass provenance, evidence-count, gzip integrity, resource-reference, and ful
 PNG decoding checks. Every catalog source and image resource must have object evidence;
 every PNG must belong to the resource inventory. Image filenames hash their
 declared resource paths, not their PNG bytes.
+Text selection must match candidate source/role precedence; conflicting peers or
+an explicit empty value require a null primary, with all candidates retained.
 
 Every mounted package needs a complete export-header inventory, including exact
 superclass references. Each selected
 index needs a decoded object with the same full path and class. Candidate classes
 and registry UI textures cannot remain header-only; UI textures also need PNGs.
-Unknown or conflicting metadata blocks publication.
+Unknown or conflicting export metadata blocks publication.
 
 Every non-native reference needs an inspected package. Named targets must match
 the complete object/outer path, case-insensitively; relevant classes and referenced

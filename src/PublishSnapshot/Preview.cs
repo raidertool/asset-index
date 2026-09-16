@@ -54,7 +54,7 @@ internal sealed record Preview(SnapshotFiles Snapshot) : IDisposable
             ValidateSources(asset.GetProperty("definitions"), sources, evidence.ObjectPaths);
             ValidateSources(asset.GetProperty("metadata"), sources, evidence.ObjectPaths);
             Require(sources.Count > 0, $"Asset {id} has no sources.");
-            PresentationChecks.Validate(asset.GetProperty("presentation"), sources, evidence.ObjectPaths);
+            PresentationChecks.Validate(asset, sources, evidence.ObjectPaths);
             var english = ValidateTranslations(asset.GetProperty("text"), evidence.Locales, asset.GetProperty("presentation"));
             if (english.Name) names++;
             if (english.Description) descriptions++;

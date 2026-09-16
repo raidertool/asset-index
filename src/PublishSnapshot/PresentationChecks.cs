@@ -8,29 +8,52 @@ internal static class PresentationChecks
 {
     private sealed record Reference(string Namespace, string Key, string Source, bool CultureInvariant);
 
-    public static void Validate(JsonElement presentation, HashSet<string> sources, HashSet<string> discovered)
+    public static void Validate(JsonElement asset, HashSet<string> sources, HashSet<string> discovered)
     {
+        var presentation = asset.GetProperty("presentation");
         Fields(presentation, "name", "description", "candidates", "containers");
         var containerSources = ReadContainers(presentation.GetProperty("containers"), sources, discovered);
-        var candidates = new List<(string Role, Reference Value)>();
+        var owners = new Dictionary<string, HashSet<string>>
+        {
+            ["definition"] = asset.GetProperty("definitions").EnumerateArray().Select(source => ObjectPath(source, "path")).ToHashSet(StringComparer.Ordinal),
+            ["metadata"] = asset.GetProperty("metadata").EnumerateArray().Select(source => ObjectPath(source, "path")).ToHashSet(StringComparer.Ordinal),
+            ["container"] = containerSources
+        };
+        var candidates = new List<(string Kind, string Role, Reference Value)>();
         foreach (var candidate in presentation.GetProperty("candidates").EnumerateArray())
         {
             Fields(candidate, "role", "sourceKind", "sourcePath", "sourceClass", "field", "definedAt", "reference");
             var kind = String(candidate, "sourceKind");
-            Require(kind is "definition" or "metadata" or "container", "Unknown text source kind.");
+            Require(owners.ContainsKey(kind), "Unknown text source kind.");
             var path = ObjectPath(candidate, "sourcePath");
-            Require((kind == "container" ? containerSources : sources).Contains(path), "Text candidate is not linked to this asset.");
+            Require(owners[kind].Contains(path), "Text candidate is not linked to this asset with its declared source kind.");
             Require(discovered.Contains(ObjectPath(candidate, "definedAt")), "Text candidate defining object is missing.");
             String(candidate, "sourceClass"); String(candidate, "field");
-            candidates.Add((String(candidate, "role"), ReadReference(candidate.GetProperty("reference"))));
+            candidates.Add((kind, String(candidate, "role"), ReadReference(candidate.GetProperty("reference"))));
         }
         foreach (var field in new[] { "name", "description" })
         {
-            if (presentation.GetProperty(field).ValueKind == JsonValueKind.Null) continue;
-            var selected = ReadReference(presentation.GetProperty(field));
+            var value = presentation.GetProperty(field);
+            var selected = value.ValueKind == JsonValueKind.Null ? null : ReadReference(value);
             var roles = field == "name" ? new[] { "display-name", "title", "short-name" } : ["description", "tooltip"];
-            Require(candidates.Any(candidate => roles.Contains(candidate.Role) && candidate.Value == selected), "Selected text lacks a matching candidate.");
+            Require(selected == Select(candidates, roles), $"Selected {field} does not match candidate precedence.");
         }
+    }
+
+    private static Reference? Select(IReadOnlyList<(string Kind, string Role, Reference Value)> candidates, string[] roles)
+    {
+        foreach (var kind in new[] { "metadata", "definition", "container" })
+            foreach (var role in roles)
+            {
+                var references = candidates.Where(candidate => candidate.Kind == kind && candidate.Role == role)
+                    .Select(candidate => candidate.Value).Distinct().ToArray();
+                if (references.Length == 0) continue;
+                // The first populated tier owns the result, including empty or
+                // conflicting values. Lower tiers cannot replace that observation.
+                return references.Length == 1 && (references[0].Key.Length > 0 || references[0].Source.Length > 0)
+                    ? references[0] : null;
+            }
+        return null;
     }
 
     private static HashSet<string> ReadContainers(JsonElement containers, HashSet<string> sources, HashSet<string> discovered)
