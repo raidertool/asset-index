@@ -115,7 +115,10 @@ internal sealed partial class EvidenceReader
             case double number: values.Add(new(pointer, type, "float", number.ToString("R", CultureInfo.InvariantCulture))); return;
             case decimal number: values.Add(new(pointer, type, "decimal", number.ToString(CultureInfo.InvariantCulture))); return;
             case Enum enumeration: values.Add(new(pointer, type, "enum", enumeration.ToString())); return;
-            case byte[] bytes: ReadBytes(bytes, pointer, type); return;
+            case byte[] bytes when value.GetType() == typeof(byte[]): ReadBytes(bytes, pointer, type); return;
+            case Array array when NumericArrayEvidence.Read(array, pointer) is { } numeric:
+                values.Add(numeric);
+                return;
             case IDictionary map: ReadMap(map, pointer, type, depth); return;
             case IList sequence: ReadSequence(sequence, pointer, type, "array", depth); return;
             case FField field:
@@ -135,6 +138,11 @@ internal sealed partial class EvidenceReader
 
     private void ReadArray(UScriptArray array, string pointer, string type, int depth)
     {
+        if (NumericArrayEvidence.Read(array, pointer) is { } numeric)
+        {
+            values.Add(numeric);
+            return;
+        }
         // ByteProperty arrays can decode as enum names. Compact only proven plain
         // bytes; other element types still expose their values and references.
         var enumName = array.InnerTagData?.EnumName;

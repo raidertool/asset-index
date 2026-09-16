@@ -25,6 +25,12 @@ It preserves property pointers, reference kinds,
 nulls, empty overrides and exact numeric strings. It never interprets an ordinary
 string as an object reference or uses CUE4Parse's JSON export as a parsing layer.
 
+Homogeneous fixed-width numeric arrays use one `numeric-le-base64` value: canonical
+property type plus `[]`, little-endian scalar bytes, and count inferred from byte
+length. Signed integers and IEEE float bits (including NaNs and negative zero) are
+lossless. Plain bytes retain `binary-base64`; enums, booleans and mixed arrays keep
+element evidence. This limits evidence expansion; CUE still retains decoded objects.
+
 Material references come from serialized properties and cached bindings. Unrelated
 package imports do not become material edges; registry and mounted-file inventories
 retain the broader content scope.

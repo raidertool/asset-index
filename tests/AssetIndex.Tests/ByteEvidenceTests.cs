@@ -1,9 +1,7 @@
-using AssetIndex.Discovery;
-using CUE4Parse.UE4.Assets;
-using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Assets.Objects;
 using CUE4Parse.UE4.Assets.Objects.Properties;
 using CUE4Parse.UE4.Objects.UObject;
+using static AssetIndex.Tests.ArrayEvidenceFixture;
 
 namespace AssetIndex.Tests;
 
@@ -88,29 +86,13 @@ public sealed class ByteEvidenceTests
     }
 
     [Fact]
-    public void NumericIdentityArraysAndReferenceArraysRemainElementEvidence()
+    public void ReferenceArraysRemainElementEvidence()
     {
-        var ids = Read(new ArrayProperty(new UScriptArray([new Int64Property(long.MinValue), new Int64Property(long.MaxValue)], "Int64Property")));
         var references = Read(new ArrayProperty(new UScriptArray([new ObjectProperty(new FPackageIndex())], "ObjectProperty")));
 
-        Assert.Collection(ids.Values,
-            value => Assert.Equal("-9223372036854775808", value.Value),
-            value => Assert.Equal("9223372036854775807", value.Value));
-        Assert.All(ids.Values, value => Assert.Equal("integer", value.Kind));
         Assert.Equal("/Properties/0/0", Assert.Single(references.References, reference => reference.Role == "property").Pointer);
         Assert.Empty(references.Values);
-        Assert.Empty(ids.Issues);
         Assert.Empty(references.Issues);
     }
 
-    private static ObjectEvidence Read(FPropertyTagType value) => EvidenceReader.Read(new UObject([
-        new FPropertyTag { Name = "Data", PropertyType = value.GetType().Name, Tag = value }
-    ])
-    { Name = "Fixture", Outer = new ResolvedPackageObject(new FixturePackage { Name = "/Game/Fixture" }) });
-
-    private sealed class NativeValue(object value) : FPropertyTagType
-    {
-        public override object GenericValue => value;
-        public override string ToString() => "Native byte fixture";
-    }
 }
