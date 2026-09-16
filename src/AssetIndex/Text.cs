@@ -23,10 +23,8 @@ internal static class Text
         var candidates = asset.Metadata.SelectMany(source => source.Text.Select(candidate => candidate with { SourceKind = "metadata" }))
             .Concat(asset.Definitions.SelectMany(source => source.Text.Select(candidate => candidate with { SourceKind = "definition" })))
             .Concat(asset.PresentationNames.SelectMany(name => name.Text))
-            .Concat(asset.InventoryRootNames.SelectMany(name => name.Text))
             .Concat(asset.VisualSlotNames.SelectMany(name => name.Text)).ToArray();
         foreach (var issue in asset.PresentationNames.SelectMany(name => name.TextIssues).Distinct()) issues.Add(issue);
-        foreach (var issue in asset.InventoryRootNames.SelectMany(name => name.TextIssues).Distinct()) issues.Add(issue);
         foreach (var issue in asset.VisualSlotNames.SelectMany(name => name.TextIssues).Distinct()) issues.Add(issue);
 
         var distinct = candidates.Distinct().OrderBy(candidate => candidate.SourcePath, StringComparer.Ordinal)

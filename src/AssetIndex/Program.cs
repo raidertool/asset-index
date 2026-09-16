@@ -134,10 +134,7 @@ internal static class Program
                 {
                     VisualSlots = asset.VisualSlotNames.Select(name => new VisualSlotPresentation(name.SlotPath,
                         name.TypeTag, name.Metadata.Path, name.Members.Select(member =>
-                            new VisualSlotMemberPresentation(member.ItemPath, member.MetadataPath)).ToArray())).ToArray(),
-                    InventoryRoots = asset.InventoryRootNames.Select(name => new InventoryRootPresentation(name.Match.Role,
-                        name.Match.ContainerType, name.Match.Root.Path, name.Match.Root.Field, name.Match.SlotPath,
-                        name.Match.ContainerPath, name.Metadata.Path)).ToArray()
+                            new VisualSlotMemberPresentation(member.ItemPath, member.MetadataPath)).ToArray())).ToArray()
                 }
             });
             if (records.Count % 250 == 0)

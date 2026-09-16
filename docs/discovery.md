@@ -102,8 +102,6 @@ field declarations. Missing or conflicting schemas produce diagnostics.
   use their typed description when no name field exists.
 - `Presentation.cs` joins loadout container types and slot references to the
   corresponding UI container label; its full join path remains in each row.
-- `InventoryRootPresentation.cs` follows typed root slots, default containers, and
-  allowed-container queries to their Stash or Augment UI category labels.
 - `VisualSlotLabels.cs` joins a slot's tag query through matching skin identities
   and UI type tags to its navigation label. Ambiguous joins stay unresolved.
 - `Images.cs` associates declared image fields, including class-specific clan and

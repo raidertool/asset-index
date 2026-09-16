@@ -15,27 +15,12 @@ internal sealed record ImageRequest(string Field, string Source, string? Resourc
 
 internal static class Images
 {
-    private static readonly string[] Fields =
-    [
-        "Icon", "BigIcon", "TinyIcon", "Image", "CurrencyIcon", "CurrencyBigIcon", "EnemyIcon", "EnemyImage",
-        "OfferImage", "OfferImage_1x1", "OfferImage_2x1", "OfferImage_9x16", "OfferImage_16x9", "OfferImage_Thumbnail",
-        "BigImage", "CollapsedImage", "BattlepassListImage", "BattlepassCoverImage", "LocationPreviewImage",
-        "Portrait", "ImageAsset", "UnlockImage", "PreviewImage", "IconMaterial", "EmptySlotImage",
-        "ModifierIcon", "ObscuredPreviewImage", "OptionalLocationIcon", "UnlockVideoPreviewImage"
-    ];
-    private static readonly Dictionary<string, string> TypedFields = new(StringComparer.Ordinal)
-    {
-        ["Texture"] = "UIClanLogoMetaDataItem",
-        ["TypeImage"] = "UIClanCustomizationMetaDataItem",
-        ["CoverImage"] = "UIEnvironmentalDamageSourceMetaDataItem"
-    };
-
     public static IReadOnlyList<ImageRequest> Capture(UObject source, TypeMappings mappings, Func<UObject, ObjectLocation> locate,
         ICollection<ExtractionIssue> issues)
     {
         var images = new List<ImageRequest>();
         var path = ObjectMetadata.Path(source);
-        foreach (var requestedField in Fields.Concat(TypedFields.Keys))
+        foreach (var requestedField in ImageFields.Simple.Concat(ImageFields.Typed.Keys))
         {
             var field = requestedField;
             try
@@ -77,7 +62,7 @@ internal static class Images
 
     private static bool SupportsField(UObject source, TypeMappings mappings, string field, FPropertyTag property)
     {
-        if (!TypedFields.TryGetValue(field, out var owner)) return true;
+        if (!ImageFields.Typed.TryGetValue(field, out var owner)) return true;
         var schema = ClassSchema.Read(source, mappings);
         if (!schema.IsA(owner)) return false;
         if (!schema.HasProperty(field, "SoftObjectProperty") || property.Tag is not SoftObjectProperty)

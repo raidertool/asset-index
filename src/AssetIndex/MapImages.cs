@@ -9,18 +9,11 @@ namespace AssetIndex;
 // including MapMaterial, remain discovery evidence rather than rendered map state.
 internal static class MapImages
 {
-    private sealed record MapField(string Owner, string Root, string Structure, string Leaf, bool IsArray);
-    private static readonly MapField[] Fields =
-    [
-        new("UIMapAreaInfoMetaDataItem", "MapAreas", "MapAreaInfo", "HeaderImage", true),
-        new("UIMapWidgetMetaDataItem", "MapWidgetSettings", "MapWidgetLevelSettings", "MapTexture", false)
-    ];
-
     public static void Capture(UObject source, TypeMappings mappings, Func<UObject, ObjectLocation> locate,
         ICollection<ImageRequest> images, ICollection<ExtractionIssue> issues)
     {
         var path = ObjectMetadata.Path(source);
-        foreach (var contract in Fields)
+        foreach (var contract in ImageFields.Nested)
         {
             var field = contract.Root;
             try
@@ -37,7 +30,7 @@ internal static class MapImages
         }
     }
 
-    private static IEnumerable<(string Field, FPropertyTagType? Value)> Entries(FPropertyTag property, MapField contract)
+    private static IEnumerable<(string Field, FPropertyTagType? Value)> Entries(FPropertyTag property, NestedImageField contract)
     {
         var field = property.Name.Text;
         if (!contract.IsArray)
@@ -70,7 +63,7 @@ internal static class MapImages
         catch (Exception error) { images.Add(Images.Failed(field, path, null, error, issues)); }
     }
 
-    private static void RequireDeclaration(ClassSchema schema, TypeMappings mappings, MapField contract)
+    private static void RequireDeclaration(ClassSchema schema, TypeMappings mappings, NestedImageField contract)
     {
         var kind = contract.IsArray ? "ArrayProperty" : "StructProperty";
         if (!schema.HasProperty(contract.Root, kind))
