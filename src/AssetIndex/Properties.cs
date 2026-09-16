@@ -10,6 +10,9 @@ internal static class Properties
 {
     public static FPropertyTag? Find(UObject source, string name) => Find(source, name, out _);
 
+    public static FPropertyTag? Find(FStructFallback source, string name, string path) =>
+        FindDirect(source.Properties, name, path);
+
     public static FPropertyTag? Find(UObject source, string name, out UObject? definedAt)
     {
         definedAt = null;
@@ -74,22 +77,26 @@ internal static class Properties
     public static UObject? Reference(UObject source, string name)
     {
         var property = Find(source, name);
-        if (property is null)
-            return null;
+        return property is null ? null : Reference(property, ObjectMetadata.Path(source) + "." + name);
+    }
 
+    public static UObject? Reference(FPropertyTag property, string path)
+    {
         return property.Tag?.GenericValue switch
         {
             FPackageIndex { IsNull: true } => null,
             FPackageIndex hard => hard.Load()
-                ?? throw new InvalidDataException($"Cannot load {ObjectMetadata.Path(source)}.{name}."),
-            FSoftObjectPath soft when soft.AssetPathName.IsNone => null,
+                ?? throw new InvalidDataException($"Cannot load {path}."),
             FSoftObjectPath soft => LoadSoftReference(soft),
-            _ => throw new InvalidDataException($"Unsupported reference at {ObjectMetadata.Path(source)}.{name}.")
+            _ => throw new InvalidDataException($"Unsupported reference at {path}.")
         };
     }
 
-    private static UObject LoadSoftReference(FSoftObjectPath reference)
+    private static UObject? LoadSoftReference(FSoftObjectPath reference)
     {
+        var path = SoftReferencePath.Read(reference);
+        if (path.Error is not null) throw new InvalidDataException(path.Error);
+        if (path.Target is null) return null;
         var target = reference.Load();
         if (string.IsNullOrEmpty(reference.SubPathString))
             return target;

@@ -20,6 +20,7 @@ decoded objects and image pixels use separate memory. Package bodies are weakly
 cached: the crawler writes evidence and retains detached catalog facts, so unused
 object graphs can be collected. Deferred image rendering reloads the exact physical
 file and export index. An active package can still retain its imported dependencies.
+Bulk texture payloads use the pinned upstream provider's resolution rules.
 
 `EvidenceReader` visits CUE4Parse property tags, arrays, sets, map keys/values,
 structs and text histories directly. Small native adapters cover data/curve/string
@@ -95,9 +96,14 @@ field declarations. Missing or conflicting schemas produce diagnostics.
 - `TextRoles.cs` assigns meaning to fields on specific UI/definition classes.
   `Text.cs` prefers UI presentation, retains alternatives, and leaves conflicting
   peers unresolved. `presentation` records chosen keys and defining objects.
+  Unlock instructions remain `unlock-description` candidates, separate from an
+  item's description.
 - `Presentation.cs` joins loadout container types and slot references to the
   corresponding UI container label; its full join path remains in each row.
-- `Images.cs` associates declared image fields. `MaterialIcons.cs` renders the
+- `Images.cs` associates declared image fields, including class-specific clan and
+  environmental images. `MapImages.cs` retains `MapAreas[n].HeaderImage` and
+  `MapWidgetSettings.MapTexture`; local containers replace the whole template field.
+  `MaterialIcons.cs` renders the
   verified color-scheme and Close Scrutiny graphs under
   [defined conditions](materials.md). Other material inputs remain evidence;
   an ingredient alone is not a rendered icon.

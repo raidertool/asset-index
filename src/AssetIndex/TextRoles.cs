@@ -20,13 +20,22 @@ internal static class TextRoles
         ["UICharacterVisualSkinPartMetaDataItem"] = [new("DisplayName", "display-name")],
         ["UICharacterVisualSkinSlotMetaDataItem"] = [new("DisplayName", "display-name")],
         ["UIEnvironmentalDamageSourceMetaDataItem"] = [new("DisplayName", "display-name")],
-        ["UIStashSlotMetaDataItem"] = [new("DisplayName", "display-name"), new("Description", "description")],
-        ["UINPCMetaDataItem"] = [new("DisplayName", "display-name"), new("Description", "description"), new("LocationName", "location-name")],
+        ["UIStashSlotMetaDataItem"] = [new("DisplayName", "display-name"), new("Description", "description"), new("EffectFormatText", "effect-format")],
+        ["UINPCMetaDataItem"] =
+        [
+            new("DisplayName", "display-name"), new("Description", "description"), new("LocationName", "location-name"),
+            new("ObscuredDisplayName", "obscured-name"), new("ObscuredDescription", "obscured-description"),
+            new("ObscuredLocationName", "obscured-location-name")
+        ],
         ["UICurrencyMetaDataItem"] = [new("LongName", "display-name"), new("ShortName", "short-name")],
         ["UIEmoteMetaDataItem"] = [new("Text", "display-name")],
         ["UISelfieAngleMetaDataItem"] = [new("Text", "display-name")],
         ["UIEnemyMetaDataItem"] = [new("EnemyName", "display-name")],
-        ["UIGameModeLocationMetaDataItem"] = [new("LocationName", "display-name"), new("LocationDescription", "description")],
+        ["UIGameModeLocationMetaDataItem"] =
+        [
+            new("LocationName", "display-name"), new("LocationDescription", "description"),
+            new("LocationNameShort", "short-name"), new("LocationAreaName", "area-name")
+        ],
         ["UIInteractQuestMetaDataItem"] = [new("InteractName", "display-name"), new("InteractDescription", "description")],
         ["UIPlayerStatsRaiderTargetMetaDataItem"] = [new("PlayerStatsRaiderTargetAllegiance", "display-name")],
         ["UIProgressionBucketMetaDataItem"] = [new("BucketName", "display-name")],
@@ -35,7 +44,8 @@ internal static class TextRoles
         ["UIBattlepassMetaDataItem"] = [new("BattlepassName", "display-name")],
         ["UIPurchasableOfferMetaDataItem"] = [new("OfferTitle", "title"), new("OfferDescription", "description")],
         ["UIMapConditionMetaDataItem"] = [new("Title", "title"), new("Description", "description")],
-        ["UIUnlockMetaDataItem"] = [new("UnlockTitle", "title"), new("UnlockDescription", "description")],
+        ["UIUnlockMetaDataItem"] =
+        [new("UnlockTitle", "title"), new("UnlockDescription", "unlock-description"), new("NavigationText", "navigation-text")],
         ["UIScoreMetaDataItem"] = [new("ScoreDescription", "description")],
         ["UISessionModifierMetaDataItem"] = [new("Description", "description")],
         ["SessionModifierDataAsset"] = [new("Description", "description")],

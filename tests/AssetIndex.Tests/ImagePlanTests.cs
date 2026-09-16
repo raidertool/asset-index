@@ -1,5 +1,7 @@
 using System.Runtime.CompilerServices;
 using CUE4Parse.FileProvider.Objects;
+using CUE4Parse.MappingsProvider;
+using CUE4Parse.MappingsProvider.Usmap;
 using CUE4Parse.UE4.Assets;
 using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Assets.Objects;
@@ -10,8 +12,10 @@ using SkiaSharp;
 
 namespace AssetIndex.Tests;
 
-public sealed class ImagePlanTests : IDisposable
+public sealed partial class ImagePlanTests : IDisposable
 {
+    private static readonly Lazy<TypeMappings> Mappings = new(() =>
+        new FileUsmapTypeMappingsProvider(Path.Combine(AppContext.BaseDirectory, "mappings", "ArcRaiders.usmap")).MappingsForGame!);
     private readonly string output = Path.Combine(Path.GetTempPath(), "asset-index-image-plan-" + Guid.NewGuid().ToString("N"));
     private readonly List<ExtractionIssue> issues = [];
 
@@ -52,7 +56,7 @@ public sealed class ImagePlanTests : IDisposable
         var source = new UObject([new FPropertyTag { Name = "icon", Tag = new ObjectProperty(new FPackageIndex()) }])
         { Name = "Source", Template = new ResolvedLoadedObject(template) };
 
-        var requests = Images.Capture(source, provider.Locate, issues);
+        var requests = Images.Capture(source, Mappings.Value, provider.Locate, issues);
 
         Assert.Collection(requests,
             absent =>
@@ -79,11 +83,97 @@ public sealed class ImagePlanTests : IDisposable
         using var provider = new ImageProvider();
         var package = provider.LoadPackage(new ImageFixtureFile("/Game/Icons.uasset"));
         var source = new UObject([Reference("Icon", package)]) { Name = "Source" };
-        var request = Assert.Single(Images.Capture(source, _ => throw new InvalidDataException("No export index."), issues));
+        var request = Assert.Single(Images.Capture(source, Mappings.Value, _ => throw new InvalidDataException("No export index."), issues));
         Assert.Equal("failed", request.Status);
         Assert.Equal("/Game/Icons.Icon", request.Resource);
         Assert.Null(request.Location);
         Assert.Equal("Source.Icon", Assert.Single(issues).Path);
+    }
+
+    [Theory]
+    [InlineData("UIClanLogoMetaDataItem", "texture", false)]
+    [InlineData("UIClanLogoMetaDataItem", "Texture", true)]
+    [InlineData("UIClanLogoMetaDataItem", "TypeImage", false)]
+    [InlineData("UIClanBackgroundMetaDataItem", "TypeImage", false)]
+    [InlineData("UIClanBorderMetaDataItem", "TypeImage", false)]
+    [InlineData("UIEnvironmentalDamageSourceMetaDataItem", "CoverImage", false)]
+    [InlineData("UIEnvironmentalDamageSourceMetaDataItem", "coverIMAGE", true)]
+    public void ClassSpecificImagesUseNativeDeclarationsIncludingRuntimeSubclassesAndTemplates(
+        string type, string field, bool inherited)
+    {
+        using var provider = new ImageProvider();
+        var file = new ImageFixtureFile("Icons.uasset");
+        provider.Files.AddFiles(new Dictionary<string, GameFile> { [file.Path] = file });
+        var package = provider.LoadPackage(file);
+        var source = TypedSource(type);
+        var owner = inherited ? TypedSource(type) : source;
+        owner.Properties.Add(new() { Name = field, Tag = new SoftObjectProperty(new FSoftObjectPath("Icons.Icon", "", package)) });
+        if (inherited)
+        {
+            owner.Name = "Template";
+            source.Template = new ResolvedLoadedObject(owner);
+            RuntimeClassFixture.Derive(source);
+        }
+
+        var request = Assert.Single(Images.Capture(source, Mappings.Value, provider.Locate, issues));
+
+        Assert.Equal("pending", request.Status);
+        Assert.Equal(field, request.Field);
+        Assert.Equal("Source", request.Source);
+        Assert.Equal("Icons.Icon", request.Resource);
+        Assert.Same(file, request.Location!.File);
+        Assert.Empty(issues);
+    }
+
+    [Fact]
+    public void ClassSpecificImageNullOverridesTemplateWithoutLoadingIt()
+    {
+        var source = TypedSource("UIClanLogoMetaDataItem");
+        source.Properties.Add(new() { Name = "Texture", Tag = new SoftObjectProperty(default) });
+        var template = TypedSource("UIClanLogoMetaDataItem");
+        template.Properties.Add(new() { Name = "Texture", Tag = new SoftObjectProperty(new FSoftObjectPath("NotLoaded.Image", "")) });
+        source.Template = new ResolvedLoadedObject(template);
+
+        var request = Assert.Single(Images.Capture(source, Mappings.Value,
+            _ => throw new InvalidOperationException("Null image must not load."), issues));
+
+        Assert.Equal("absent", request.Status);
+        Assert.Null(request.Resource);
+        Assert.Null(request.Location);
+        Assert.Empty(issues);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ClassSpecificFieldNamesCannotInventImageRolesForUnrelatedClasses(bool runtimeImpostor)
+    {
+        var source = TypedSource("Object");
+        source.Properties.Add(new() { Name = "Texture", Tag = new SoftObjectProperty(default) });
+        source.Properties.Add(new() { Name = "TypeImage", Tag = new SoftObjectProperty(default) });
+        source.Properties.Add(new() { Name = "CoverImage", Tag = new SoftObjectProperty(default) });
+        if (runtimeImpostor) RuntimeClassFixture.Derive(source, "UIClanLogoMetaDataItem");
+
+        Assert.Empty(Images.Capture(source, Mappings.Value,
+            _ => throw new InvalidOperationException("Unrelated reference must not load."), issues));
+        Assert.Empty(issues);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ClassSpecificImageSchemaOrValueFailuresRemainExplicit(bool missingParent)
+    {
+        var source = TypedSource("UIClanLogoMetaDataItem");
+        source.Properties.Add(new() { Name = "Texture", Tag = new Int64Property(42) });
+        if (missingParent) RuntimeClassFixture.Derive(source).Super = null;
+
+        var request = Assert.Single(Images.Capture(source, Mappings.Value,
+            _ => throw new InvalidOperationException("Invalid image must not load."), issues));
+
+        Assert.Equal("failed", request.Status);
+        Assert.Null(request.Resource);
+        Assert.Equal("Source.Texture", Assert.Single(issues).Path);
     }
 
     [Fact]
@@ -205,7 +295,7 @@ public sealed class ImagePlanTests : IDisposable
         var package = new NestedImagePackage();
         var definition = package.ExportsLazy[2].Value;
         var location = new ObjectLocation(new ImageFixtureFile("/Game/Nested.uasset"), 1, "/Game/Nested.Parent:Icon");
-        var request = Assert.Single(Images.Capture(definition, _ => location, issues));
+        var request = Assert.Single(Images.Capture(definition, Mappings.Value, _ => location, issues));
         Assert.Equal("/Game/Nested.Parent:Source", request.Source);
         Assert.Equal(location.Path, request.Resource);
         Assert.Equal("pending", request.Status);
@@ -228,7 +318,7 @@ public sealed class ImagePlanTests : IDisposable
         var target = package.ExportsLazy[0].Value;
         var source = new UObject([Reference("Icon", package)]) { Name = "Definition" };
         var capture = new LocationCapture(provider, target);
-        var requests = Images.Capture(source, capture.Locate, issues);
+        var requests = Images.Capture(source, Mappings.Value, capture.Locate, issues);
         return (Source(source.Name, requests), new(package), new(source), new(target), new(capture));
     }
 
@@ -242,6 +332,11 @@ public sealed class ImagePlanTests : IDisposable
     }
 
     private static CatalogSource Source(string path, IReadOnlyList<ImageRequest> requests) => new(new(path, "DataAsset", path), [], requests);
+    private static UObject TypedSource(string type) => new()
+    {
+        Name = "Source",
+        Class = new ResolvedLoadedObject(new UScriptClass(type))
+    };
     private static FPropertyTag Reference(string field, IPackage package) => new()
     {
         Name = field,
@@ -254,13 +349,13 @@ public sealed class ImagePlanTests : IDisposable
         protected override IPackage ReadPackage(GameFile file)
         {
             ReadFiles.Add(file);
-            return new ImagePackage(file.Path[..^7], ((ImageFixtureFile)file).Color);
+            return new ImagePackage(file.Path[..^7], ((ImageFixtureFile)file).Color, this);
         }
     }
 
     private sealed class ImagePackage : AbstractUePackage
     {
-        public ImagePackage(string path, ushort color) : base(path, null)
+        public ImagePackage(string path, ushort color, ImageProvider provider) : base(path, provider)
         {
             ExportsLazy = [new(() => new ImagesTests.CompressedTexture(color)
             {

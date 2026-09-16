@@ -97,10 +97,7 @@ internal sealed partial class EvidenceReader
             case UScriptSet set: ReadSequence(set.Properties, pointer, type, "set", depth); return;
             case UScriptMap map: ReadMap(map.Properties, pointer, type, depth); return;
             case FPackageIndex reference: ReadHardReference(reference, pointer, "property"); return;
-            case FSoftObjectPath reference:
-                references.Add(new(pointer, "soft", "property", reference.AssetPathName.IsNone ? null : reference.ToString(),
-                    reference.AssetPathName.IsNone, reference.Owner?.Name, null, null, null));
-                return;
+            case FSoftObjectPath reference: ReadSoftReference(reference, pointer); return;
             case ResolvedObject reference: ReadResolvedReference(reference, pointer, "property"); return;
             case UObject export: ReadResolvedReference(new ResolvedLoadedObject(export), pointer, "property", "object"); return;
             case FText text: ReadText(text, pointer, depth); return;
@@ -134,6 +131,13 @@ internal sealed partial class EvidenceReader
             case IUStruct structure: ReadNativeFields(structure, pointer, depth); return;
             default: issues.Add(new(pointer, type, $"Unsupported compound value: {value.GetType().FullName}.")); return;
         }
+    }
+
+    private void ReadSoftReference(FSoftObjectPath reference, string pointer)
+    {
+        var path = SoftReferencePath.Read(reference);
+        references.Add(new(pointer, "soft", "property", path.Target, path.Target is null,
+            reference.Owner?.Name, null, null, path.Error));
     }
 
     private void ReadArray(UScriptArray array, string pointer, string type, int depth)

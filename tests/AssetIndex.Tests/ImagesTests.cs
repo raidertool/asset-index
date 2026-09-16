@@ -1,5 +1,7 @@
 using CUE4Parse.Compression;
 using CUE4Parse.FileProvider.Objects;
+using CUE4Parse.MappingsProvider;
+using CUE4Parse.MappingsProvider.Usmap;
 using CUE4Parse.UE4.Assets;
 using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Assets.Exports.Texture;
@@ -14,6 +16,8 @@ namespace AssetIndex.Tests;
 
 public sealed class ImagesTests
 {
+    private static readonly Lazy<TypeMappings> Mappings = new(() =>
+        new FileUsmapTypeMappingsProvider(Path.Combine(AppContext.BaseDirectory, "mappings", "ArcRaiders.usmap")).MappingsForGame!);
     [Fact]
     public void DecodesCompressedTextureWithManagedDecoder()
     {
@@ -72,7 +76,7 @@ public sealed class ImagesTests
             var resources = new ImageResources(output, issues);
             var location = new ObjectLocation(new ImageFixtureFile("KnownTexture.uasset"), 0, texture.GetPathName());
             var source = new CatalogSource(new(definition.Name, definition.ExportType, definition.GetPathName()), [],
-                Images.Capture(definition, _ => location, issues));
+                Images.Capture(definition, Mappings.Value, _ => location, issues));
             var image = Assert.Single(Images.Export(new CatalogAsset(42, metadata ? [] : [source], metadata ? [source] : []),
                 resources, _ => texture, issues));
             Assert.Equal(image.Resource, Assert.Single(resources.Entries).Path);

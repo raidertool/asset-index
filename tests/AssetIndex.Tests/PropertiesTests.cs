@@ -2,6 +2,7 @@ using CUE4Parse.UE4.Assets;
 using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Assets.Objects;
 using CUE4Parse.UE4.Assets.Objects.Properties;
+using CUE4Parse.UE4.Objects.UObject;
 
 namespace AssetIndex.Tests;
 
@@ -54,6 +55,52 @@ public class PropertiesTests
         Assert.True(Properties.TryGet<int>(source, "VALUE", out var value, out var definedAt));
         Assert.Equal(0, value);
         Assert.Same(source, definedAt);
+    }
+
+    [Theory]
+    [InlineData("", false)]
+    [InlineData("", true)]
+    [InlineData("None", false)]
+    [InlineData("None", true)]
+    public void EmptySoftReferencesStayNullWithoutLoadingOrFallingThrough(string assetPath, bool inherited)
+    {
+        var template = new UObject { Name = "Template" };
+        var source = new UObject { Name = "Source", Template = new ResolvedLoadedObject(template) };
+        var owner = inherited ? template : source;
+        owner.Properties.Add(Soft("Icon", assetPath, ""));
+        if (!inherited) template.Properties.Add(Soft("Icon", "/Game/NeverLoaded.Image", ""));
+
+        Assert.Null(Properties.Reference(source, "Icon"));
+        Assert.Null(Properties.Reference(owner.Properties[0], "Source.Icon"));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("None")]
+    public void OrphanSoftSubpathsFailBeforeTryingToLoad(string assetPath)
+    {
+        var property = Soft("Icon", assetPath, "Child.Leaf");
+        var source = new UObject([property]) { Name = "Source" };
+
+        var error = Assert.Throws<InvalidDataException>(() => Properties.Reference(source, "Icon"));
+
+        Assert.Equal("Soft reference has a subobject path without an asset path.", error.Message);
+        Assert.Equal(error.Message,
+            Assert.Throws<InvalidDataException>(() => Properties.Reference(property, "Source.Icon")).Message);
+    }
+
+    [Fact]
+    public void NestedFieldLookupPreservesNullAndRejectsDuplicateNames()
+    {
+        var field = Soft("Icon", "", "");
+        var nested = new FStructFallback([field]);
+
+        Assert.Same(field, Properties.Find(nested, "ICON", "Source.Image"));
+        Assert.Null(Properties.Reference(field, "Source.Image.Icon"));
+        Assert.Null(Properties.Find(nested, "Absent", "Source.Image"));
+        nested.Properties.Add(Soft("ICON", "None", ""));
+        Assert.Contains("Ambiguous property Source.Image.icon",
+            Assert.Throws<InvalidDataException>(() => Properties.Find(nested, "icon", "Source.Image")).Message);
     }
 
     [Fact]
@@ -128,4 +175,7 @@ public class PropertiesTests
 
     private static FPropertyTag Integer(string name, int value) =>
         new("IntProperty", new IntProperty(value)) { Name = name };
+
+    private static FPropertyTag Soft(string name, string assetPath, string subPath) =>
+        new("SoftObjectProperty", new SoftObjectProperty(new FSoftObjectPath(assetPath, subPath))) { Name = name };
 }

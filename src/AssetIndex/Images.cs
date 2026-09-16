@@ -1,4 +1,7 @@
+using CUE4Parse.MappingsProvider;
 using CUE4Parse.UE4.Assets.Exports;
+using CUE4Parse.UE4.Assets.Objects;
+using CUE4Parse.UE4.Assets.Objects.Properties;
 using CUE4Parse_Conversion.Options;
 using CUE4Parse_Conversion.Textures;
 
@@ -20,36 +23,66 @@ internal static class Images
         "Portrait", "ImageAsset", "UnlockImage", "PreviewImage", "IconMaterial", "EmptySlotImage",
         "ModifierIcon", "ObscuredPreviewImage", "OptionalLocationIcon", "UnlockVideoPreviewImage"
     ];
+    private static readonly Dictionary<string, string> TypedFields = new(StringComparer.Ordinal)
+    {
+        ["Texture"] = "UIClanLogoMetaDataItem",
+        ["TypeImage"] = "UIClanCustomizationMetaDataItem",
+        ["CoverImage"] = "UIEnvironmentalDamageSourceMetaDataItem"
+    };
 
-    public static IReadOnlyList<ImageRequest> Capture(UObject source, Func<UObject, ObjectLocation> locate,
+    public static IReadOnlyList<ImageRequest> Capture(UObject source, TypeMappings mappings, Func<UObject, ObjectLocation> locate,
         ICollection<ExtractionIssue> issues)
     {
         var images = new List<ImageRequest>();
         var path = ObjectMetadata.Path(source);
-        foreach (var requestedField in Fields)
+        foreach (var requestedField in Fields.Concat(TypedFields.Keys))
         {
             var field = requestedField;
-            string? resourcePath = null;
             try
             {
                 if (Properties.Find(source, field) is not { } property) continue;
                 field = property.Name.Text;
-                var reference = Properties.Reference(source, field);
-                if (reference is null)
-                {
-                    images.Add(new(field, path, null, "absent"));
-                    continue;
-                }
-                resourcePath = ObjectMetadata.Path(reference);
-                images.Add(new(field, path, resourcePath, "pending", locate(reference)));
+                if (!SupportsField(source, mappings, requestedField, property)) continue;
+                images.Add(CaptureReference(property, field, path, locate, issues));
             }
             catch (Exception error)
             {
-                issues.Add(new("image", $"{path}.{field}", error.Message));
-                images.Add(new(field, path, resourcePath, "failed"));
+                images.Add(Failed(field, path, null, error, issues));
             }
         }
+        MapImages.Capture(source, mappings, locate, images, issues);
         return images;
+    }
+
+    internal static ImageRequest CaptureReference(FPropertyTag property, string field, string path,
+        Func<UObject, ObjectLocation> locate, ICollection<ExtractionIssue> issues)
+    {
+        string? resourcePath = null;
+        try
+        {
+            var reference = Properties.Reference(property, $"{path}.{field}");
+            if (reference is null) return new(field, path, null, "absent");
+            resourcePath = ObjectMetadata.Path(reference);
+            return new(field, path, resourcePath, "pending", locate(reference));
+        }
+        catch (Exception error) { return Failed(field, path, resourcePath, error, issues); }
+    }
+
+    internal static ImageRequest Failed(string field, string path, string? resourcePath, Exception error,
+        ICollection<ExtractionIssue> issues)
+    {
+        issues.Add(new("image", $"{path}.{field}", error.Message));
+        return new(field, path, resourcePath, "failed");
+    }
+
+    private static bool SupportsField(UObject source, TypeMappings mappings, string field, FPropertyTag property)
+    {
+        if (!TypedFields.TryGetValue(field, out var owner)) return true;
+        var schema = ClassSchema.Read(source, mappings);
+        if (!schema.IsA(owner)) return false;
+        if (!schema.HasProperty(field, "SoftObjectProperty") || property.Tag is not SoftObjectProperty)
+            throw new InvalidDataException($"Image field {ObjectMetadata.Path(source)}.{property.Name.Text} is not a declared soft object reference.");
+        return true;
     }
 
     public static IReadOnlyList<AssetImage> Export(CatalogAsset asset, ImageResources resources,

@@ -98,18 +98,48 @@ public sealed class TextTests
 
     [Theory]
     [InlineData("Description")]
-    [InlineData("UnlockDescription")]
     [InlineData("ScoreDescription")]
     public void ExistingDescriptionFieldsTakePriorityOverTheSlotTooltip(string field)
     {
         var tooltip = WithText("EmptySlotTooltipText", new FText("Fallback tooltip"), "UIInventorySlotMetaDataItem");
-        var type = field switch { "UnlockDescription" => "UIUnlockMetaDataItem", "ScoreDescription" => "UIScoreMetaDataItem", _ => "UIGameplayItemMetaDataItem" };
+        var type = field == "ScoreDescription" ? "UIScoreMetaDataItem" : "UIGameplayItemMetaDataItem";
         var description = WithText(field, new FText("Preferred description"), type);
         var issues = new List<ExtractionIssue>();
 
         var text = Text.Read(Asset([], [tooltip, description], issues), issues);
 
         Assert.Equal("Preferred description", text.Description?.Source);
+        Assert.Empty(issues);
+    }
+
+    [Theory]
+    [InlineData("Description", "UIGameplayItemMetaDataItem")]
+    [InlineData("EmptySlotTooltipText", "UIInventorySlotMetaDataItem")]
+    public void UnlockInstructionsDoNotCompeteWithAnAssetDescription(string field, string type)
+    {
+        var description = WithText(field, new FText("Medical Lab description"), type);
+        var unlock = WithText("UnlockDescription", new FText("Requires a Medical Lab"), "UIUnlockMetaDataItem");
+        unlock.Name = "Unlock";
+        var issues = new List<ExtractionIssue>();
+
+        var text = Text.Read(Asset([], [unlock, description], issues), issues);
+
+        Assert.Equal("Medical Lab description", text.Description?.Source);
+        Assert.Contains(text.Candidates, candidate => candidate.Role == "unlock-description"
+            && candidate.Reference.Source == "Requires a Medical Lab");
+        Assert.Empty(issues);
+    }
+
+    [Fact]
+    public void UnlockInstructionsAloneRemainContextualText()
+    {
+        var unlock = WithText("UnlockDescription", new FText("Rounds played: {0}/{1}"), "UIUnlockMetaDataItem");
+        var issues = new List<ExtractionIssue>();
+
+        var text = Text.Read(Asset(unlock, issues), issues);
+
+        Assert.Null(text.Description);
+        Assert.Equal("unlock-description", Assert.Single(text.Candidates).Role);
         Assert.Empty(issues);
     }
 
@@ -241,6 +271,36 @@ public sealed class TextTests
         var text = Text.Read(Asset(source), []);
         Assert.Null(text.Name);
         Assert.Equal("location-name", Assert.Single(text.Candidates).Role);
+    }
+
+    [Theory]
+    [InlineData("UIUnlockMetaDataItem", "NavigationText", "navigation-text")]
+    [InlineData("UIStashSlotMetaDataItem", "EffectFormatText", "effect-format")]
+    [InlineData("UIGameModeLocationMetaDataItem", "LocationAreaName", "area-name")]
+    [InlineData("UINPCMetaDataItem", "ObscuredDisplayName", "obscured-name")]
+    [InlineData("UINPCMetaDataItem", "ObscuredDescription", "obscured-description")]
+    [InlineData("UINPCMetaDataItem", "ObscuredLocationName", "obscured-location-name")]
+    public void ContextualLabelsKeepTheirPurposeWithoutBecomingPrimaryText(string type, string field, string role)
+    {
+        var source = WithText(field, new FText("Contextual label"), type);
+        var issues = new List<ExtractionIssue>();
+
+        var text = Text.Read(Asset(source, issues), issues);
+
+        Assert.Null(text.Name);
+        Assert.Null(text.Description);
+        Assert.Equal(role, Assert.Single(text.Candidates).Role);
+        Assert.Empty(issues);
+    }
+
+    [Fact]
+    public void LocationShortNameIsAFallbackAndRetainsItsOwnRole()
+    {
+        var source = WithText("LocationNameShort", new FText("Short location"), "UIGameModeLocationMetaDataItem");
+        var text = Text.Read(Asset(source), []);
+
+        Assert.Equal("Short location", text.Name?.Source);
+        Assert.Equal("short-name", Assert.Single(text.Candidates).Role);
     }
 
     [Fact]

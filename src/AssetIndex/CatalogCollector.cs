@@ -52,7 +52,7 @@ internal sealed class CatalogCollector(TypeMappings mappings, Func<UObject, Obje
 
     private CatalogSource Capture(UObject source) => new(
         new(source.Name, source.ExportType, ObjectMetadata.Path(source)), Text.Capture(source, mappings, issues),
-        Images.Capture(source, locate, issues));
+        Images.Capture(source, mappings, locate, issues));
 
     private static CatalogSource[] Sorted(Dictionary<long, Dictionary<string, CatalogSource>> rows, long id) =>
         rows.GetValueOrDefault(id)?.Values.OrderBy(source => source.Reference.Path, StringComparer.Ordinal).ToArray() ?? [];
