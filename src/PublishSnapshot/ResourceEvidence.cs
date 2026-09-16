@@ -82,8 +82,14 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, HashSet<str
             foreach (var value in row.GetProperty("values").EnumerateArray())
             {
                 Fields(value, "pointer", "type", "kind", "value");
-                properties.ValidatePointer(String(value, "pointer")); String(value, "type"); NullableString(value, "value");
-                if (String(value, "kind") == "binary-base64") ValidateBinary(String(value, "value", allowEmpty: true));
+                properties.ValidatePointer(String(value, "pointer"));
+                var type = String(value, "type");
+                NullableString(value, "value");
+                switch (String(value, "kind"))
+                {
+                    case "binary-base64": ValidateBinary(String(value, "value", allowEmpty: true)); break;
+                    case "numeric-le-base64": ValidateNumeric(type, String(value, "value", allowEmpty: true)); break;
+                }
             }
             foreach (var entry in row.GetProperty("tableEntries").EnumerateArray())
             {
@@ -114,10 +120,24 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, HashSet<str
         return locales;
     }
 
-    private static void ValidateBinary(string encoded)
+    private static void ValidateNumeric(string type, string encoded)
+    {
+        var width = type switch
+        {
+            "Int8Property[]" => 1,
+            "Int16Property[]" or "UInt16Property[]" => 2,
+            "IntProperty[]" or "UInt32Property[]" or "FloatProperty[]" => 4,
+            "Int64Property[]" or "UInt64Property[]" or "DoubleProperty[]" => 8,
+            _ => 0
+        };
+        Require(width > 0, "Unknown encoded numeric array type.");
+        Require(ValidateBinary(encoded) % width == 0, "Numeric array payload contains a partial element.");
+    }
+
+    private static int ValidateBinary(string encoded)
     {
         Require(encoded.Length % 4 == 0 && !encoded.Any(char.IsWhiteSpace) && Base64.IsValid(encoded), "Invalid binary base64 evidence.");
-        if (encoded.Length == 0) return;
+        if (encoded.Length == 0) return 0;
         // Re-encode the last quartet to reject nonzero padding bits. Earlier
         // quartets contain complete bytes; validation needs no payload allocation.
         Span<byte> bytes = stackalloc byte[3];
@@ -126,6 +146,7 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, HashSet<str
         Require(Convert.TryFromBase64Chars(tail, bytes, out var count) &&
             Convert.TryToBase64Chars(bytes[..count], canonical, out var written) &&
             tail.SequenceEqual(canonical[..written]), "Noncanonical binary base64 evidence.");
+        return (encoded.Length / 4 - 1) * 3 + count;
     }
 
     private static Dictionary<string, ResourceImage> ReadResources(IReadOnlyDictionary<string, SnapshotFile> files, HashSet<string> objects)
