@@ -14,7 +14,8 @@ jobs:
   extract:
     if: ${{ github.event.repository.private == true }}
     runs-on: ubuntu-latest
-    timeout-minutes: 160
+    # Leave time for setup and artifact upload outside the extraction step.
+    timeout-minutes: 180
     env:
       CUE4PARSE_SKIP_NATIVE: "true"
     steps:
@@ -66,7 +67,7 @@ jobs:
         run: bash scripts/ci/prepare-runner-disk.sh
 
       - name: Read Steam depot and extract preview
-        timeout-minutes: 115
+        timeout-minutes: 135
         shell: bash
         env:
           STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
@@ -113,8 +114,8 @@ jobs:
           mkdir -p "$mount_dir"
           # One client resolves and mounts the manifest. A separate login could invalidate its token.
           # GitHub masks these secrets. Keep raw Steam logs off the job log and out of artifacts.
-          timeout --kill-after=15s 100m dotnet "$depotfs" mount "${depot_args[@]}" \
-            --timeout 6000 --mount-point "$mount_dir" \
+          timeout --kill-after=15s 130m dotnet "$depotfs" mount "${depot_args[@]}" \
+            --timeout 7800 --mount-point "$mount_dir" \
             > "$RUNNER_TEMP/steam-mount.log" 2>&1 &
           mount_pid=$!
           cleanup() {
@@ -161,7 +162,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           game_dir="$mount_dir/PioneerGame/Content/Paks"
           timeout --kill-after=5s 20s test -d "$game_dir"
-          timeout --kill-after=15s 90m dotnet run --project src/AssetIndex -c Release --no-build -- \
+          timeout --kill-after=15s 120m dotnet run --project src/AssetIndex -c Release --no-build -- \
             --game-dir "$game_dir" --usmap mappings/ArcRaiders.usmap \
             --output "$RUNNER_TEMP/asset-index-preview"
 

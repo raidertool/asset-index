@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import re
 import signal
 import subprocess
 import sys
@@ -73,6 +74,24 @@ def workflow_shell():
 
 
 class PreviewTests(unittest.TestCase):
+    def test_nested_time_budgets_leave_cleanup_and_artifact_time(self):
+        workflow = (ROOT / ".github/workflows/extract.yml").read_text()
+        script = workflow_shell()
+        steps = re.split(r"(?m)^      - name: ", workflow)[1:]
+        budgets = {}
+        for step in steps:
+            limit = re.search(r"(?m)^        timeout-minutes: (\d+)$", step)
+            self.assertIsNotNone(limit, f"Unbounded workflow step: {step.splitlines()[0]}")
+            budgets[step.splitlines()[0]] = int(limit[1])
+        job = int(re.search(r"(?m)^    timeout-minutes: (\d+)$", workflow)[1])
+        mount = int(re.search(r'timeout --kill-after=15s (\d+)m dotnet "\$depotfs" mount', script)[1])
+        extract = int(re.search(r"timeout --kill-after=15s (\d+)m dotnet run", script)[1])
+        client = int(re.search(r"--timeout (\d+) --mount-point", script)[1])
+        self.assertEqual(client, mount * 60)
+        self.assertGreaterEqual(mount, extract + 5)  # Mount readiness and directory probe.
+        self.assertGreaterEqual(budgets["Read Steam depot and extract preview"], mount + 5)  # Teardown.
+        self.assertGreaterEqual(job, sum(budgets.values()) + 5)  # Include setup and artifact upload.
+
     def run_preview(self, announcement=ANNOUNCEMENT, *, mount_exit=0, extract_exit=0, ready=True):
         with tempfile.TemporaryDirectory() as directory:
             temp = Path(directory)
@@ -100,7 +119,7 @@ class PreviewTests(unittest.TestCase):
             process = subprocess.Popen(["bash", "-c", workflow_shell()], env=env, text=True,
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
             try:
-                stdout, stderr = process.communicate(timeout=10)
+                stdout, stderr = process.communicate(timeout=30)
             finally:
                 # This group belongs only to this test; never leave a failed mock mount running.
                 try:
