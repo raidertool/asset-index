@@ -2,11 +2,6 @@ name: Extract preview
 
 on:
   workflow_dispatch:
-    inputs:
-      publish:
-        description: Publish a successful snapshot (reviewed main only).
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -20,23 +15,9 @@ jobs:
     if: ${{ github.event.repository.private == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 160
-    outputs:
-      extractor_commit: ${{ steps.preview.outputs.extractor_commit }}
-      manifest_id: ${{ steps.preview.outputs.manifest_id }}
-      artifact_id: ${{ steps.artifact.outputs.artifact-id }}
     env:
       CUE4PARSE_SKIP_NATIVE: "true"
     steps:
-      - name: Validate publication request
-        env:
-          PUBLISH: ${{ inputs.publish }}
-        run: |
-          set -euo pipefail
-          if [[ "$PUBLISH" == true && ( "$GITHUB_REPOSITORY" != raidertool/asset-index || "$GITHUB_REF" != refs/heads/main ) ]]; then
-            echo "Publication requires raidertool/asset-index main." >&2
-            exit 1
-          fi
-
       - name: Check out extractor
         timeout-minutes: 5
         uses: actions/checkout@v4
@@ -85,7 +66,6 @@ jobs:
         run: bash scripts/ci/prepare-runner-disk.sh
 
       - name: Read Steam depot and extract preview
-        id: preview
         timeout-minutes: 115
         shell: bash
         env:
@@ -187,13 +167,8 @@ jobs:
           timeout --kill-after=15s 90m dotnet run --project src/AssetIndex -c Release --no-build -- \
             --game-dir "$game_dir" --usmap mappings/ArcRaiders.usmap \
             --output "$RUNNER_TEMP/asset-index-preview"
-          {
-            echo "extractor_commit=$GITHUB_SHA"
-            echo "manifest_id=$manifest_id"
-          } >> "$GITHUB_OUTPUT"
 
       - name: Save preview artifacts
-        id: artifact
         timeout-minutes: 5
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
@@ -210,59 +185,3 @@ jobs:
             ${{ runner.temp }}/asset-index-preview/discovery/
             ${{ runner.temp }}/asset-index-preview/localization/
             ${{ runner.temp }}/asset-index-preview/images/
-
-  publish:
-    needs: extract
-    if: >-
-      ${{ github.event.repository.private == true && inputs.publish && needs.extract.result == 'success' &&
-          github.repository == 'raidertool/asset-index' && github.ref == 'refs/heads/main' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: write
-    env:
-      GH_TOKEN: ${{ github.token }}
-      EXTRACTOR_COMMIT: ${{ needs.extract.outputs.extractor_commit }}
-      MANIFEST_ID: ${{ needs.extract.outputs.manifest_id }}
-      ARTIFACT_ID: ${{ needs.extract.outputs.artifact_id }}
-    steps:
-      - name: Validate extraction outputs
-        run: |
-          set -euo pipefail
-          if [[ ! "$EXTRACTOR_COMMIT" =~ ^[0-9a-f]{40}$ || "$EXTRACTOR_COMMIT" != "$GITHUB_SHA" ||
-                ! "$MANIFEST_ID" =~ ^[1-9][0-9]*$ || ! "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]; then
-            echo "Successful extraction must provide its exact commit, manifest and artifact ID." >&2
-            exit 1
-          fi
-
-      - name: Check out the validated source
-        timeout-minutes: 5
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.extract.outputs.extractor_commit }}
-          persist-credentials: false
-
-      - name: Download this run's preview
-        timeout-minutes: 10
-        uses: actions/download-artifact@v8
-        with:
-          artifact-ids: ${{ needs.extract.outputs.artifact_id }}
-          path: ${{ runner.temp }}/asset-index-preview
-          digest-mismatch: error
-
-      - name: Set up .NET
-        timeout-minutes: 5
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.302
-
-      - name: Validate and publish snapshot
-        timeout-minutes: 20
-        run: |
-          set -euo pipefail
-          gh auth setup-git --hostname github.com
-          arguments=(
-            "$RUNNER_TEMP/asset-index-preview" https://github.com/raidertool/asset-index.git
-            "$EXTRACTOR_COMMIT" "$MANIFEST_ID"
-          )
-          dotnet run --project src/PublishSnapshot -c Release -- "${arguments[@]}"
