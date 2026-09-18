@@ -120,3 +120,26 @@ preserves the texture address modes and fixes its animation input to zero. White
 vertex tint and no widget effects are assumed. These conditions do not reproduce
 arbitrary engine rendering. Tests use synthetic images and independent arithmetic
 fixtures. Unsupported materials retain evidence rather than a guessed icon.
+
+## Local publication
+
+Validate a complete preview and write only public files locally:
+
+```sh
+dotnet run --project src/PublishSnapshot -c Release -- \
+  --export <preview-directory> <new-export-directory> <extractor-commit> <Steam-manifest-id>
+```
+
+The direct publisher validates the same preview, then updates `data` and its tag:
+
+```sh
+dotnet run --project src/PublishSnapshot -c Release -- \
+  <preview-directory> <remote> <extractor-commit> <Steam-manifest-id>
+```
+
+Public `coverage.json` contains verified output counts and aggregate unresolved
+reference/schema counts. `images` counts IDs with an exported image; discovery
+`resources` counts exported image resources. English name/description counts use
+resolved English translations and can differ from CSV source-text fallbacks.
+A successful status means validation passed, not that every game object has a
+name or that all game content was decoded. Full preview diagnostics stay local.

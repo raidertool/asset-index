@@ -77,6 +77,7 @@ class ReleaseTests(unittest.TestCase):
 
     def test_runtime_extraction_orchestration_counts_as_software(self):
         paths = [".github/workflows/extract.yml", "scripts/ci/prepare-runner-disk.sh",
+                 "scripts/ci/with-disk-reserve.py",
                  "scripts/steam/extract.sh", "scripts/steam/install.py", "scripts/automation/update.py"]
         for patch, path in enumerate(paths, start=3):
             with self.subTest(path=path):

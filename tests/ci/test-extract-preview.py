@@ -42,7 +42,8 @@ def stop_mount(*_):
     sys.exit(0)
 
 if command == "timeout":
-    os.execvp(args[2], args[2:])
+    assert args[0] == "--foreground"
+    os.execvp(args[3], args[3:])
 elif command == "sleep":
     time.sleep(0.01)
 elif command == "git":
@@ -62,6 +63,9 @@ elif command == "dotnet":
         sys.exit(int(os.environ["MOCK_AUTH_EXIT"]))
     record("extract", credentials=credentials(), args=args[1:])
     print("private-dummy extraction diagnostics")
+    if os.environ.get("MOCK_EXTRACT_WAIT") == "true":
+        while True:
+            time.sleep(0.01)
     sys.exit(int(os.environ["MOCK_EXTRACT_EXIT"]))
 elif command == "SteamDepotFs":
     record("steam", args=args, credentials=credentials())
@@ -80,6 +84,31 @@ else:
     sys.exit(f"Unexpected mock command: {command}")
 '''
 
+DISK_FAILURE = r'''
+import importlib.util
+import os
+from pathlib import Path
+import sys
+from types import SimpleNamespace
+
+root = Path(os.environ["SOURCE_DIR"])
+spec = importlib.util.spec_from_file_location("monitor", root / "scripts/ci/with-disk-reserve.py")
+monitor = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(monitor)
+temp = Path(os.environ["RUNNER_TEMP"])
+def usage(_):
+    events = temp / "events.jsonl"
+    extracting = events.exists() and '"event": "extract"' in events.read_text()
+    return SimpleNamespace(free=(1 if extracting else 3) * monitor.GIB)
+monitor.shutil.disk_usage = usage
+monitor.INTERVAL = 0.01
+try:
+    sys.exit(monitor.run(["bash", str(root / "scripts/steam/extract.sh")], temp, None))
+except RuntimeError:
+    print("Disk reserve reached; no data was published.")
+    sys.exit(1)
+'''
+
 
 class PreviewTests(unittest.TestCase):
     def test_nested_time_budgets_leave_validation_and_cleanup_time(self):
@@ -93,15 +122,15 @@ class PreviewTests(unittest.TestCase):
             self.assertIsNotNone(limit, f"Unbounded extraction step: {step.splitlines()[0]}")
             budgets[step.splitlines()[0]] = int(limit[1])
         script = SCRIPT.read_text()
-        mount = int(re.search(r'timeout --kill-after=15s (\d+)m "\$STEAM_DEPOTFS" mount', script)[1])
-        extract = int(re.search(r'if timeout --kill-after=15s (\d+)m dotnet', script)[1])
+        mount = int(re.search(r'timeout --foreground --kill-after=15s (\d+)m "\$STEAM_DEPOTFS" mount', script)[1])
+        extract = int(re.search(r'if timeout --foreground --kill-after=15s (\d+)m dotnet', script)[1])
         client = int(re.search(r"--timeout (\d+) --mount-point", script)[1])
         self.assertEqual(client, mount * 60)
         self.assertGreaterEqual(mount, extract + 5)
         self.assertGreaterEqual(budgets["Extract selected Steam release"], mount + 5)
         self.assertGreaterEqual(job_budget, sum(budgets.values()) + 5)
 
-    def run_preview(self, announcement=ANNOUNCEMENT, **overrides):
+    def run_preview(self, announcement=ANNOUNCEMENT, *, disk_failure=False, **overrides):
         with tempfile.TemporaryDirectory() as directory:
             temp = Path(directory)
             binaries = temp / "bin"
@@ -133,10 +162,11 @@ class PreviewTests(unittest.TestCase):
                 "MOCK_UNMOUNT_FAIL": "false",
                 **overrides,
             }
-            process = subprocess.Popen(["bash", str(SCRIPT)], env=env, text=True,
+            command = [sys.executable, "-c", DISK_FAILURE] if disk_failure else ["bash", str(SCRIPT)]
+            process = subprocess.Popen(command, env=env, text=True,
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
             try:
-                stdout, stderr = process.communicate(timeout=30)
+                stdout, stderr = process.communicate(timeout=45 if disk_failure else 30)
             finally:
                 # The group contains only this test's subprocesses.
                 try:
@@ -216,6 +246,15 @@ class PreviewTests(unittest.TestCase):
         self.assertEqual(status, 1)
         self.assertEqual([event["event"] for event in events][-2:], ["cleanup", "mount-stopped"])
         self.assertIn("Steam mount cleanup failed", output)
+
+    def test_disk_exhaustion_terminates_extraction_and_cleans_mount(self):
+        status, events, output = self.run_preview(disk_failure=True, MOCK_EXTRACT_WAIT="true")
+        self.assertEqual(status, 1)
+        names = [event["event"] for event in events]
+        self.assertIn("extract", names)
+        self.assertIn("mount-stopped", names)
+        self.assertEqual(names.count("cleanup"), 1)
+        self.assertIn("Disk reserve reached", output)
 
 
 spec = importlib.util.spec_from_file_location("steam_installer", ROOT / "scripts/steam/install.py")

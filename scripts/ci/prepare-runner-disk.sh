@@ -16,15 +16,11 @@ sudo rm -rf -- /usr/local/lib/android /usr/local/.ghcup \
   /opt/hostedtoolcache/CodeQL /usr/share/swift /usr/lib/jvm \
   /opt/az /etc/skel/.rustup /home/runner/.rustup
 
-# Current build: ~19 GiB raw packages + 8 GiB Steam cache + guard/output space.
+# SteamDepotFS streams selected pages. Report capacity; the command monitor
+# enforces the operational free-space reserve while extraction/export run.
 available_kib="$(df -Pk -- "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')"
 if [[ ! "$available_kib" =~ ^[0-9]+$ ]]; then
   echo "Could not read available runner disk space." >&2
   exit 1
 fi
-required_kib=$((32 * 1024 * 1024))
-printf 'Extraction disk: %s KiB available; %s KiB required.\n' "$available_kib" "$required_kib"
-if (( available_kib < required_kib )); then
-  echo "Extraction requires at least 32 GiB free for package spool, Steam cache and output." >&2
-  exit 1
-fi
+printf 'Extraction disk after cleanup: %s KiB available.\n' "$available_kib"

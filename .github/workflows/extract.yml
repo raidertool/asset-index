@@ -88,6 +88,16 @@ jobs:
             !/assets.json
             !/resources.json
             !/schema.json
+      - name: Prepare extraction disk and FUSE
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          bash scripts/ci/prepare-runner-disk.sh
+          printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          sudo apt-get update
+          sudo apt-get install -y fuse3 libfuse2
+          if [[ ! -c /dev/fuse ]]; then sudo modprobe fuse; fi
+          test -c /dev/fuse
       - name: Set up .NET
         timeout-minutes: 5
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
@@ -100,15 +110,6 @@ jobs:
           dotnet build src/SteamAuthToken/SteamAuthToken.csproj -c Release --nologo
           dotnet build src/AssetIndex/AssetIndex.csproj -c Release --nologo
           dotnet build src/PublishSnapshot/PublishSnapshot.csproj -c Release --nologo
-      - name: Prepare extraction disk and FUSE
-        timeout-minutes: 5
-        run: |
-          set -euo pipefail
-          bash scripts/ci/prepare-runner-disk.sh
-          sudo apt-get update
-          sudo apt-get install -y fuse3 libfuse2
-          if [[ ! -c /dev/fuse ]]; then sudo modprobe fuse; fi
-          test -c /dev/fuse
       - name: Install verified SteamDepotFS
         timeout-minutes: 5
         run: python3 scripts/steam/install.py "$RUNNER_TEMP/steam-depotfs"
@@ -118,15 +119,16 @@ jobs:
           STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
           STEAM_PASSWORD: ${{ secrets.STEAM_PASSWORD }}
           STEAM_DEPOTFS: ${{ runner.temp }}/steam-depotfs/SteamDepotFs
-        run: bash scripts/steam/extract.sh
+        run: python3 scripts/ci/with-disk-reserve.py -- bash scripts/steam/extract.sh
       - name: Validate and export public files
         id: export
         timeout-minutes: 15
         run: |
           set -euo pipefail
-          if ! dotnet src/PublishSnapshot/bin/Release/net10.0/PublishSnapshot.dll --export \
+          if ! python3 scripts/ci/with-disk-reserve.py --log "$RUNNER_TEMP/export.log" -- \
+            dotnet src/PublishSnapshot/bin/Release/net10.0/PublishSnapshot.dll --export \
             "$RUNNER_TEMP/asset-index-preview" "$RUNNER_TEMP/asset-index-public" \
-            "$EXTRACTOR_COMMIT" "$MANIFEST_ID" > "$RUNNER_TEMP/export.log" 2>&1; then
+            "$EXTRACTOR_COMMIT" "$MANIFEST_ID"; then
             echo "Snapshot validation failed; no artifact or data was published." >&2
             exit 1
           fi

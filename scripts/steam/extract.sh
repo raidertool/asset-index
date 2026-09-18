@@ -24,7 +24,7 @@ mount_pid=''
 cleanup() {
   unset STEAM_USERNAME STEAM_PASSWORD STEAM_ACCESS_TOKEN token
   if [[ -n "$mount_pid" ]]; then
-    timeout --kill-after=5s 10s fusermount3 -u "$mount_dir" >/dev/null 2>&1 || true
+    timeout --foreground --kill-after=5s 10s fusermount3 -u "$mount_dir" >/dev/null 2>&1 || true
     kill "$mount_pid" >/dev/null 2>&1 || true
     for _ in {1..5}; do
       kill -0 "$mount_pid" 2>/dev/null || break
@@ -49,7 +49,7 @@ trap 'exit 143' TERM
 
 unset STEAM_ACCESS_TOKEN STEAM_AUTH_CODE STEAM_TWO_FACTOR_CODE STEAM_LOGIN_ID
 echo 'Authenticating to Steam...'
-if ! token="$(timeout --kill-after=5s 3m dotnet "$source_dir/src/SteamAuthToken/bin/Release/net10.0/SteamAuthToken.dll" 2>"$private_dir/auth.log")"; then
+if ! token="$(timeout --foreground --kill-after=5s 3m dotnet "$source_dir/src/SteamAuthToken/bin/Release/net10.0/SteamAuthToken.dll" 2>"$private_dir/auth.log")"; then
   fail 'Steam authentication failed. Verify the account locally before retrying.'
 fi
 [[ -n "$token" && ${#token} -le 16384 && "$token" != *$'\n'* && "$token" != *$'\r'* ]] || fail 'Steam authentication returned an invalid token.'
@@ -58,7 +58,8 @@ unset token STEAM_PASSWORD
 mkdir -p "$mount_dir"
 login_id="$(python3 -c 'import secrets; print(secrets.randbelow(2**32 - 1) + 1)')"
 echo 'Mounting the requested Steam version...'
-timeout --kill-after=15s 130m "$STEAM_DEPOTFS" mount \
+# Keep child processes in the monitored group so cancellation reaches them.
+timeout --foreground --kill-after=15s 130m "$STEAM_DEPOTFS" mount \
   --app 1808500 --depot 1808501 --branch public --manifest "$MANIFEST_ID" \
   --login-id "$login_id" \
   --cache-dir "$private_dir/chunks" \
@@ -75,9 +76,9 @@ mountpoint -q "$mount_dir" || fail 'Steam mount readiness timed out.'
 mounted_id="$(sed -nE 's/^mounting app=1808500 depot=1808501 manifest=(.*) at .+$/\1/p' "$private_dir/mount.log" | sort -u)"
 [[ "$mounted_id" == "$MANIFEST_ID" ]] || fail 'Mounted Steam version does not match the requested version.'
 game_dir="$mount_dir/PioneerGame/Content/Paks"
-timeout --kill-after=5s 20s test -d "$game_dir" || fail 'Game files are unavailable in the mounted version.'
+timeout --foreground --kill-after=5s 20s test -d "$game_dir" || fail 'Game files are unavailable in the mounted version.'
 echo 'Extracting game assets...'
-if timeout --kill-after=15s 120m dotnet "$source_dir/src/AssetIndex/bin/Release/net10.0/AssetIndex.dll" \
+if timeout --foreground --kill-after=15s 120m dotnet "$source_dir/src/AssetIndex/bin/Release/net10.0/AssetIndex.dll" \
   --game-dir "$game_dir" --usmap "$source_dir/mappings/ArcRaiders.usmap" \
   --output "$RUNNER_TEMP/asset-index-preview" >"$private_dir/extraction.log" 2>&1; then
   echo 'Extraction completed; full validation and public export follow.'

@@ -13,7 +13,8 @@ TAG = re.compile(r"exfil-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 CONVENTIONAL = re.compile(r"([a-z][a-z0-9-]*)(?:\([^\n]+\))?(!)?: .+")
 BUILD_FILES = {"global.json", "Directory.Build.props", "Directory.Build.targets",
                "Directory.Packages.props", "NuGet.config", ".gitmodules"}
-RUNTIME_FILES = {".github/workflows/extract.yml", "scripts/ci/prepare-runner-disk.sh"}
+RUNTIME_FILES = {".github/workflows/extract.yml", "scripts/ci/prepare-runner-disk.sh",
+                 "scripts/ci/with-disk-reserve.py"}
 
 
 def git(repo, *args):

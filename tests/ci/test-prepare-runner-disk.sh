@@ -14,7 +14,7 @@ MOCK
 cat > "$test_dir/bin/df" <<'MOCK'
 #!/usr/bin/env bash
 printf 'Filesystem 1024-blocks Used Available Capacity Mounted\n'
-printf '/dev/fake 99999999 0 %s 0%% /\n' "${MOCK_AVAILABLE_KIB:-33554432}"
+printf '/dev/fake 99999999 0 %s 0%% /\n' "${MOCK_AVAILABLE_KIB:-10485760}"
 exit "${MOCK_DF_RESULT:-0}"
 MOCK
 cat > "$test_dir/bin/uname" <<'MOCK'
@@ -40,7 +40,6 @@ done
 expect_failure MOCK_SUDO_RESULT=17
 expect_failure MOCK_DF_RESULT=18
 expect_failure MOCK_AVAILABLE_KIB=unknown
-expect_failure MOCK_AVAILABLE_KIB=33554431
 bash "$script"
 cat > "$test_dir/expected" <<'EXPECTED'
 rm
@@ -56,4 +55,4 @@ rm
 /home/runner/.rustup
 EXPECTED
 diff -u "$test_dir/expected" "$DISK_TEST_LOG"
-echo "Runner disk preparation: 10 mocked cases passed."
+echo "Runner disk preparation: 9 mocked cases passed."
