@@ -1,185 +1,206 @@
-name: Extract preview
+name: Update asset snapshot
 
 on:
+  schedule:
+    - cron: '2-59/5 * * * *'
   workflow_dispatch:
+    inputs:
+      force:
+        description: Extract even when the current Steam release is already published.
+        type: boolean
+        default: false
+      publish:
+        description: Publish the validated snapshot; otherwise export only.
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: extract-preview
+  group: update-asset-snapshot
   cancel-in-progress: false
 
 jobs:
-  extract:
-    if: ${{ github.event.repository.private == true }}
+  plan:
+    if: ${{ github.repository == 'raidertool/asset-index' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
-    # Leave time for setup and artifact upload outside the extraction step.
-    timeout-minutes: 180
-    env:
-      CUE4PARSE_SKIP_NATIVE: "true"
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      needed: ${{ steps.plan.outputs.needed }}
+      manifest_id: ${{ steps.plan.outputs.manifest_id }}
+      extractor_commit: ${{ steps.plan.outputs.extractor_commit }}
+      expected_metadata_blob: ${{ steps.plan.outputs.expected_metadata_blob }}
     steps:
-      - name: Check out extractor
-        timeout-minutes: 5
-        uses: actions/checkout@v4
+      - name: Check out update planner only
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: /scripts/automation/
+      - name: Check public version and retry state
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE: ${{ inputs.force }}
+          UPDATES_ENABLED: ${{ vars.ASSET_UPDATES_ENABLED }}
+        run: python3 scripts/automation/update.py plan
+
+  extract:
+    name: Extract validated snapshot
+    needs: plan
+    if: ${{ needs.plan.outputs.needed == 'true' }}
+    # Configure this environment to allow only main before adding Steam secrets.
+    environment: steam-extraction
+    runs-on: ubuntu-latest
+    timeout-minutes: 205
+    outputs:
+      export_sha256: ${{ steps.export.outputs.export_sha256 }}
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+    env:
+      CUE4PARSE_SKIP_NATIVE: 'true'
+      MANIFEST_ID: ${{ needs.plan.outputs.manifest_id }}
+      EXTRACTOR_COMMIT: ${{ needs.plan.outputs.extractor_commit }}
+    steps:
+      - name: Check out released source
+        timeout-minutes: 5
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.plan.outputs.extractor_commit }}
+          persist-credentials: false
           submodules: recursive
-          persist-credentials: false
-
-      - name: Check out SteamDepotFS
-        timeout-minutes: 5
-        uses: actions/checkout@v4
-        with:
-          repository: raidertool/SteamDepotFS
-          # Modern authentication: https://github.com/raidertool/SteamDepotFS/pull/3 (under review).
-          ref: 5c1143e17a0c7d5742b1c8652bdb9df0ef974ab2
-          path: .work/SteamDepotFS
-          persist-credentials: false
-
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /src/
+            /vendor/
+            /mappings/
+            /scripts/
+            /*.json
+            /*.props
+            /*.targets
+            /NuGet.config
+            /.gitmodules
+            !/metadata.json
+            !/coverage.json
+            !/assets.json
+            !/resources.json
+            !/schema.json
       - name: Set up .NET
         timeout-minutes: 5
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
-          dotnet-version: |
-            10.0.302
-            8.0.x
-
-      - name: Build and test offline
-        timeout-minutes: 10
+          dotnet-version: 10.0.302
+      - name: Build released tools
+        timeout-minutes: 15
         run: |
-          dotnet test tests/AssetIndex.Tests/AssetIndex.Tests.csproj -c Release --nologo
-          dotnet build .work/SteamDepotFS/src/SteamDepotFs/SteamDepotFs.csproj -c Release --nologo
-
-      - name: Install FUSE
+          set -euo pipefail
+          dotnet build src/SteamAuthToken/SteamAuthToken.csproj -c Release --nologo
+          dotnet build src/AssetIndex/AssetIndex.csproj -c Release --nologo
+          dotnet build src/PublishSnapshot/PublishSnapshot.csproj -c Release --nologo
+      - name: Prepare extraction disk and FUSE
         timeout-minutes: 5
         run: |
           set -euo pipefail
+          bash scripts/ci/prepare-runner-disk.sh
           sudo apt-get update
           sudo apt-get install -y fuse3 libfuse2
-          if [[ ! -c /dev/fuse ]]; then
-            sudo modprobe fuse
-          fi
+          if [[ ! -c /dev/fuse ]]; then sudo modprobe fuse; fi
           test -c /dev/fuse
-
-      - name: Prepare extraction disk
+      - name: Install verified SteamDepotFS
         timeout-minutes: 5
-        run: bash scripts/ci/prepare-runner-disk.sh
-
-      - name: Read Steam depot and extract preview
-        timeout-minutes: 135
-        shell: bash
+        run: python3 scripts/steam/install.py "$RUNNER_TEMP/steam-depotfs"
+      - name: Extract selected Steam release
+        timeout-minutes: 140
         env:
           STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
           STEAM_PASSWORD: ${{ secrets.STEAM_PASSWORD }}
-          STEAM_ACCESS_TOKEN: ${{ secrets.STEAM_ACCESS_TOKEN }}
+          STEAM_DEPOTFS: ${{ runner.temp }}/steam-depotfs/SteamDepotFs
+        run: bash scripts/steam/extract.sh
+      - name: Validate and export public files
+        id: export
+        timeout-minutes: 15
         run: |
           set -euo pipefail
-          umask 077
-          if [[ -z "$STEAM_USERNAME" || ( -z "$STEAM_PASSWORD" && -z "$STEAM_ACCESS_TOKEN" ) ]]; then
-            echo "Configure STEAM_USERNAME and either STEAM_PASSWORD or STEAM_ACCESS_TOKEN after review." >&2
+          if ! dotnet src/PublishSnapshot/bin/Release/net10.0/PublishSnapshot.dll --export \
+            "$RUNNER_TEMP/asset-index-preview" "$RUNNER_TEMP/asset-index-public" \
+            "$EXTRACTOR_COMMIT" "$MANIFEST_ID" > "$RUNNER_TEMP/export.log" 2>&1; then
+            echo "Snapshot validation failed; no artifact or data was published." >&2
             exit 1
           fi
-          depotfs="$GITHUB_WORKSPACE/.work/SteamDepotFS/src/SteamDepotFs/bin/Release/net8.0/SteamDepotFs.dll"
-          depot_args=(
-            --app 1808500 --depot 1808501 --branch public
-            --cache-dir "$RUNNER_TEMP/steam-depot-cache"
-            --cache-max-bytes 8G --cache-low-watermark 6G --cache-min-free-bytes 2G
-          )
-
-          report_steam_failure() {
-            local phase="$1" result="$2" log="$3" status reason
-            reason="Unrecognized Steam error; verify this account locally before retrying."
-            status="$(sed -nE 's/^(Steam logon failed:|Authentication failed:) (InvalidPassword|AccountDisabled|AccountNotFound|AccountLogonDenied|AccountLoginDeniedNeedTwoFactor|InvalidLoginAuthCode|ExpiredLoginAuthCode|RateLimitExceeded|LimitExceeded|ServiceUnavailable|NoConnection|AccessDenied)([ (.].*)?$/\2/p' "$log" | tail -1)"
-            case "$status" in
-              InvalidPassword) reason="Steam rejected the credentials or session token (InvalidPassword); check the configured secrets." ;;
-              AccountLogonDenied|AccountLoginDeniedNeedTwoFactor|InvalidLoginAuthCode|ExpiredLoginAuthCode)
-                reason="Steam requires valid Guard authentication; authenticate locally and configure a valid session token." ;;
-              AccountDisabled|AccountNotFound|AccessDenied)
-                reason="Steam denied this account; verify the username and account access locally." ;;
-              RateLimitExceeded|LimitExceeded) reason="Steam rate limited authentication; wait before retrying." ;;
-              ServiceUnavailable|NoConnection) reason="Steam is unavailable; retry after connectivity recovers." ;;
-            esac
-            if [[ "$result" == 124 || "$result" == 137 ]]; then
-              reason="Steam timed out; verify connectivity and account access before retrying."
-            elif grep -Eq '^Steam (Guard requires |rejected the supplied Guard code\.)' "$log"; then
-              reason="Steam Guard is missing or rejected; authenticate locally and configure a valid session token."
-            elif grep -Eq '^Could not get depot key for app=[0-9]+ depot=[0-9]+: AccessDenied$' "$log"; then
-              reason="Steam denied depot access; verify this account owns the game and can access its files."
-            fi
-            printf '%s failed (exit %s): %s\n' "$phase" "$result" "$reason" >&2
-          }
-
-          mount_dir="$RUNNER_TEMP/arc-depot"
-          mkdir -p "$mount_dir"
-          # One client resolves and mounts the manifest. A separate login could invalidate its token.
-          # GitHub masks these secrets. Keep raw Steam logs off the job log and out of artifacts.
-          timeout --kill-after=15s 130m dotnet "$depotfs" mount "${depot_args[@]}" \
-            --timeout 7800 --mount-point "$mount_dir" \
-            > "$RUNNER_TEMP/steam-mount.log" 2>&1 &
-          mount_pid=$!
-          cleanup() {
-            timeout --kill-after=5s 10s fusermount3 -u "$mount_dir" >/dev/null 2>&1 || true
-            kill "$mount_pid" >/dev/null 2>&1 || true
-            for _ in {1..5}; do
-              if ! kill -0 "$mount_pid" 2>/dev/null; then
-                return
-              fi
-              sleep 1
-            done
-            kill -KILL "$mount_pid" >/dev/null 2>&1 || true
-          }
-          trap cleanup EXIT
-          unset STEAM_USERNAME STEAM_PASSWORD STEAM_ACCESS_TOKEN
-          for _ in {1..120}; do
-            if mountpoint -q "$mount_dir"; then
-              break
-            fi
-            if ! kill -0 "$mount_pid" 2>/dev/null; then
-              result=0
-              wait "$mount_pid" || result=$?
-              report_steam_failure "Steam mount" "$result" "$RUNNER_TEMP/steam-mount.log"
-              exit 1
-            fi
-            sleep 1
-          done
-          if ! mountpoint -q "$mount_dir"; then
-            report_steam_failure "Steam mount" 124 "$RUNNER_TEMP/steam-mount.log"
-            exit 1
-          fi
-          manifest_id="$(sed -nE 's/^mounting app=1808500 depot=1808501 manifest=(.*) at .+$/\1/p' "$RUNNER_TEMP/steam-mount.log" | sort -u)"
-          # Compare equal-length decimal strings: Bash arithmetic cannot represent every uint64.
-          # shellcheck disable=SC2071
-          if [[ ! "$manifest_id" =~ ^[1-9][0-9]*$ ]] ||
-            [[ ${#manifest_id} -gt 20 ]] ||
-            [[ ${#manifest_id} -eq 20 && "$manifest_id" > 18446744073709551615 ]]; then
-            echo "SteamDepotFS did not announce one valid mounted manifest." >&2
-            exit 1
-          fi
-          {
-            echo "Extractor commit: $GITHUB_SHA"
-            echo "Steam app: 1808500; depot: 1808501; manifest: $manifest_id"
-          } >> "$GITHUB_STEP_SUMMARY"
-          game_dir="$mount_dir/PioneerGame/Content/Paks"
-          timeout --kill-after=5s 20s test -d "$game_dir"
-          timeout --kill-after=15s 120m dotnet run --project src/AssetIndex -c Release --no-build -- \
-            --game-dir "$game_dir" --usmap mappings/ArcRaiders.usmap \
-            --output "$RUNNER_TEMP/asset-index-preview"
-
-      - name: Save preview artifacts
+          digest="$(dotnet src/PublishSnapshot/bin/Release/net10.0/PublishSnapshot.dll \
+            --export-digest "$RUNNER_TEMP/asset-index-public")"
+          [[ "$digest" =~ ^[0-9a-f]{64}$ ]]
+          echo "export_sha256=$digest" >> "$GITHUB_OUTPUT"
+      - name: Transfer approved public files
+        id: upload
         timeout-minutes: 5
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: asset-index-preview-${{ github.run_id }}
-          retention-days: 7
-          if-no-files-found: warn
-          path: |
-            ${{ runner.temp }}/asset-index-preview/assets.json
-            ${{ runner.temp }}/asset-index-preview/asset_index.csv
-            ${{ runner.temp }}/asset-index-preview/asset_localizations.csv
-            ${{ runner.temp }}/asset-index-preview/coverage.json
-            ${{ runner.temp }}/asset-index-preview/resources.json
-            ${{ runner.temp }}/asset-index-preview/discovery/
-            ${{ runner.temp }}/asset-index-preview/localization/
-            ${{ runner.temp }}/asset-index-preview/images/
+          name: asset-snapshot-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/asset-index-public/
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
+
+  publish:
+    name: Publish validated snapshot
+    needs: [plan, extract]
+    if: ${{ (github.event_name == 'schedule' && vars.ASSET_UPDATES_ENABLED == 'true') || inputs.publish }}
+    environment: asset-publication
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    env:
+      CUE4PARSE_SKIP_NATIVE: 'true'
+      EXTRACTOR_COMMIT: ${{ needs.plan.outputs.extractor_commit }}
+      MANIFEST_ID: ${{ needs.plan.outputs.manifest_id }}
+      EXPORT_SHA256: ${{ needs.extract.outputs.export_sha256 }}
+      EXPECTED_METADATA_BLOB: ${{ needs.plan.outputs.expected_metadata_blob }}
+    steps:
+      - name: Check out released publisher
+        timeout-minutes: 5
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.plan.outputs.extractor_commit }}
+          persist-credentials: false
+          submodules: recursive
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /src/
+            /vendor/
+            /mappings/
+            /scripts/automation/
+            /global.json
+            /Directory.*
+            /NuGet.config
+            /.gitmodules
+      - name: Set up .NET
+        timeout-minutes: 5
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: 10.0.302
+      - name: Build released publisher
+        timeout-minutes: 15
+        run: dotnet build src/PublishSnapshot/PublishSnapshot.csproj -c Release --nologo
+      - name: Download this run's public export
+        timeout-minutes: 5
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ needs.extract.outputs.artifact_id }}
+          path: ${{ runner.temp }}/asset-index-public
+          merge-multiple: true
+      - name: Recheck publication state and publish atomically
+        timeout-minutes: 10
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 scripts/automation/update.py current
+          gh auth setup-git --hostname github.com
+          dotnet src/PublishSnapshot/bin/Release/net10.0/PublishSnapshot.dll --publish-export \
+            "$RUNNER_TEMP/asset-index-public" https://github.com/raidertool/asset-index.git \
+            "$EXTRACTOR_COMMIT" "$MANIFEST_ID" "$EXPORT_SHA256" "$EXPECTED_METADATA_BLOB"

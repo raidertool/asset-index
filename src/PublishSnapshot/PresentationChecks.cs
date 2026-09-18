@@ -9,18 +9,18 @@ internal static class PresentationChecks
     private sealed record Reference(string Namespace, string Key, string Source, bool CultureInvariant);
     private sealed record Candidate(string Kind, string Role, string Class, string Field, Reference Value);
 
-    public static void Validate(JsonElement asset, HashSet<string> sources, HashSet<string> discovered)
+    public static void Validate(JsonElement asset, HashSet<string> sources, Func<string, bool> objectExists)
     {
         var presentation = asset.GetProperty("presentation");
         Fields(presentation, "name", "description", "candidates", "containers", "visualSlots", "inventoryRoots");
-        var containerSources = ReadContainers(presentation.GetProperty("containers"), sources, discovered);
+        var containerSources = ReadContainers(presentation.GetProperty("containers"), sources, objectExists);
         var owners = new Dictionary<string, HashSet<string>>
         {
             ["definition"] = asset.GetProperty("definitions").EnumerateArray().Select(source => ObjectPath(source, "path")).ToHashSet(StringComparer.Ordinal),
             ["metadata"] = asset.GetProperty("metadata").EnumerateArray().Select(source => ObjectPath(source, "path")).ToHashSet(StringComparer.Ordinal),
             ["container"] = containerSources,
-            ["visual-slot"] = VisualSlotChecks.Read(presentation.GetProperty("visualSlots"), sources, discovered),
-            ["inventory-root"] = InventoryRootChecks.Read(presentation.GetProperty("inventoryRoots"), sources, discovered)
+            ["visual-slot"] = VisualSlotChecks.Read(presentation.GetProperty("visualSlots"), sources, objectExists),
+            ["inventory-root"] = InventoryRootChecks.Read(presentation.GetProperty("inventoryRoots"), sources, objectExists)
         };
         var candidates = new List<Candidate>();
         foreach (var candidate in presentation.GetProperty("candidates").EnumerateArray())
@@ -30,7 +30,7 @@ internal static class PresentationChecks
             Require(owners.ContainsKey(kind), "Unknown text source kind.");
             var path = ObjectPath(candidate, "sourcePath");
             Require(owners[kind].Contains(path), "Text candidate is not linked to this asset with its declared source kind.");
-            Require(discovered.Contains(ObjectPath(candidate, "definedAt")), "Text candidate defining object is missing.");
+            Require(objectExists(ObjectPath(candidate, "definedAt")), "Text candidate defining object is missing.");
             candidates.Add(new(kind, String(candidate, "role"), String(candidate, "sourceClass"),
                 String(candidate, "field"), ReadReference(candidate.GetProperty("reference"))));
         }
@@ -81,7 +81,7 @@ internal static class PresentationChecks
         return null;
     }
 
-    private static HashSet<string> ReadContainers(JsonElement containers, HashSet<string> sources, HashSet<string> discovered)
+    private static HashSet<string> ReadContainers(JsonElement containers, HashSet<string> sources, Func<string, bool> objectExists)
     {
         var containerSources = new HashSet<string>(StringComparer.Ordinal);
         foreach (var container in containers.EnumerateArray())
@@ -92,7 +92,7 @@ internal static class PresentationChecks
             String(container, "containerType");
             Require(container.GetProperty("containerIndex").GetInt32() >= 0, "Invalid container index.");
             foreach (var field in new[] { "framePath", "slotPath", "metadataPath" })
-                Require(discovered.Contains(ObjectPath(container, field)), "Container presentation lacks object evidence.");
+                Require(objectExists(ObjectPath(container, field)), "Container presentation lacks object evidence.");
             var slot = ObjectPath(container, "slotPath");
             var target = container.GetProperty("containerPath");
             if (role == "container-slot")
@@ -100,7 +100,7 @@ internal static class PresentationChecks
             else
             {
                 var path = ObjectPath(container, "containerPath");
-                Require(discovered.Contains(path) && sources.Contains(path), "Default container is not this asset's source.");
+                Require(objectExists(path) && sources.Contains(path), "Default container is not this asset's source.");
             }
             containerSources.Add(ObjectPath(container, "metadataPath"));
         }

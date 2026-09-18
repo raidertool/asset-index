@@ -21,7 +21,7 @@ internal sealed record Preview(SnapshotFiles Snapshot) : IDisposable
             Require(coverage.RootElement.GetProperty("status").GetString() == "succeeded", "Preview is incomplete.");
             Require(coverage.RootElement.GetProperty("issues").GetArrayLength() == 0, "Preview has diagnostics.");
             var evidence = ResourceEvidence.Read(snapshot.Files, coverage.RootElement);
-            ValidateRecords(assets.RootElement, coverage.RootElement, evidence);
+            ValidateCatalog(assets.RootElement, coverage.RootElement, evidence.Localizations, evidence.Resources, evidence.ObjectPaths.Contains);
             TextOriginChecks.Validate(assets.RootElement, snapshot.Files["discovery/objects.jsonl.gz"]);
             SemanticChecks.Validate(assets.RootElement, snapshot.Files, coverage.RootElement);
             CsvChecks.Validate(assets.RootElement, snapshot.Files);
@@ -36,7 +36,9 @@ internal sealed record Preview(SnapshotFiles Snapshot) : IDisposable
         return JsonDocument.Parse(stream);
     }
 
-    private static void ValidateRecords(JsonElement assets, JsonElement report, ResourceEvidence evidence)
+    internal static void ValidateCatalog(JsonElement assets, JsonElement report,
+        IReadOnlyList<LocalizationEvidence> localizations, IReadOnlyDictionary<string, ResourceImage> resources,
+        Func<string, bool> objectExists)
     {
         Require(assets.ValueKind == JsonValueKind.Array && assets.GetArrayLength() > 0, "Preview has no asset records.");
         var ids = new HashSet<string>(StringComparer.Ordinal);
@@ -51,14 +53,14 @@ internal sealed record Preview(SnapshotFiles Snapshot) : IDisposable
             Require(ids.Add(id), $"Duplicate asset ID: {id}");
             Require(asset.GetProperty("definitions").GetArrayLength() > 0, $"Asset {id} has no publishable definition.");
             var sources = new HashSet<string>(StringComparer.Ordinal);
-            ValidateSources(asset.GetProperty("definitions"), sources, evidence.ObjectPaths);
-            ValidateSources(asset.GetProperty("metadata"), sources, evidence.ObjectPaths);
+            ValidateSources(asset.GetProperty("definitions"), sources, objectExists);
+            ValidateSources(asset.GetProperty("metadata"), sources, objectExists);
             Require(sources.Count > 0, $"Asset {id} has no sources.");
-            PresentationChecks.Validate(asset, sources, evidence.ObjectPaths);
-            var english = LocalizedTextChecks.Validate(asset.GetProperty("text"), evidence.Localizations, asset.GetProperty("presentation"));
+            PresentationChecks.Validate(asset, sources, objectExists);
+            var english = LocalizedTextChecks.Validate(asset.GetProperty("text"), localizations, asset.GetProperty("presentation"));
             if (english.Name) names++;
             if (english.Description) descriptions++;
-            if (ValidateImages(asset.GetProperty("images"), sources, evidence.Resources)) illustrated++;
+            if (ValidateImages(asset.GetProperty("images"), sources, resources)) illustrated++;
         }
         CheckCount(report, "assetIds", ids.Count);
         CheckCount(report, "englishNames", names);
@@ -69,14 +71,14 @@ internal sealed record Preview(SnapshotFiles Snapshot) : IDisposable
         CheckCount(report, "loaded", candidates);
     }
 
-    private static void ValidateSources(JsonElement sources, HashSet<string> paths, HashSet<string> discovered)
+    private static void ValidateSources(JsonElement sources, HashSet<string> paths, Func<string, bool> objectExists)
     {
         foreach (var source in sources.EnumerateArray())
         {
             Fields(source, "name", "class", "path");
             Require(!string.IsNullOrWhiteSpace(String(source, "name")) && !string.IsNullOrWhiteSpace(String(source, "class")), "Source names and classes must not be blank.");
             var path = String(source, "path");
-            Require(path.StartsWith('/') && !path.Any(char.IsControl) && paths.Add(path) && discovered.Contains(path), "Invalid or duplicate source path.");
+            Require(path.StartsWith('/') && !path.Any(char.IsControl) && paths.Add(path) && objectExists(path), "Invalid or duplicate source path.");
         }
     }
 

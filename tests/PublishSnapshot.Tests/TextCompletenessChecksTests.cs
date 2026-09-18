@@ -167,7 +167,7 @@ public sealed class TextCompletenessChecksTests
             var sources = Asset["definitions"]!.AsArray().Concat(Asset["metadata"]!.AsArray())
                 .Select(value => value!["path"]!.GetValue<string>()).ToHashSet(StringComparer.Ordinal);
             var discovered = Fixture.Objects.Select(value => value["path"]!.GetValue<string>()).ToHashSet(StringComparer.Ordinal);
-            PresentationChecks.Validate(document.RootElement, sources, discovered);
+            PresentationChecks.Validate(document.RootElement, sources, discovered.Contains);
         }
 
         public void Dispose() => Fixture.Dispose();

@@ -29,20 +29,26 @@ internal sealed class SnapshotFiles : IDisposable
     internal static readonly string[] Required = ["asset_index.csv", "asset_localizations.csv", "assets.json", "coverage.json", "resources.json", "discovery/objects.jsonl.gz", "discovery/exports.jsonl.gz", "discovery/files.jsonl.gz", "discovery/registry.jsonl.gz", "discovery/packages.jsonl.gz", "localization/en.jsonl.gz"];
 
     public static bool Allowed(string path) => path == "discovery/package-index.jsonl.gz" || Required.Contains(path) || ResourceFiles.IsImagePath(path) || LocalePath.IsMatch(path);
-    public static SnapshotFiles Capture(string source)
+    public static SnapshotFiles Capture(string source) => Capture(source, Allowed, Required, ["images", "discovery", "localization"]);
+
+    public static SnapshotFiles CapturePublic(string source) => Capture(source,
+        path => path == "metadata.json" || DataSnapshot.Allowed(path),
+        [.. DataSnapshot.Required, "metadata.json"], ["images", "localization"]);
+
+    private static SnapshotFiles Capture(string source, Func<string, bool> allowed, string[] required, string[] roots)
     {
         var snapshot = new SnapshotFiles();
         Directory.CreateDirectory(snapshot.directory);
         try
         {
-            snapshot.CopyDirectory(System.IO.Path.GetFullPath(source), "");
-            foreach (var path in Required) Preview.Require(snapshot.Files.ContainsKey(path), $"Missing preview file: {path}");
+            snapshot.CopyDirectory(System.IO.Path.GetFullPath(source), "", allowed, roots);
+            foreach (var path in required) Preview.Require(snapshot.Files.ContainsKey(path), $"Missing preview file: {path}");
             return snapshot;
         }
         catch { snapshot.Dispose(); throw; }
     }
 
-    private void CopyDirectory(string source, string prefix)
+    private void CopyDirectory(string source, string prefix, Func<string, bool> allowed, string[] roots)
     {
         Preview.Require((File.GetAttributes(source) & FileAttributes.ReparsePoint) == 0, "Preview directories cannot be links.");
         foreach (var entry in Directory.EnumerateFileSystemEntries(source).Order(StringComparer.Ordinal))
@@ -52,12 +58,12 @@ internal sealed class SnapshotFiles : IDisposable
             var relative = prefix + System.IO.Path.GetFileName(entry);
             if ((attributes & FileAttributes.Directory) != 0)
             {
-                Preview.Require(relative is "images" or "discovery" or "localization" ||
+                Preview.Require(roots.Contains(relative) ||
                     relative.StartsWith("images/", StringComparison.Ordinal) && ResourceFiles.IsImagePath(relative + "/probe.png"), $"Unexpected preview directory: {relative}");
-                CopyDirectory(entry, relative + "/");
+                CopyDirectory(entry, relative + "/", allowed, roots);
                 continue;
             }
-            Preview.Require(Allowed(relative), $"Unexpected preview file: {relative}");
+            Preview.Require(allowed(relative), $"Unexpected preview file: {relative}");
             var target = System.IO.Path.Combine(directory, relative);
             Directory.CreateDirectory(System.IO.Path.GetDirectoryName(target)!);
             File.Copy(entry, target);

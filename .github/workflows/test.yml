@@ -30,8 +30,12 @@ jobs:
         run: bash tests/ci/test-prepare-runner-disk.sh
       - name: Test preview Steam session offline
         run: python3 tests/ci/test-extract-preview.py
+      - name: Test update scheduling offline
+        run: python3 tests/ci/test-update.py
       - name: Test source release policy offline
         run: python3 tests/ci/test-release.py
+      - name: Build Steam authentication helper
+        run: dotnet build src/SteamAuthToken/SteamAuthToken.csproj -c Release --nologo
       - name: Run offline tests
         run: dotnet test tests/AssetIndex.Tests/AssetIndex.Tests.csproj -c Release --nologo
       - name: Test snapshot publisher offline

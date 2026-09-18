@@ -16,10 +16,15 @@ internal static class ContentDigest
 
     public static string Tree(IEnumerable<Entry> entries) => Calculate(entries.Where(entry => DataSnapshot.Payload(entry.Path)));
 
-    private static string Calculate(IEnumerable<Entry> entries)
+    // The job handoff includes exact coverage and metadata bytes. Dataset identity
+    // intentionally excludes those files so diagnostic changes do not version data.
+    public static string ExportFiles(IReadOnlyDictionary<string, SnapshotFile> files) => Calculate(files
+        .Select(pair => new Entry("100644", BlobId(pair.Value), pair.Key)), "asset-index-export-v1\n");
+
+    private static string Calculate(IEnumerable<Entry> entries, string prefix = "asset-index-content-v1\n")
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        hash.AppendData(Encoding.UTF8.GetBytes("asset-index-content-v1\n"));
+        hash.AppendData(Encoding.UTF8.GetBytes(prefix));
         foreach (var entry in entries.OrderBy(entry => entry.Path, StringComparer.Ordinal))
             hash.AppendData(Encoding.UTF8.GetBytes($"{entry.Mode} {entry.ObjectId}\t{entry.Path}\n"));
         return Convert.ToHexStringLower(hash.GetHashAndReset());

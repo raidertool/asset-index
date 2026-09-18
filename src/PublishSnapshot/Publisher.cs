@@ -44,7 +44,24 @@ internal static class Publisher
         var metadata = Metadata.Create(extractorCommit, manifestId, ContentDigest.Files(snapshot.Files));
         var directory = Path.Combine(Path.GetTempPath(), "asset-index-publish-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
-        try { return PublishSnapshot(directory, remote, snapshot, metadata); }
+        try { return PublishSnapshot(directory, remote, snapshot.Files, metadata); }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    public static Publication PublishExport(string exportDirectory, string remote, string extractorCommit,
+        string manifestId, string exportSha256, string expectedMetadataBlob)
+    {
+        Metadata.ValidateProvenance(extractorCommit, manifestId);
+        Preview.Require(Regex.IsMatch(exportSha256, @"\A[0-9a-f]{64}\z", RegexOptions.CultureInvariant), "Invalid export digest.");
+        Preview.Require(expectedMetadataBlob == "missing" ||
+            Regex.IsMatch(expectedMetadataBlob, @"\A[0-9a-f]{40}\z", RegexOptions.CultureInvariant),
+            "Expected metadata blob must be a Git SHA-1 or missing.");
+        using var export = PublicExport.Read(exportDirectory, exportSha256);
+        Preview.Require(export.Metadata == Metadata.Create(extractorCommit, manifestId, export.Metadata.ContentSha256),
+            "Export metadata differs from the trusted extraction result.");
+        var directory = Path.Combine(Path.GetTempPath(), "asset-index-publish-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try { return PublishSnapshot(directory, remote, export.Files, export.Metadata, expectedMetadataBlob); }
         finally { Directory.Delete(directory, recursive: true); }
     }
 
@@ -63,14 +80,15 @@ internal static class Publisher
         Directory.CreateDirectory(staging);
         try
         {
-            WriteSnapshot(staging, snapshot, metadata);
+            WriteSnapshot(staging, snapshot.Files, metadata);
             Directory.Move(staging, output);
         }
         finally { if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true); }
         return metadata;
     }
 
-    private static Publication PublishSnapshot(string directory, string remote, DataSnapshot snapshot, Metadata metadata)
+    private static Publication PublishSnapshot(string directory, string remote,
+        IReadOnlyDictionary<string, SnapshotFile> files, Metadata metadata, string? expectedMetadataBlob = null)
     {
         var git = new Git(directory);
         git.Run("init", "--quiet");
@@ -95,14 +113,23 @@ internal static class Publisher
                 "Main no longer contains this release; refusing to restore an older snapshot.");
             return new(false, commit, tag);
         }
+        if (expectedMetadataBlob is not null)
+            Preview.Require((entries.SingleOrDefault(entry => entry.Path == "metadata.json")?.ObjectId ?? "missing") == expectedMetadataBlob,
+                "Published metadata changed since extraction was planned; retry against the current snapshot.");
         foreach (var entry in entries) File.Delete(Path.Combine(directory, entry.Path));
-        WriteSnapshot(directory, snapshot, metadata);
-        var roots = entries.Select(entry => entry.Path).Concat(snapshot.Files.Keys).Append("metadata.json")
+        WriteSnapshot(directory, files, metadata);
+        var expectedMetadata = git.Run("hash-object", "--no-filters", "coverage.json", "metadata.json");
+        var roots = entries.Select(entry => entry.Path).Concat(files.Keys).Append("metadata.json")
             .Select(path => path.Split('/')[0]).Distinct(StringComparer.Ordinal).ToArray();
         git.Run(["add", "--force", "--all", "--", .. roots]);
         var staged = git.Run("write-tree").Trim();
-        Preview.Require(ContentDigest.Tree(GeneratedTree(git, staged)) == metadata.ContentSha256,
+        var stagedEntries = GeneratedTree(git, staged);
+        Preview.Require(ContentDigest.Tree(stagedEntries) == metadata.ContentSha256,
             "Git transformed generated content; publication was not attempted.");
+        var stagedMetadata = string.Concat(new[] { "coverage.json", "metadata.json" }
+            .Select(path => stagedEntries.Single(entry => entry.Path == path).ObjectId + "\n"));
+        Preview.Require(stagedMetadata == expectedMetadata,
+            "Git transformed generated metadata; publication was not attempted.");
         if (git.Run("diff", "--cached", "--name-only").Length > 0)
             git.Run("-c", "user.name=alexbowe", "-c", "user.email=alex@alexbowe.com", "commit", "--quiet", "-m", "chore: update asset snapshot");
         var published = git.Run("rev-parse", "HEAD").Trim();
@@ -110,15 +137,16 @@ internal static class Publisher
         return new(true, published, tag);
     }
 
-    private static void WriteSnapshot(string directory, DataSnapshot snapshot, Metadata metadata)
+    private static void WriteSnapshot(string directory, IReadOnlyDictionary<string, SnapshotFile> files, Metadata metadata)
     {
-        foreach (var (path, file) in snapshot.Files)
+        foreach (var (path, file) in files)
         {
             var target = Path.Combine(directory, path);
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
             File.Copy(file.Path, target);
         }
-        File.WriteAllBytes(Path.Combine(directory, "metadata.json"), JsonSerializer.SerializeToUtf8Bytes(metadata, Preview.Json));
+        if (!files.ContainsKey("metadata.json"))
+            File.WriteAllBytes(Path.Combine(directory, "metadata.json"), JsonSerializer.SerializeToUtf8Bytes(metadata, Preview.Json));
     }
 
     private static ContentDigest.Entry[] GeneratedTree(Git git, string commit)

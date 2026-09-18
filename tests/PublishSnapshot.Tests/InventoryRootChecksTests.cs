@@ -179,7 +179,7 @@ public sealed class InventoryRootChecksTests
             case "wrong-category": relation["containerType"] = "ENewInventoryContainerType::Augment"; break;
         }
         using var json = JsonDocument.Parse(rows.ToJsonString());
-        Assert.Throws<InvalidDataException>(() => InventoryRootChecks.Read(json.RootElement, sources, discovered));
+        Assert.Throws<InvalidDataException>(() => InventoryRootChecks.Read(json.RootElement, sources, discovered.Contains));
     }
 
     [Fact]

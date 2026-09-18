@@ -52,7 +52,7 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, IReadOnlyLi
         unavailable.Complete(inputs, discovery);
         ExportCoverage.Validate(files, report, inputs, objectTypes, targets, uiTextures, requiredBodies);
         var locales = ReadLocalizations(files);
-        var resources = ReadResources(files, objects);
+        var resources = ReadResources(files, objects.Contains);
         Require(uiTextures.IsSubsetOf(resources.Keys), "A registry UI texture lacks a published resource.");
         CheckCount(discovery, "resources", resources.Count);
         return new(objects, locales, resources);
@@ -121,7 +121,7 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, IReadOnlyLi
         return objects;
     }
 
-    private static IReadOnlyList<LocalizationEvidence> ReadLocalizations(IReadOnlyDictionary<string, SnapshotFile> files)
+    internal static IReadOnlyList<LocalizationEvidence> ReadLocalizations(IReadOnlyDictionary<string, SnapshotFile> files)
     {
         var locales = new List<LocalizationEvidence>();
         foreach (var (path, file) in files.Where(pair => SnapshotFiles.LocalePath.IsMatch(pair.Key)))
@@ -168,7 +168,7 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, IReadOnlyLi
         return (encoded.Length / 4 - 1) * 3 + count;
     }
 
-    private static Dictionary<string, ResourceImage> ReadResources(IReadOnlyDictionary<string, SnapshotFile> files, HashSet<string> objects)
+    internal static Dictionary<string, ResourceImage> ReadResources(IReadOnlyDictionary<string, SnapshotFile> files, Func<string, bool> objectExists)
     {
         using var document = ReadJson(files, "resources.json");
         var resources = new Dictionary<string, ResourceImage>(StringComparer.Ordinal);
@@ -177,7 +177,7 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, IReadOnlyLi
         {
             Fields(row, "path", "status", "file", "width", "height");
             var path = ObjectPath(row, "path");
-            Require(objects.Contains(path), "Image resource lacks object evidence.");
+            Require(objectExists(path), "Image resource lacks object evidence.");
             Require(String(row, "status") == "exported", "Image resource failed to export.");
             var file = String(row, "file");
             Require(file == ResourceFiles.ImagePath(path) && images.Add(file), "Invalid or duplicate resource file.");

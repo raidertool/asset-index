@@ -233,7 +233,7 @@ public sealed class PresentationChecksTests
     private static void Validate(JsonNode asset)
     {
         using var json = JsonDocument.Parse(asset.ToJsonString());
-        PresentationChecks.Validate(json.RootElement, [Definition, Metadata], [Definition, Metadata, Container, RootLabel]);
+        PresentationChecks.Validate(json.RootElement, [Definition, Metadata], new HashSet<string> { Definition, Metadata, Container, RootLabel }.Contains);
     }
 }
 

@@ -11,10 +11,12 @@ Initialize submodules as described in the [README](README.md#run-locally), then:
 CUE4PARSE_SKIP_NATIVE=true dotnet test tests/AssetIndex.Tests/AssetIndex.Tests.csproj -c Release
 dotnet test tests/PublishSnapshot.Tests/PublishSnapshot.Tests.csproj -c Release
 python3 tests/ci/test-release.py
+python3 tests/ci/test-update.py
+python3 tests/ci/test-extract-preview.py
 bash tests/ci/test-prepare-runner-disk.sh
 ```
 
-CI is offline. Publisher and release tests use temporary local Git repositories;
+Pull-request CI is offline. Publisher and release tests use temporary local Git repositories;
 they do not contact GitHub. Use your installed game or your own Steam credentials
 for live checks. Keep credentials, game files and complete previews out of Git
 and issues. State when live compatibility was not tested.
@@ -41,8 +43,8 @@ the relevant offline tests for dependency changes.
 Use `feat`, `fix`, or a breaking-change marker for relevant software changes.
 The release script checks changed file paths rather than trusting the commit
 scope. It includes `src/`, `vendor/`, `.usmap` files under `mappings/`, and root SDK,
-solution and dependency configuration, plus the extraction workflow and runner
-disk-preparation script. Docs and generated output are excluded.
+solution and dependency configuration, plus update/Steam scripts, the extraction
+workflow and runner disk-preparation script. Docs and generated output are excluded.
 
 Preview the version locally with `python3 scripts/release/version.py`; this only
 reads Git. After successful push CI on `main`, the serialized release workflow

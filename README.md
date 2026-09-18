@@ -62,10 +62,10 @@ Exit codes: `0` succeeded, `1` incomplete, `2` invalid input. Inspect coverage
 and affected rows/images even after success. Partial output is diagnostic evidence;
 retry into a new directory. Full `discovery/` evidence remains in the preview.
 
-Game-backed previews run locally or in a private repository. The
-[manual workflow](.github/workflows/extract.yml) skips extraction and artifact
-upload in public repositories. Public CI runs offline without Steam credentials.
-A successful preview does not publish itself.
+Pull-request CI runs offline without Steam credentials. The separate
+[update workflow](.github/workflows/extract.yml) uses released source on `main`
+for live extraction. Manual runs default to exporting public files without
+publishing. Complete previews and authentication logs are never uploaded.
 
 ## Versions and publication
 
@@ -100,8 +100,26 @@ atomically without overwriting a concurrent writer.
 performs the same validation and writes only public files locally. Full discovery
 evidence and diagnostic messages are excluded.
 
-Scheduling and importer cutover remain pending a game-backed rehearsal. The
-existing dataset remains available until its validated replacement is ready.
+## Automatic updates
+
+Once enabled, GitHub checks public Steam version information every five minutes.
+Only an unpublished release triggers Steam login and extraction. Failed attempts
+have a one-hour cooldown; later checks retry. GitHub can delay or skip scheduled
+runs, and disables schedules after 60 days without repository activity. Manual
+runs remain available; `force` re-extracts the current release. Dispatch manual
+runs after an active update finishes: newer scheduled runs can replace a pending run.
+
+Extraction uses the latest immutable `exfil-v*` release on `main`. A separate
+job publishes its validated public export; source changes alone do not trigger
+extraction. Public export artifacts expire after one day. No game files, Steam
+caches, full discovery records or authentication logs are uploaded or cached.
+
+Maintainers: restrict the `steam-extraction` and `asset-publication` environments
+to `main`. Put only `STEAM_USERNAME` and `STEAM_PASSWORD` in `steam-extraction`;
+the publisher uses the repository's `GITHUB_TOKEN`. Confirm branch/tag rules allow
+its atomic update, test a manual export, then explicitly select `publish` for the
+first publication. Set `ASSET_UPDATES_ENABLED=true` to enable scheduled updates.
+Until then, the schedule skips extraction; manual runs remain available.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for tests and mapping updates, and
 [implementation notes](docs/notes.md) for selection and validation rules.

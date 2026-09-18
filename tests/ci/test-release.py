@@ -76,11 +76,14 @@ class ReleaseTests(unittest.TestCase):
                 self.git("tag", version)
 
     def test_runtime_extraction_orchestration_counts_as_software(self):
-        self.commit(".github/workflows/extract.yml", "fix: correct Steam mount timeout")
-        self.assertEqual(release.plan(self.repo)["tag"], "exfil-v0.13.3")
-        self.git("tag", "exfil-v0.13.3")
-        self.commit("scripts/ci/prepare-runner-disk.sh", "fix: retain enough extraction disk space")
-        self.assertEqual(release.plan(self.repo)["tag"], "exfil-v0.13.4")
+        paths = [".github/workflows/extract.yml", "scripts/ci/prepare-runner-disk.sh",
+                 "scripts/steam/extract.sh", "scripts/steam/install.py", "scripts/automation/update.py"]
+        for patch, path in enumerate(paths, start=3):
+            with self.subTest(path=path):
+                self.commit(path, "fix: correct update orchestration")
+                tag = f"exfil-v0.13.{patch}"
+                self.assertEqual(release.plan(self.repo)["tag"], tag)
+                self.git("tag", tag)
 
     def test_actual_paths_override_commit_scope(self):
         self.commit("docs/notes.md", "fix(extractor): typo")

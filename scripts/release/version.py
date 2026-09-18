@@ -30,7 +30,7 @@ def ancestor(repo, older, newer):
 def source_path(path):
     if Path(path).suffix.lower() in {".md", ".rst", ".adoc"}:
         return False
-    return (path.startswith(("src/", "vendor/")) or path == "vendor/CUE4Parse"
+    return (path.startswith(("src/", "vendor/", "scripts/steam/", "scripts/automation/")) or path == "vendor/CUE4Parse"
             or (path.startswith("mappings/") and path.endswith(".usmap"))
             or path in BUILD_FILES or path in RUNTIME_FILES
             or ("/" not in path and path.endswith((".sln", ".slnx"))))

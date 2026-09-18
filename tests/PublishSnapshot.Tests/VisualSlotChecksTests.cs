@@ -51,6 +51,6 @@ public sealed class VisualSlotChecksTests
     {
         using var json = JsonDocument.Parse(new JsonArray(slots).ToJsonString());
         return VisualSlotChecks.Read(json.RootElement, ["/Game/Slot.Slot"],
-            ["/Game/Slot.Slot", "/Game/Nav.Nav", "/Game/Item.Item", "/Game/ItemUi.ItemUi"]);
+            new HashSet<string> { "/Game/Slot.Slot", "/Game/Nav.Nav", "/Game/Item.Item", "/Game/ItemUi.ItemUi" }.Contains);
     }
 }

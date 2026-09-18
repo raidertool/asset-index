@@ -69,6 +69,14 @@ Generated output includes both CSVs, catalog, resources, all exported PNGs,
 localization, coverage and metadata. Each published file must fit GitHub's 100 MiB
 blob limit.
 
+Public CI validates the full preview before transferring its public export to a
+fresh publisher job. `--export-digest` hashes every exported file, including
+coverage and metadata; this handoff hash is separate from data identity below.
+`--publish-export` requires that hash, the source/Steam identities and the previously
+observed metadata Git blob. It rechecks public structure and exact bytes; original
+object evidence was checked upstream. Never accept this digest from an untrusted
+run or execute files from the transferred artifact.
+
 ## Data identity
 
 `metadata.json` uses this shape:
