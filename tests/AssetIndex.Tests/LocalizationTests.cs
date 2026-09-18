@@ -94,10 +94,11 @@ public sealed class LocalizationTests : IDisposable
 
         var rows = Text.Localize(provider, assets, issues);
 
-        Assert.Equal(3, rows.Count);
+        Assert.Equal(4, rows.Count);
         Assert.Contains(new LocalizedText(1, "en", "XP", ""), rows);
         Assert.Contains(new LocalizedText(1, locale, "XP", ""), rows);
-        Assert.Contains(new LocalizedText(2, "en", "English source", ""), rows);
+        Assert.Contains(new LocalizedText(2, "en", "", ""), rows);
+        Assert.Contains(new LocalizedText(2, locale, "", ""), rows);
         Assert.Empty(issues);
     }
 
