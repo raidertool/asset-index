@@ -21,11 +21,12 @@ internal sealed class ReferenceClosure
         return added || promoted;
     }
 
-    public IEnumerable<ExtractionIssue> Check(IEnumerable<string> objects)
+    public IEnumerable<ExtractionIssue> Check(IEnumerable<string> objects, IReadOnlySet<string>? provenHeaderOnly = null)
     {
         var found = objects.ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var (target, source) in origins)
-            if (!found.Contains(target) && (NeedsBody(target) || !inventoryOnly.Contains(target)))
+            if (!found.Contains(target) && !(provenHeaderOnly?.Contains(target) ?? false) &&
+                (NeedsBody(target) || !inventoryOnly.Contains(target)))
                 yield return new("reference", source, $"Referenced object was not decoded: {target}.");
     }
 }

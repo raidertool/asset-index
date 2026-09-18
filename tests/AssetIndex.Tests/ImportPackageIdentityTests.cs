@@ -120,7 +120,7 @@ public sealed class ImportPackageIdentityTests
         return reader;
     }
 
-    private static FFilePackageStoreEntry Store(params FPackageId[] imports)
+    internal static FFilePackageStoreEntry Store(params FPackageId[] imports)
     {
         var bytes = new byte[16 + imports.Length * sizeof(ulong)];
         BinaryPrimitives.WriteInt32LittleEndian(bytes, imports.Length);

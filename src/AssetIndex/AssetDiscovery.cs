@@ -4,6 +4,7 @@ using CUE4Parse.FileProvider.Objects;
 using CUE4Parse.UE4.Assets;
 using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Assets.Exports.Texture;
+using CUE4Parse.UE4.Objects.UObject;
 
 namespace AssetIndex;
 
@@ -16,6 +17,10 @@ internal sealed record DiscoveryResult(IReadOnlyList<CatalogAsset> Assets, IRead
     public int RegisteredAssets => Registry.Count;
     public int Candidates => Packages.Count;
     public int Loaded => Packages.Count(package => package.Status == "succeeded");
+    public int UnmappedNonCatalogExports { get; init; }
+    public IReadOnlyList<ExtractionIssue> Notices { get; init; } = [];
+    public int UnavailableSoftReferences { get; init; }
+    public int UnavailableHardReferences { get; init; }
 }
 
 internal static class AssetDiscovery
@@ -37,6 +42,9 @@ internal sealed class ObjectCrawler(PackageProvider provider, Action<ObjectEvide
     private readonly CUE4Parse.MappingsProvider.TypeMappings mappings = provider.MappingsForGame
         ?? throw new InvalidDataException("Asset discovery requires type mappings.");
     private readonly List<ExtractionIssue> issues = [];
+    private readonly List<ExtractionIssue> notices = [];
+    private int unavailableSoftReferences;
+    private int unavailableHardReferences;
     private readonly DiagnosticSamples diagnostics = new(Console.Error);
     private readonly Queue<PackageWork> pendingPackages = new();
     private readonly Queue<(PackageWork Package, ExportHeader Header)> pendingExports = new();
@@ -45,6 +53,10 @@ internal sealed class ObjectCrawler(PackageProvider provider, Action<ObjectEvide
     private readonly Dictionary<string, (ObjectReference Source, string Origin)> objects = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, ObjectLocation> uiTextures = new(StringComparer.OrdinalIgnoreCase);
     private readonly ReferenceClosure references = new();
+    private readonly Dictionary<string, ExportHeader> headers = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> headerOnly = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ClassScope classScope = new(provider.MappingsForGame
+        ?? throw new InvalidDataException("Asset discovery requires type mappings."), provider.MappingSha256);
     private Dictionary<string, RegisteredObject[]> registeredPackages = new(StringComparer.OrdinalIgnoreCase);
     private int inspected;
     private int decoded;
@@ -89,12 +101,18 @@ internal sealed class ObjectCrawler(PackageProvider provider, Action<ObjectEvide
             if (++decoded % 250 == 0) ReportProgress(owner.Path);
         }
         progress?.Set("reference-closure");
-        foreach (var issue in references.Check(objects.Keys)) AddIssue(issue, "reference:missing-target");
+        foreach (var issue in references.Check(objects.Keys, headerOnly)) AddIssue(issue, "reference:missing-target");
         progress?.Set("catalog");
         var allObjects = objects.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => pair.Value.Source).ToArray();
         var reads = packages.Values.OrderBy(package => package.Path, StringComparer.Ordinal).Select(package => package.Report()).ToArray();
         return new(catalog.Complete(), allObjects, registry, files, reads, issues,
-            uiTextures.Values.OrderBy(location => location.Path, StringComparer.Ordinal).ToArray());
+            uiTextures.Values.OrderBy(location => location.Path, StringComparer.Ordinal).ToArray())
+        {
+            Notices = notices,
+            UnavailableSoftReferences = unavailableSoftReferences,
+            UnavailableHardReferences = unavailableHardReferences,
+            UnmappedNonCatalogExports = headerOnly.Count
+        };
     }
 
     private PackageWork RequestPackage(string path, string reason)
@@ -142,7 +160,12 @@ internal sealed class ObjectCrawler(PackageProvider provider, Action<ObjectEvide
         }
 
         progress?.Set("write-export-headers", work.Path);
-        foreach (var header in work.Headers) writeHeader(header);
+        foreach (var header in work.Headers)
+        {
+            writeHeader(header);
+            if (header.Path is { } path && !headers.TryAdd(path, header))
+                PackageIssue(work, "metadata", path, "Duplicate export path across inspected packages.");
+        }
         if (!packageNames.TryAdd(work.Name!, work))
         {
             var first = packageNames[work.Name!];
@@ -151,8 +174,6 @@ internal sealed class ObjectCrawler(PackageProvider provider, Action<ObjectEvide
         }
         foreach (var header in work.Headers)
         {
-            if (header.Error is not null)
-                PackageIssue(work, "metadata", $"{work.Path}#export/{header.Index}", header.Error);
             if (Registry.SelectClass(header)) Select(work, header);
         }
         foreach (var entry in registeredPackages.GetValueOrDefault(work.Path, []))
@@ -174,6 +195,11 @@ internal sealed class ObjectCrawler(PackageProvider provider, Action<ObjectEvide
             return;
         }
         var header = matches[0];
+        if (CanOmitBody(header))
+        {
+            references.Inventory(target);
+            return;
+        }
         if (references.NeedsBody(target) || Registry.FollowClass(header)) Select(work, header);
         else references.Inventory(target);
     }
@@ -205,6 +231,15 @@ internal sealed class ObjectCrawler(PackageProvider provider, Action<ObjectEvide
     private void ReadExport(PackageWork work, ExportHeader header, CatalogCollector catalog, IReadOnlySet<string> uiPaths)
     {
         var origin = $"{work.Path}#export/{header.Index}";
+        if (CanOmitBody(header) && !uiPaths.Contains(header.Path!))
+        {
+            work.Selected.Remove(header.Index);
+            references.Inventory(header.Path!);
+            if (headerOnly.Add(header.Path!))
+                notices.Add(new("schema", header.Path!, "Field layout is unavailable; verified class family is outside catalog selection. Header retained."));
+            return;
+        }
+        if (header.Error is not null) PackageIssue(work, "metadata", origin, header.Error);
         progress?.Set("decode-export", work.Path, header.Index);
         UObject source;
         try
@@ -221,9 +256,7 @@ internal sealed class ObjectCrawler(PackageProvider provider, Action<ObjectEvide
         }
         progress?.Set("read-evidence", work.Path, header.Index);
         var evidence = EvidenceReader.Read(source);
-        if (!string.Equals(header.Path, evidence.Path, StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(header.Class, evidence.Class, StringComparison.OrdinalIgnoreCase))
-            PackageIssue(work, "metadata", origin, $"Decoded object {evidence.Class} {evidence.Path} disagrees with its export header {header.Class} {header.Path}.");
+        CheckHeader(work, header, evidence, source is UStruct, origin);
         ReadEvidence(evidence, work, header.Index);
         work.Decoded.Add(header.Index);
         if (evidence.Path.Length == 0) return;
@@ -240,8 +273,27 @@ internal sealed class ObjectCrawler(PackageProvider provider, Action<ObjectEvide
         catch (Exception error) { PackageIssue(work, "image", evidence.Path, AssetDiscovery.DescribeError(error)); }
     }
 
+    private void CheckHeader(PackageWork work, ExportHeader header, ObjectEvidence evidence, bool declaration, string origin)
+    {
+        if (!string.Equals(header.Path, evidence.Path, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(header.Class, evidence.Class, StringComparison.OrdinalIgnoreCase))
+            PackageIssue(work, "metadata", origin, $"Decoded object {evidence.Class} {evidence.Path} disagrees with its export header {header.Class} {header.Path}.");
+        var classPath = evidence.References.FirstOrDefault(edge => edge.Pointer == "/Class")?.TargetPath;
+        if (!string.Equals(header.ClassPath, classPath, StringComparison.OrdinalIgnoreCase))
+            PackageIssue(work, "metadata", origin, "Decoded qualified class differs from its export header.");
+        if (declaration && !string.Equals(header.SuperPath,
+            evidence.References.FirstOrDefault(edge => edge.Pointer == "/Native/SuperStruct")?.TargetPath, StringComparison.OrdinalIgnoreCase))
+            PackageIssue(work, "metadata", origin, "Decoded superclass differs from its export header.");
+    }
+
+    private bool CanOmitBody(ExportHeader header) => !header.AncestryComplete && header.Error is not null &&
+        header.Path is not null && header.ClassPath is not null && classScope.CanOmitBody(header.ClassPath, path =>
+            headers.TryGetValue(path, out var declaration) && declaration.ClassPath is { } meta
+                ? new(meta, declaration.SuperPath, declaration.AncestryComplete && declaration.Error is null) : null);
+
     private void ReadEvidence(ObjectEvidence evidence, PackageWork owner, int exportIndex)
     {
+        evidence = ClassifyUnavailable(evidence, owner, exportIndex);
         progress?.Set("write-evidence", owner.Path, exportIndex);
         writeEvidence(evidence);
         progress?.Set("follow-references", owner.Path, exportIndex);
@@ -249,6 +301,12 @@ internal sealed class ObjectCrawler(PackageProvider provider, Action<ObjectEvide
             PackageIssue(owner, "evidence", evidence.Path + issue.Pointer, issue.Message);
         foreach (var reference in evidence.References)
         {
+            if (reference.Unavailable is not null && IsNoncritical(evidence, reference, owner, exportIndex))
+            {
+                if (reference.Kind == "soft") unavailableSoftReferences++;
+                else unavailableHardReferences++;
+                continue;
+            }
             if (reference.Error is not null)
                 PackageIssue(owner, "reference", evidence.Path + reference.Pointer, reference.Error);
             if (reference.IsNull || reference.TargetPath is not { } target || target.StartsWith("/Script/", StringComparison.OrdinalIgnoreCase)) continue;
@@ -261,6 +319,36 @@ internal sealed class ObjectCrawler(PackageProvider provider, Action<ObjectEvide
             work.Targets.TryAdd(target, source);
             if (changed && work.Headers is not null && work.Failure is null) SelectTarget(work, target, source);
         }
+    }
+
+    private ObjectEvidence ClassifyUnavailable(ObjectEvidence evidence, PackageWork owner, int exportIndex)
+    {
+        return evidence with
+        {
+            References = evidence.References.Select(reference =>
+        {
+            if (reference.Kind != "soft" || reference.IsNull || reference.Error is not null || reference.TargetPath is not { } target ||
+                provider.InputIndex.MissingSoft(target) is not { } missing ||
+                !IsNoncritical(evidence, reference, owner, exportIndex)) return reference;
+            return reference with { Unavailable = missing };
+        }).ToArray()
+        };
+    }
+
+    private bool IsNoncritical(ObjectEvidence evidence, ReferenceEvidence reference, PackageWork owner, int exportIndex)
+    {
+        if (reference.Role != "property" || evidence.Issues.Count != 0 || ReferencePolicy.RootPointer(reference.Pointer) is not { } root)
+            return false;
+        var field = evidence.Properties.SingleOrDefault(property => property.Pointer == root);
+        if (field is null || ReferencePolicy.ProtectedFields.Contains(field.Name)) return false;
+        try
+        {
+            var source = LoadPackage(owner).ExportsLazy[exportIndex].Value;
+            var schema = ClassSchema.Read(source, mappings);
+            return schema.Error is null && ReferencePolicy.AllowsUnavailable(schema.NativeAncestry, field.Name) &&
+                schema.HasProperty(field.Name, field.Type);
+        }
+        catch (Exception) { return false; } // Failure is retained by normal strict reference handling.
     }
 
     private void PackageIssue(PackageWork package, string stage, string path, string message)

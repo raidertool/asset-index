@@ -19,11 +19,16 @@ internal class PackageProvider(string directory) : TheiaFileProvider(directory, 
     // identity keeps shadowed archive versions distinct; their page spool survives reloads.
     private readonly ConcurrentDictionary<GameFile, PackageEntry> packages = new(ReferenceEqualityComparer.Instance);
     private readonly ConditionalWeakTable<IPackage, GameFile> packageFiles = new();
+    private readonly ConcurrentDictionary<ulong, byte> loadedPackageIds = new();
     private readonly PackageArchiveStore archives = new();
     private bool disposed;
+    private Discovery.PackageInputIndex? inputIndex;
+    internal Discovery.PackageInputIndex InputIndex => inputIndex ??= new(this);
+    internal bool HasLoadedPackageId(ulong id) => loadedPackageIds.ContainsKey(id);
     internal long CachedPackageBytes => archives.CachedBytes;
     internal long SpooledPackageBytes => archives.SpooledBytes;
     internal long PackageSpoolAvailableBytes => new DriveInfo(archives.DirectoryPath).AvailableFreeSpace;
+    internal string? MappingSha256 { get; set; }
 
     public override IPackage LoadPackage(GameFile file)
     {
@@ -33,6 +38,7 @@ internal class PackageProvider(string directory) : TheiaFileProvider(directory, 
             var package = ReadPackage(file);
             if (!ReferenceEquals(packageFiles.GetValue(package, _ => file), file))
                 throw new InvalidDataException("Package instance maps to multiple physical files.");
+            loadedPackageIds.TryAdd(FPackageId.FromName(package.Name).id, 0);
             return package;
         });
     }

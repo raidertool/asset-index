@@ -15,4 +15,6 @@ internal sealed record RunReport(
     IReadOnlyList<ExtractionIssue> Notices,
     DiscoveryCoverage Discovery);
 
-internal sealed record DiscoveryCoverage(string NativeScope, string MappingSha256, int Objects, int Resources);
+internal sealed record DiscoveryCoverage(string NativeScope, string MappingSha256, int Objects, int Resources,
+    int UnavailableSoftReferences = 0, int UnavailableHardReferences = 0, int UnmappedNonCatalogExports = 0,
+    IReadOnlyList<InputContainer>? InputContainers = null);

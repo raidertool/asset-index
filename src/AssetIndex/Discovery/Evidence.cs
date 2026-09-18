@@ -15,7 +15,11 @@ internal sealed record PropertyEvidence(
 
 internal sealed record ReferenceEvidence(
     string Pointer, string Kind, string Role, string? TargetPath, bool IsNull,
-    string? Package, int? PackageIndex, int? ExportIndex, string? Error);
+    string? Package, int? PackageIndex, int? ExportIndex, string? Error)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public UnavailableReference? Unavailable { get; init; }
+}
 
 internal sealed record TextEvidence(
     string Pointer, uint Flags, string History, string? Namespace, string? Key,

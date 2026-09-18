@@ -37,6 +37,13 @@ unrelated exports can remain header-only. Exact object/outer paths and superclas
 references must agree. A loaded package does not mean every body or native payload
 was decoded.
 
+Missing layouts can remain header-only when independently verified class-family
+evidence excludes catalog data; this never supplies a guessed decoding schema.
+Ordinary exploratory references may be unavailable only when the inspected package
+indexes prove absence. Catalog dependencies remain strict. Coverage format 3
+reports these limits in `exploration`: unavailable soft/hard reference counts and
+unmapped non-catalog export counts. Private evidence stays in `discovery/`.
+
 Evidence preserves property pointers, reference kinds, nulls, explicit empty
 values and exact numbers. Property ordinals describe decoded order, not declaration
 slots. Homogeneous fixed-width numeric arrays use `numeric-le-base64`: canonical

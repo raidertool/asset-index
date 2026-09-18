@@ -54,13 +54,19 @@ internal sealed class DataSnapshot : IDisposable
         var discovery = source.GetProperty("discovery");
         var result = new Dictionary<string, object>
         {
-            ["formatVersion"] = 2,
+            ["formatVersion"] = 3,
             ["status"] = "succeeded"
         };
         foreach (var field in new[] { "registeredAssets", "candidates", "loaded", "assetIds", "englishNames", "descriptions", "images" })
             result.Add(field, source.GetProperty(field).GetInt32());
         result.Add("issueCounts", new { total = 0 });
         result.Add("noticeCount", source.GetProperty("notices").GetArrayLength());
+        result.Add("exploration", new
+        {
+            unavailableSoftReferences = Count("unavailableSoftReferences"),
+            unavailableHardReferences = Count("unavailableHardReferences"),
+            unmappedNonCatalogExports = Count("unmappedNonCatalogExports")
+        });
         result.Add("discovery", new
         {
             mappingSha256 = Preview.String(discovery, "mappingSha256"),
@@ -68,6 +74,7 @@ internal sealed class DataSnapshot : IDisposable
             resources = discovery.GetProperty("resources").GetInt32()
         });
         return JsonSerializer.SerializeToUtf8Bytes(result, Preview.Json);
+        int Count(string field) => discovery.TryGetProperty(field, out var value) ? value.GetInt32() : 0;
     }
 
     public void Dispose() => Directory.Delete(directory, recursive: true);

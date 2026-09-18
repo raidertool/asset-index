@@ -34,7 +34,8 @@ public sealed partial class PublisherTests
         Assert.True(File.Exists(Path.Combine(preview, unowned)));
         Assert.True(File.Exists(Path.Combine(preview, "discovery/objects.jsonl.gz")));
         using var coverage = JsonDocument.Parse(remoteGit.Run("show", result.Commit + ":coverage.json"));
-        Assert.Equal(2, coverage.RootElement.GetProperty("formatVersion").GetInt32());
+        Assert.Equal(3, coverage.RootElement.GetProperty("formatVersion").GetInt32());
+        Assert.All(coverage.RootElement.GetProperty("exploration").EnumerateObject(), field => Assert.Equal(0, field.Value.GetInt32()));
         Assert.Equal(0, coverage.RootElement.GetProperty("issueCounts").GetProperty("total").GetInt32());
         Assert.False(coverage.RootElement.TryGetProperty("issues", out _));
         Assert.False(coverage.RootElement.TryGetProperty("notices", out _));

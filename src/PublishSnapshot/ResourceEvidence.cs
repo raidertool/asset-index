@@ -14,7 +14,11 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, IReadOnlyLi
     public static ResourceEvidence Read(IReadOnlyDictionary<string, SnapshotFile> files, JsonElement report)
     {
         var discovery = report.GetProperty("discovery");
-        Fields(discovery, "nativeScope", "mappingSha256", "objects", "resources");
+        Fields(discovery, discovery.TryGetProperty("unavailableSoftReferences", out _)
+            ? (discovery.TryGetProperty("inputContainers", out _)
+                ? ["nativeScope", "mappingSha256", "objects", "resources", "unavailableSoftReferences", "unavailableHardReferences", "unmappedNonCatalogExports", "inputContainers"]
+                : ["nativeScope", "mappingSha256", "objects", "resources", "unavailableSoftReferences", "unavailableHardReferences", "unmappedNonCatalogExports"])
+            : ["nativeScope", "mappingSha256", "objects", "resources"]);
         String(discovery, "nativeScope");
         Require(Regex.IsMatch(String(discovery, "mappingSha256"), "\\A[0-9a-f]{64}\\z"), "Invalid mapping hash.");
         foreach (var notice in report.GetProperty("notices").EnumerateArray())
@@ -24,7 +28,8 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, IReadOnlyLi
         }
         var targets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var requiredBodies = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var objectTypes = ReadObjects(files["discovery/objects.jsonl.gz"], targets, requiredBodies);
+        var unavailable = new UnavailableInputs(files);
+        var objectTypes = ReadObjects(files["discovery/objects.jsonl.gz"], targets, requiredBodies, unavailable);
         var objects = objectTypes.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
         CheckCount(discovery, "objects", objects.Count);
         var registry = new HashSet<string>(StringComparer.Ordinal);
@@ -44,6 +49,7 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, IReadOnlyLi
         });
         CheckCount(report, "registeredAssets", registry.Count);
         var inputs = MountedInputs.Read(files["discovery/files.jsonl.gz"], registryPackages);
+        unavailable.Complete(inputs, discovery);
         ExportCoverage.Validate(files, report, inputs, objectTypes, targets, uiTextures, requiredBodies);
         var locales = ReadLocalizations(files);
         var resources = ReadResources(files, objects);
@@ -53,7 +59,7 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, IReadOnlyLi
     }
 
     private static Dictionary<string, string> ReadObjects(SnapshotFile file, HashSet<string> targets,
-        HashSet<string> requiredBodies)
+        HashSet<string> requiredBodies, UnavailableInputs unavailable)
     {
         var objects = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         JsonLines.Read(file, row =>
@@ -64,12 +70,15 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, IReadOnlyLi
             var properties = PropertyHeaders.Read(row.GetProperty("properties"));
             foreach (var reference in row.GetProperty("references").EnumerateArray())
             {
-                Fields(reference, "pointer", "kind", "role", "targetPath", "isNull", "package", "packageIndex", "exportIndex", "error");
+                Fields(reference, reference.TryGetProperty("unavailable", out _)
+                    ? ["pointer", "kind", "role", "targetPath", "isNull", "package", "packageIndex", "exportIndex", "error", "unavailable"]
+                    : ["pointer", "kind", "role", "targetPath", "isNull", "package", "packageIndex", "exportIndex", "error"]);
                 var pointer = String(reference, "pointer");
                 var role = String(reference, "role");
                 properties.ValidatePointer(pointer); String(reference, "kind");
                 Require((pointer == "/Native/ClassDefaultObject") == (role == "class-default") &&
                     (pointer == "/Template") == (role == "template"), "Reference role differs from its native field.");
+                if (unavailable.Reference(row, reference)) continue;
                 Require(reference.GetProperty("error").ValueKind == JsonValueKind.Null, "Object reference failed to resolve.");
                 var isNull = reference.GetProperty("isNull").GetBoolean();
                 Require(isNull == (reference.GetProperty("targetPath").ValueKind == JsonValueKind.Null), "Inconsistent null reference.");

@@ -15,6 +15,7 @@ internal static class SemanticChecks
         var fields = IdentityContext.RootFields.Concat(PresentationRelationChecks.RootFields)
             .Concat(ImageOriginChecks.RootFields).Concat(TextRoleChecks.RootFields);
         var evidence = DecodedEvidence.Read(files["discovery/objects.jsonl.gz"], fields, schemas.ObserveObject);
+        UnavailableInputs.ValidateDependencies(files["discovery/objects.jsonl.gz"], schemas);
         var identities = new IdentityContext(evidence, schemas);
         identities.Validate(assets);
         new PresentationRelationChecks(evidence, identities).Validate(assets);

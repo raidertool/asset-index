@@ -1,3 +1,4 @@
+using AssetIndex;
 using System.Text.Json;
 using static PublishSnapshot.Preview;
 
@@ -9,7 +10,8 @@ internal sealed class ExportCoverage
 {
     private static readonly string[] Roots = ["DataAsset", "UIMetaDataItem", "DataTable", "CurveTable", "StringTable", "Blueprint", "BlueprintGeneratedClass"];
     private static readonly string[] ReferenceRoots = ["Struct", "Texture", "MaterialInterface", "Widget", "WidgetTree", "PanelSlot"];
-    private sealed record Header(string Path, string Class, string? SuperPath, string[] Ancestry)
+    private sealed record Header(string Path, string Class, string ClassPath, string? SuperPath,
+        string[] Ancestry, bool Complete)
     {
         public bool Candidate => Roots.Any(root => Ancestry.Contains(root, StringComparer.OrdinalIgnoreCase));
         public bool Follow => Candidate || ReferenceRoots.Any(root => Ancestry.Contains(root, StringComparer.OrdinalIgnoreCase));
@@ -21,6 +23,7 @@ internal sealed class ExportCoverage
     private readonly Dictionary<string, SortedDictionary<int, Header>> headers = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> decoded = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> names = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> headerOnly = new(StringComparer.OrdinalIgnoreCase);
 
     public static void Validate(IReadOnlyDictionary<string, SnapshotFile> files, JsonElement report, MountedInputs inputs,
         IReadOnlyDictionary<string, string> objects, IEnumerable<string> targets, IReadOnlySet<string> uiTextures,
@@ -31,6 +34,7 @@ internal sealed class ExportCoverage
         CheckCount(report, "candidates", coverage.packages.Count);
         Require(inputs.Paths.SetEquals(coverage.packages.Keys), "A mounted package was not inspected.");
         coverage.ReadHeaders(files["discovery/exports.jsonl.gz"]);
+        coverage.CheckScopes(files, report);
         coverage.CheckObjects(objects, uiTextures);
         coverage.CheckReferences(targets.Concat(coverage.paths.Values.Select(header => header.SuperPath).OfType<string>()), inputs, requiredBodies);
     }
@@ -60,12 +64,15 @@ internal sealed class ExportCoverage
         Require(packages.TryGetValue(package, out var owner), "Export header lacks an inspected package.");
         var index = row.GetProperty("index").GetInt32();
         Require(index >= 0 && index < owner!.Exports, "Export header index is outside its package.");
-        Require(row.GetProperty("error").ValueKind == JsonValueKind.Null && row.GetProperty("ancestryComplete").GetBoolean(),
-            "Export header metadata is incomplete.");
+        var complete = row.GetProperty("ancestryComplete").GetBoolean();
+        Require(complete == (row.GetProperty("error").ValueKind == JsonValueKind.Null), "Export header metadata is inconsistent.");
+        if (!complete) String(row, "error");
         var path = ResourceEvidence.ObjectPath(row, "path");
         Require(path.Contains('.') && PackageName(path).Equals(owner!.Name, StringComparison.OrdinalIgnoreCase), "Export header has the wrong package name.");
         var type = String(row, "class");
-        ResourceEvidence.ObjectPath(row, "classPath");
+        var classPath = ResourceEvidence.ObjectPath(row, "classPath");
+        Require(classPath.Contains('.') && ShortName(classPath).Equals(type, StringComparison.OrdinalIgnoreCase),
+            "Export class differs from its qualified class path.");
         var superPath = row.GetProperty("superPath").ValueKind == JsonValueKind.Null
             ? null : ResourceEvidence.ObjectPath(row, "superPath");
         Require(superPath is null || superPath.Contains('.'), "Superclass header must name an object.");
@@ -75,11 +82,71 @@ internal sealed class ExportCoverage
             return value.GetString()!;
         }).ToArray();
         Require(ancestry.Length is > 0 and <= 128 && ancestry[0].Equals(type, StringComparison.OrdinalIgnoreCase) &&
-            ancestry[^1].Equals("Object", StringComparison.OrdinalIgnoreCase), "Incomplete export ancestry.");
-        var header = new Header(path, type, superPath, ancestry);
+            (!complete || ancestry[^1].Equals("Object", StringComparison.OrdinalIgnoreCase)), "Incomplete export ancestry.");
+        var header = new Header(path, type, classPath, superPath, ancestry, complete);
         Require(headers[package].TryAdd(index, header), "Duplicate export header index.");
         Require(paths.TryAdd(path, header), "Ambiguous export header paths differ only by case or repeat.");
     });
+
+    private void CheckScopes(IReadOnlyDictionary<string, SnapshotFile> files, JsonElement report)
+    {
+        var discovery = report.GetProperty("discovery");
+        var incomplete = paths.Values.Where(header => !header.Complete).ToArray();
+        if (incomplete.Length > 0)
+        {
+            var hash = String(discovery, "mappingSha256");
+            var mappings = IdentitySchemas.LoadMappings(Path.Combine(AppContext.BaseDirectory, "mappings", "ArcRaiders.usmap"), hash);
+            var scope = new ClassScope(mappings, hash);
+            var declarations = ReadScopeDeclarations(files["discovery/objects.jsonl.gz"]);
+            foreach (var header in incomplete)
+            {
+                Require(scope.CanOmitBody(header.ClassPath, path => declarations.GetValueOrDefault(path)),
+                    $"Export header metadata is incomplete: {header.Path}.");
+                // The recorded partial ancestry must be the actual runtime chain
+                // ending at the missing native layout, not an invented root.
+                var ancestry = new List<string>();
+                var current = header.ClassPath;
+                while (!current.StartsWith("/Script/", StringComparison.OrdinalIgnoreCase))
+                {
+                    ancestry.Add(ShortName(current));
+                    current = paths[current].SuperPath!;
+                }
+                ancestry.Add(ShortName(current));
+                Require(header.Ancestry.SequenceEqual(ancestry, StringComparer.OrdinalIgnoreCase),
+                    "Incomplete ancestry contradicts the verified class declarations.");
+                headerOnly.Add(header.Path);
+            }
+        }
+        var declared = discovery.TryGetProperty("unmappedNonCatalogExports", out var value) ? value.GetInt32() : 0;
+        Require(declared == headerOnly.Count, "Unmapped non-catalog export count is inconsistent.");
+    }
+
+    private Dictionary<string, ClassScopeDeclaration> ReadScopeDeclarations(SnapshotFile file)
+    {
+        var result = new Dictionary<string, ClassScopeDeclaration>(StringComparer.OrdinalIgnoreCase);
+        JsonLines.Read(file, row =>
+        {
+            var path = String(row, "path");
+            if (!paths.TryGetValue(path, out var header) || !header.Complete || header.SuperPath is null) return;
+            if (!header.ClassPath.Equals("/Script/UMG.WidgetBlueprintGeneratedClass", StringComparison.OrdinalIgnoreCase) &&
+                !header.ClassPath.Equals("/Script/Engine.BlueprintGeneratedClass", StringComparison.OrdinalIgnoreCase)) return;
+            var references = row.GetProperty("references").EnumerateArray().ToArray();
+            if (!Matches("/Class", "class", "resolved", header.ClassPath) ||
+                !Matches("/Native/SuperStruct", "super", "hard", header.SuperPath)) return;
+            result.Add(path, new(header.ClassPath, header.SuperPath, true));
+            bool Matches(string pointer, string role, string kind, string target)
+            {
+                var links = references.Where(edge => String(edge, "pointer") == pointer).ToArray();
+                return links.Length == 1 && String(links[0], "role") == role && String(links[0], "kind") == kind &&
+                    links[0].GetProperty("targetPath").ValueKind == JsonValueKind.String &&
+                    String(links[0], "targetPath").Equals(target, StringComparison.OrdinalIgnoreCase) &&
+                    !row.GetProperty("values").EnumerateArray().Concat(row.GetProperty("texts").EnumerateArray())
+                        .Any(value => String(value, "pointer") == pointer ||
+                            String(value, "pointer").StartsWith(pointer + "/", StringComparison.Ordinal));
+            }
+        });
+        return result;
+    }
 
     private void CheckObjects(IReadOnlyDictionary<string, string> objects, IReadOnlySet<string> uiTextures)
     {
@@ -90,6 +157,7 @@ internal sealed class ExportCoverage
             foreach (var (index, header) in exports)
             {
                 var selected = owner.Selected.Contains(index);
+                Require(!headerOnly.Contains(header.Path) || !selected, "An export with an unknown field layout was decoded.");
                 Require(selected || !(header.Candidate || uiTextures.Contains(header.Path)), $"Required export was not selected: {header.Path}.");
                 if (!selected) continue;
                 Require(objects.TryGetValue(header.Path, out var type) && type!.Equals(header.Class, StringComparison.OrdinalIgnoreCase), $"Selected export lacks matching object evidence: {header.Path}.");
@@ -111,7 +179,7 @@ internal sealed class ExportCoverage
             // Package aliases establish a read, never an invented object/outer path.
             if (!target.Contains('.')) continue;
             Require(paths.TryGetValue(target, out var header), $"Named reference target is absent from an inspected package: {target}.");
-            if (header!.Follow || requiredBodies.Contains(target))
+            if (!headerOnly.Contains(target) && (header!.Follow || requiredBodies.Contains(target)))
                 Require(decoded.Contains(target), $"Referenced export was not decoded: {target}.");
         }
     }
@@ -131,4 +199,5 @@ internal sealed class ExportCoverage
     }
 
     private static string PackageName(string path) => path.Split('.', 2)[0];
+    private static string ShortName(string path) => path[(path.LastIndexOf('.') + 1)..];
 }

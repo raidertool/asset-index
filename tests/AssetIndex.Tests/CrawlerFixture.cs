@@ -14,6 +14,9 @@ internal sealed class CrawlerExport(string name, string? type = "DataAsset")
 {
     public string Name { get; } = name;
     public string? Type { get; } = type;
+    public string? ClassPath { get; init; }
+    public int? ClassIndex { get; init; }
+    public string? SuperPath { get; init; }
     public int? OuterIndex { get; init; }
     public Action<UObject>? OnLoad { get; init; }
     public Func<UObject>? Factory { get; init; }
@@ -40,7 +43,9 @@ internal sealed class CrawlerPackage : AbstractUePackage
         for (var index = 0; index < metadata.Length; index++)
         {
             metadata[index].Parent = exports[index].OuterIndex is { } outer ? metadata[outer] : new ResolvedPackageObject(this);
-            metadata[index].Type = exports[index].Type is { } type ? Native(type) : null;
+            metadata[index].Type = exports[index].ClassIndex is { } declaration ? metadata[declaration]
+                : exports[index].Type is { } type ? Native(exports[index].ClassPath ?? "/Script/Fixture." + type) : null;
+            metadata[index].ParentClass = exports[index].SuperPath is { } parent ? Native(parent) : null;
         }
         ExportsLazy = exports.Select((spec, index) => new Lazy<UObject>(() =>
         {
@@ -54,10 +59,11 @@ internal sealed class CrawlerPackage : AbstractUePackage
         })).ToArray();
     }
 
-    private static ResolvedObject Native(string type)
+    private static ResolvedObject Native(string path)
     {
-        var package = new CrawlerPackage("", "/Script/Fixture");
-        return new Node(package, -1, type) { Parent = new ResolvedPackageObject(package) };
+        var split = path.LastIndexOf('.');
+        var package = new CrawlerPackage("", path[..split]);
+        return new Node(package, -1, path[(split + 1)..]) { Parent = new ResolvedPackageObject(package) };
     }
 
     public override FPackageFileSummary Summary { get; } = new();
@@ -73,9 +79,11 @@ internal sealed class CrawlerPackage : AbstractUePackage
     {
         public ResolvedObject? Parent { get; set; }
         public ResolvedObject? Type { get; set; }
+        public ResolvedObject? ParentClass { get; set; }
         public override FName Name => name;
         public override ResolvedObject? Outer => Parent;
         public override ResolvedObject? Class => Type;
+        public override ResolvedObject? Super => ParentClass;
     }
 }
 

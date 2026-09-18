@@ -130,6 +130,13 @@ internal sealed partial class EvidenceReader
         }
         try
         {
+            if (reference.Owner?.Provider is PackageProvider provider && provider.InputIndex.MissingHard(reference) is { } missing)
+            {
+                references.Add(new(pointer, "hard", role, null, false, reference.Owner.Name, reference.Index, null,
+                    "Referenced package is unavailable in the supplied inputs.")
+                { Unavailable = missing });
+                return;
+            }
             var target = reference.ResolvedObject;
             references.Add(new(pointer, "hard", role, target is null ? null : ObjectMetadata.Path(target), false,
                 reference.Owner?.Name, reference.Index, target?.ExportIndex,

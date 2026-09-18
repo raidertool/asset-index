@@ -3,6 +3,7 @@ using CUE4Parse.GameTypes.Theia.FileProvider;
 using CUE4Parse.MappingsProvider.Usmap;
 using CUE4Parse.UE4.IO.Objects;
 using CUE4Parse.UE4.Objects.Core.Misc;
+using System.Security.Cryptography;
 
 namespace AssetIndex;
 
@@ -18,6 +19,7 @@ internal static class GameFiles
         try
         {
             provider.MappingsContainer = new FileUsmapTypeMappingsProvider(options.Usmap);
+            provider.MappingSha256 = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(options.Usmap)));
             provider.Initialize();
             provider.SubmitKey(new FGuid(), new FAesKey(Environment.GetEnvironmentVariable("ARC_AES_KEY") ?? DefaultKey));
             provider.Mount();

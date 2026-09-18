@@ -52,10 +52,12 @@ internal static class Program
         DiscoveryResult? discovery = null;
         var records = new List<AssetRecord>();
         var resourceCount = 0;
+        IReadOnlyList<InputContainer>? inputContainers = null;
         try
         {
             Console.WriteLine("Mounting game containers...");
             using var provider = GameFiles.Open(options);
+            inputContainers = Discovery.PackageInputIndex.Census(provider);
             Console.WriteLine($"Mounted {provider.Files.Count:N0} files. Reading typed object fields and references...");
             var storage = PackageStorage.Read(provider.Files.Values);
             Console.WriteLine($"Mounted IoStore packages including shadowed versions: {storage.Packages:N0} distinct entries, {storage.Bytes:N0} raw bytes.");
@@ -74,7 +76,9 @@ internal static class Program
                 evidence.Complete();
             }
             issues.AddRange(discovery.Issues);
+            notices.AddRange(discovery.Notices);
             Snapshot.WriteLines(options.OutputDirectory, "discovery/packages.jsonl.gz", discovery.Packages);
+            Snapshot.WriteLines(options.OutputDirectory, "discovery/package-index.jsonl.gz", new[] { provider.InputIndex.Record });
             var materials = new MaterialIcons(provider,
                 new(TextureAddress.TA_Wrap, TextureAddress.TA_Wrap, TextureFilter.TF_Bilinear),
                 new(TextureAddress.TA_Clamp, TextureAddress.TA_Clamp, TextureFilter.TF_Bilinear));
@@ -99,7 +103,9 @@ internal static class Program
             records.Count(asset => asset.Text.Any(text => text.Locale == "en" && text.Description.Length > 0)),
             records.Count(asset => asset.Images.Any(image => image.Status == "exported")), issues,
             notices.Distinct().ToArray(), new(Discovery.EvidenceReader.NativeScope,
-                Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(options.Usmap))), discovery?.Objects.Count ?? 0, resourceCount));
+                Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(options.Usmap))), discovery?.Objects.Count ?? 0, resourceCount,
+                discovery?.UnavailableSoftReferences ?? 0, discovery?.UnavailableHardReferences ?? 0,
+                discovery?.UnmappedNonCatalogExports ?? 0, inputContainers));
         Snapshot.Write(options.OutputDirectory, "assets.json", records);
         Snapshot.WriteFile(options.OutputDirectory, CatalogCsv.MainFile,
             stream => CatalogCsv.Write(stream, CatalogCsv.MainRows(records)));

@@ -28,7 +28,7 @@ internal sealed class SnapshotFiles : IDisposable
     internal static readonly Regex LocalePath = new("\\Alocalization/[a-z]{2,3}(?:_[a-z0-9]{2,8})*\\.jsonl\\.gz\\z", RegexOptions.CultureInvariant);
     internal static readonly string[] Required = ["asset_index.csv", "asset_localizations.csv", "assets.json", "coverage.json", "resources.json", "discovery/objects.jsonl.gz", "discovery/exports.jsonl.gz", "discovery/files.jsonl.gz", "discovery/registry.jsonl.gz", "discovery/packages.jsonl.gz", "localization/en.jsonl.gz"];
 
-    public static bool Allowed(string path) => Required.Contains(path) || ResourceFiles.IsImagePath(path) || LocalePath.IsMatch(path);
+    public static bool Allowed(string path) => path == "discovery/package-index.jsonl.gz" || Required.Contains(path) || ResourceFiles.IsImagePath(path) || LocalePath.IsMatch(path);
     public static SnapshotFiles Capture(string source)
     {
         var snapshot = new SnapshotFiles();

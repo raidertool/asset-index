@@ -16,6 +16,9 @@
     <Compile Include="../AssetIndex/ImageFields.cs" Link="ImageFields.cs" />
     <Compile Include="../AssetIndex/InventoryRootPolicy.cs" Link="InventoryRootPolicy.cs" />
     <Compile Include="../AssetIndex/TextRolePolicy.cs" Link="TextRolePolicy.cs" />
+    <Compile Include="../AssetIndex/ReferencePolicy.cs" Link="ReferencePolicy.cs" />
+    <Compile Include="../AssetIndex/PackageIndexRecords.cs" Link="PackageIndexRecords.cs" />
+    <Compile Include="../AssetIndex/ClassScope.cs" Link="ClassScope.cs" />
     <PackageReference Include="SkiaSharp" Version="2.88.9" />
     <PackageReference Include="Microsoft.Bcl.Memory" Version="10.0.4" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="2.88.9" />
