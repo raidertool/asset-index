@@ -1,0 +1,25 @@
+{
+  "formatVersion": 3,
+  "status": "succeeded",
+  "registeredAssets": 123722,
+  "candidates": 119183,
+  "loaded": 119183,
+  "assetIds": 5199,
+  "englishNames": 4046,
+  "descriptions": 1014,
+  "images": 2520,
+  "issueCounts": {
+    "total": 0
+  },
+  "noticeCount": 143,
+  "exploration": {
+    "unavailableSoftReferences": 157,
+    "unavailableHardReferences": 6,
+    "unmappedNonCatalogExports": 129
+  },
+  "discovery": {
+    "mappingSha256": "61018eaea9fed46a1351fbdc5f7429e6f24df8f45fad576b4b15c534b1b359c4",
+    "objects": 89815,
+    "resources": 3045
+  }
+}

@@ -1,12 +1,10 @@
 {
-  "steamBuildId": "25163933",
-  "steamBuildUpdatedAtUtc": "2026-09-08T08:59:53Z",
-  "depots": [
-    {
-      "depotId": "1808501",
-      "manifestId": "4625131891870974441"
-    }
-  ],
-  "tag": "arc-25163933-exfil-v0.13.4",
-  "publishedAtUtc": "2026-09-08T09:21:43Z"
+  "formatVersion": 2,
+  "contentSha256": "06176ddf9733ed277ec824484563111641c2d1f660c7204f9a6ed3d14cd44c23",
+  "extractorCommit": "3de256bbe35d3df8e87b6fcb4c7ab8053f273fb2",
+  "steam": {
+    "appId": 1808500,
+    "depotId": 1808501,
+    "manifestId": "4625131891870974441"
+  }
 }
