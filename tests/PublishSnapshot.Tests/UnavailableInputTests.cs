@@ -225,6 +225,80 @@ public sealed partial class PublisherTests
         Assert.All(fields, field => Assert.Contains(field, ReferencePolicy.ProtectedFields));
     }
 
+    [Fact]
+    public void ProvedUnavailableActorPropertyKeepsTheCatalogComplete()
+    {
+        AddUnavailableActorFixture();
+
+        var result = Publisher.Publish(preview, remote, NextExtractor, "456");
+
+        Assert.True(result.Changed);
+        using var coverage = JsonDocument.Parse(remoteGit.Run("show", "refs/heads/main:coverage.json"));
+        Assert.Equal(1, coverage.RootElement.GetProperty("exploration").GetProperty("unavailableSoftReferences").GetInt32());
+    }
+
+    [Theory]
+    [InlineData("Icon")]
+    [InlineData("PersistenceDataAsset")]
+    [InlineData("InventedField")]
+    public void ActorAbsenceCannotHideProtectedOrUndeclaredFields(string field)
+    {
+        AddUnavailableActorFixture();
+        ChangeLines("discovery/objects.jsonl.gz", rows => Extra(rows)["properties"]![0]!["name"] = field);
+
+        RejectUnavailable("Catalog dependency cannot be unavailable");
+    }
+
+    [Theory]
+    [InlineData("class", "/Class")]
+    [InlineData("template", "/Template")]
+    public void ActorStructuralReferencesStillCannotBeUnavailable(string role, string pointer)
+    {
+        AddUnavailableActorFixture();
+        ChangeLines("discovery/objects.jsonl.gz", rows =>
+        {
+            MissingEdge(rows)["role"] = role;
+            MissingEdge(rows)["pointer"] = pointer;
+        });
+
+        RejectUnavailable("ordinary nonnull property");
+    }
+
+    [Fact]
+    public void ActorAbsenceStillRequiresTheCompleteContainerCensus()
+    {
+        AddUnavailableActorFixture();
+        ChangeJson("coverage.json", node => node["discovery"]!["inputContainers"] = null);
+
+        RejectUnavailable("independent container census");
+    }
+
+    [Fact]
+    public void ActorAbsenceCannotHideAMountedLogicalPackage()
+    {
+        AddUnavailableActorFixture();
+        ChangeLines("discovery/packages.jsonl.gz", rows => rows[0]!["name"] = "/Game/Absent");
+
+        RejectUnavailable("present package identity");
+    }
+
+    private void AddUnavailableActorFixture()
+    {
+        const string type = "MainMenuLevelScriptActor";
+        AddUnavailableFixture(false);
+        ChangeLines("discovery/objects.jsonl.gz", rows =>
+        {
+            var source = Extra(rows);
+            source["class"] = type;
+            source["properties"]![0] = PropertyHeader("/Properties/0", "OutpostLevelDataAsset", "SoftObjectProperty");
+            var classLink = source["references"]!.AsArray().Single(row => row!["role"]!.GetValue<string>() == "class")!;
+            classLink["targetPath"] = "/Script/Fixture." + type;
+            MissingEdge(rows)["pointer"] = "/Properties/0";
+        });
+        ChangeLines("discovery/exports.jsonl.gz", rows => rows[^1] =
+            ExportHeader(UnavailableFile, 0, UnavailableSource, type, "LevelScriptActor", "Actor", "Object"));
+    }
+
     private void RejectUnavailable(string? message = null)
     {
         var refs = remoteGit.Run("show-ref");

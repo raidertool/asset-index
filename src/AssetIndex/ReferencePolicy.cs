@@ -16,7 +16,8 @@ internal static class ReferencePolicy
         StringComparer.OrdinalIgnoreCase);
 
     public static bool AllowsUnavailable(IEnumerable<string> ancestry, string field) =>
-        ancestry.Contains("DataAsset", StringComparer.OrdinalIgnoreCase) && !ProtectedFields.Contains(field);
+        (ancestry.Contains("DataAsset", StringComparer.OrdinalIgnoreCase) ||
+            ancestry.Contains("Actor", StringComparer.OrdinalIgnoreCase)) && !ProtectedFields.Contains(field);
 
     public static string? RootPointer(string pointer)
     {
