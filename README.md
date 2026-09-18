@@ -51,3 +51,7 @@ test coverage or a percentage of the whole game; most consumers can ignore it.
 
 Contribute extractor changes on `main`; dataset documentation changes target
 `data`. See [CONTRIBUTING.md](https://github.com/raidertool/asset-index/blob/main/CONTRIBUTING.md).
+
+## Credits
+
+Thanks to xivy, whose skills made this possible.
