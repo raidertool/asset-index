@@ -8,7 +8,7 @@ public sealed partial class PublisherTests
     public void InitializationCreatesAnOrphanProjectedSnapshotAndNormalRetryIsUnchanged()
     {
         remoteGit.Run("update-ref", "-d", "refs/heads/data");
-        AddUnownedImage("/Game/T_RegistryOnly.T_RegistryOnly", "Texture2D");
+        var unowned = AddUnownedImage("/Game/T_RegistryOnly.T_RegistryOnly", "Texture2D");
         var input = HashFiles(preview);
         var seedReferences = new Git(seed).Run("show-ref");
 
@@ -20,7 +20,7 @@ public sealed partial class PublisherTests
         Assert.Equal("commit", remoteGit.Run("cat-file", "-t", "refs/tags/" + tag).Trim());
         Assert.Equal(commit, remoteGit.Run("rev-list", "--parents", "-n", "1", commit).Trim());
         Assert.Equal(initialCommit, RemoteRef("refs/heads/main"));
-        Assert.Equal(DataSnapshot.Required.Append(Image).Append("metadata.json").Order(),
+        Assert.Equal(DataSnapshot.Required.Concat([Image, unowned, "metadata.json"]).Order(),
             remoteGit.Run("ls-tree", "-r", "--name-only", commit).Split('\n', StringSplitOptions.RemoveEmptyEntries).Order());
         Assert.Equal(File.ReadAllText(Path.Combine(preview, "assets.json")), remoteGit.Run("show", commit + ":assets.json"));
         using var metadata = JsonDocument.Parse(remoteGit.Run("show", commit + ":metadata.json"));
