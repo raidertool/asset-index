@@ -13,7 +13,7 @@ until the validated replacement is published. Source and generated data share `m
 | --- | --- |
 | `asset_index.csv` | `asset_id,asset_name,display_name,description,image,wide_image` |
 | `asset_localizations.csv` | `asset_id,locale,display_name,description` |
-| `assets.json` | Full definitions, presentation sources, localized text and image roles |
+| `assets.json` | Definition and metadata references, presentation sources, localized text and image roles |
 | `resources.json`, `images/` | All exported images, including UI textures without an asset ID |
 | `localization/` | Compressed translation dictionaries |
 | `metadata.json`, `coverage.json` | Snapshot identity and extraction diagnostics |
@@ -22,7 +22,8 @@ IDs are decimal strings in JSON; read CSV IDs as strings too. One ID can have
 multiple definitions and image roles. The core CSV is a convenient projection;
 `assets.json` retains the detail.
 
-Localized JSON and CSV fields stay blank when the selected translation is absent.
+`assets.json.text` and `asset_localizations.csv` fields stay blank when the selected
+translation is absent.
 Authored source text is separate in `presentation.name.source`,
 `presentation.description.source` and candidate references. The English core CSV
 uses the selected English translation, with authored source text as its explicit
@@ -33,6 +34,11 @@ example, `/Game/Pioneer/UI/Icon.Icon` becomes `images/Game/Pioneer/UI/Icon.png`.
 Use the published reference; several assets can share one image. `wide_image`
 contains a supported whole-asset image that is wider than it is tall, when one
 exists. A map region or control icon does not become an item's wide image.
+
+The new CSV renames `display_name_en` and `description_en` to `display_name` and
+`description`. Technical names can change, and previously populated names or
+descriptions can become blank. Use the published image paths instead of
+constructing legacy filenames.
 
 ## Run locally
 
