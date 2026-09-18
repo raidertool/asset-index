@@ -46,14 +46,14 @@ public sealed partial class PublisherTests
     private void AssertEvidenceRejectedBeforeGit()
     {
         var references = remoteGit.Run("show-ref");
-        var publishedFiles = remoteGit.Run("ls-tree", "-r", "refs/heads/data");
+        var publishedFiles = remoteGit.Run("ls-tree", "-r", "refs/heads/main");
         var input = HashFiles(preview);
 
         Assert.Throws<InvalidDataException>(() => Publisher.Publish(preview,
             Path.Combine(root, "nonexistent-remote.git"), NextExtractor, "456"));
 
         Assert.Equal(references, remoteGit.Run("show-ref"));
-        Assert.Equal(publishedFiles, remoteGit.Run("ls-tree", "-r", "refs/heads/data"));
+        Assert.Equal(publishedFiles, remoteGit.Run("ls-tree", "-r", "refs/heads/main"));
         Assert.Equal(input, HashFiles(preview));
     }
 

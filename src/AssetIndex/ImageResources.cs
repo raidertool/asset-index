@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Assets.Exports.Material;
 using CUE4Parse.UE4.Assets.Exports.Texture;
@@ -13,6 +11,7 @@ internal sealed class ImageResources(string output, ICollection<ExtractionIssue>
 {
     private readonly SortedDictionary<string, ImageResource> resources = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ObjectLocation> locations = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> filenames = new(StringComparer.OrdinalIgnoreCase);
     public IReadOnlyCollection<ImageResource> Entries => resources.Values;
 
     public ImageResource Export(ObjectLocation location, Func<ObjectLocation, UObject> load)
@@ -58,8 +57,9 @@ internal sealed class ImageResources(string output, ICollection<ExtractionIssue>
                 UMaterial material when materials is not null => materials.Render(material),
                 _ => throw new NotSupportedException($"Unsupported image source: {source.ExportType}.")
             };
-            var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(path)));
-            var file = $"images/{hash}.png";
+            var file = ResourceFiles.ImagePath(path);
+            if (!filenames.TryAdd(file, path))
+                throw new InvalidDataException($"Image filename conflicts with resource {filenames[file]}: {file}.");
             var bytes = Images.Encode(decoded);
             Snapshot.WriteFile(output, file, stream => stream.Write(bytes));
             result = new(path, "exported", file, decoded.Width, decoded.Height);

@@ -1,0 +1,34 @@
+name: Version extractor
+
+on:
+  workflow_run:
+    workflows: [Test extractor]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-exfil
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event == 'push' &&
+          github.event.workflow_run.head_repository.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+      - name: Publish an immutable source version tag
+        env:
+          TESTED_COMMIT: ${{ github.event.workflow_run.head_sha }}
+        run: python3 scripts/release/version.py --target "$TESTED_COMMIT" --publish

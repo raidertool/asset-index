@@ -101,6 +101,10 @@ internal static class Program
             notices.Distinct().ToArray(), new(Discovery.EvidenceReader.NativeScope,
                 Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(options.Usmap))), discovery?.Objects.Count ?? 0, resourceCount));
         Snapshot.Write(options.OutputDirectory, "assets.json", records);
+        Snapshot.WriteFile(options.OutputDirectory, CatalogCsv.MainFile,
+            stream => CatalogCsv.Write(stream, CatalogCsv.MainRows(records)));
+        Snapshot.WriteFile(options.OutputDirectory, CatalogCsv.LocalizationFile,
+            stream => CatalogCsv.Write(stream, CatalogCsv.LocalizationRows(records)));
         Snapshot.Write(options.OutputDirectory, "coverage.json", report);
         Console.WriteLine($"{report.Status}: {report.AssetIds:N0} IDs, {report.EnglishNames:N0} English names, {report.Images:N0} assets with images, {issues.Count:N0} issues.");
         return issues.Count == 0 ? 0 : 1;

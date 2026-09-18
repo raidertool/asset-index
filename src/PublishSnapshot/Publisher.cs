@@ -7,120 +7,144 @@ namespace PublishSnapshot;
 
 internal sealed record Publication(bool Changed, string Commit, string Tag);
 internal sealed record SteamMetadata(int AppId, int DepotId, string ManifestId);
-internal sealed record Metadata(int FormatVersion, string ExtractorCommit, SteamMetadata Steam)
+internal sealed record Metadata(int FormatVersion, string ContentSha256, string ExtractorCommit, SteamMetadata Steam)
 {
-    public static Metadata Create(string extractorCommit, string manifestId)
+    public static Metadata Create(string extractorCommit, string manifestId, string contentSha256)
     {
-        Preview.Require(Regex.IsMatch(extractorCommit, "\\A[0-9a-f]{40}\\z", RegexOptions.CultureInvariant), "Extractor commit must be 40 lowercase hexadecimal characters.");
-        Preview.Require(ulong.TryParse(manifestId, NumberStyles.None, CultureInfo.InvariantCulture, out var manifest) && manifest > 0 && manifest.ToString(CultureInfo.InvariantCulture) == manifestId, "Manifest ID must be a canonical positive uint64 string.");
-        return new(1, extractorCommit, new(1808500, 1808501, manifestId));
+        ValidateProvenance(extractorCommit, manifestId);
+        Preview.Require(Regex.IsMatch(contentSha256, @"\A[0-9a-f]{64}\z", RegexOptions.CultureInvariant), "Invalid snapshot content digest.");
+        return new(2, contentSha256, extractorCommit, new(1808500, 1808501, manifestId));
     }
 
-    public static Metadata Read(string path)
+    public static void ValidateProvenance(string extractorCommit, string manifestId)
     {
-        using var document = JsonDocument.Parse(File.ReadAllBytes(path));
+        Preview.Require(Regex.IsMatch(extractorCommit, @"\A[0-9a-f]{40}\z", RegexOptions.CultureInvariant), "Extractor commit must be 40 lowercase hexadecimal characters.");
+        Preview.Require(ulong.TryParse(manifestId, NumberStyles.None, CultureInfo.InvariantCulture, out var manifest) && manifest > 0 && manifest.ToString(CultureInfo.InvariantCulture) == manifestId, "Manifest ID must be a canonical positive uint64 string.");
+    }
+
+    public static Metadata Parse(string json)
+    {
+        using var document = JsonDocument.Parse(json);
         var root = document.RootElement;
-        Preview.Fields(root, "formatVersion", "extractorCommit", "steam");
+        Preview.Fields(root, "formatVersion", "contentSha256", "extractorCommit", "steam");
         var steam = root.GetProperty("steam");
         Preview.Fields(steam, "appId", "depotId", "manifestId");
-        Preview.Require(root.GetProperty("formatVersion").GetInt32() == 1 && steam.GetProperty("appId").GetInt32() == 1808500 && steam.GetProperty("depotId").GetInt32() == 1808501, "Existing snapshot metadata is incompatible.");
-        return Create(Preview.String(root, "extractorCommit"), Preview.String(steam, "manifestId"));
+        Preview.Require(root.GetProperty("formatVersion").GetInt32() == 2 && steam.GetProperty("appId").GetInt32() == 1808500 && steam.GetProperty("depotId").GetInt32() == 1808501, "Existing snapshot metadata is incompatible.");
+        return Create(Preview.String(root, "extractorCommit"), Preview.String(steam, "manifestId"), Preview.String(root, "contentSha256"));
     }
 }
 
 internal static class Publisher
 {
-    public static Publication Publish(string previewDirectory, string remote, string extractorCommit, string manifestId) =>
-        Run(previewDirectory, remote, extractorCommit, manifestId, initialize: false);
-
-    public static Publication Initialize(string previewDirectory, string remote, string extractorCommit, string manifestId) =>
-        Run(previewDirectory, remote, extractorCommit, manifestId, initialize: true);
-
-    private static Publication Run(string previewDirectory, string remote, string extractorCommit, string manifestId, bool initialize)
+    public static Publication Publish(string previewDirectory, string remote, string extractorCommit, string manifestId)
     {
-        // Capture and validate private files before any Git operation.
-        var metadata = Metadata.Create(extractorCommit, manifestId);
+        Metadata.ValidateProvenance(extractorCommit, manifestId);
         using var preview = Preview.Read(previewDirectory);
         using var snapshot = DataSnapshot.Create(preview);
+        var metadata = Metadata.Create(extractorCommit, manifestId, ContentDigest.Files(snapshot.Files));
         var directory = Path.Combine(Path.GetTempPath(), "asset-index-publish-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
+        try { return PublishSnapshot(directory, remote, snapshot, metadata); }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    public static Metadata Export(string previewDirectory, string outputDirectory, string extractorCommit, string manifestId)
+    {
+        Metadata.ValidateProvenance(extractorCommit, manifestId);
+        using var preview = Preview.Read(previewDirectory);
+        using var snapshot = DataSnapshot.Create(preview);
+        var metadata = Metadata.Create(extractorCommit, manifestId, ContentDigest.Files(snapshot.Files));
+        var output = Path.GetFullPath(outputDirectory);
+        Preview.Require(!Path.Exists(output), "Export destination must not exist.");
+        var parent = Path.GetDirectoryName(output)!;
+        Preview.Require(Directory.Exists(parent), "Export destination parent must exist.");
+        Preview.Require((File.GetAttributes(parent) & FileAttributes.ReparsePoint) == 0, "Export destination parent cannot be a link.");
+        var staging = Path.Combine(parent, ".asset-index-export-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(staging);
         try
         {
-            var git = new Git(directory);
-            git.Run("init", "--quiet");
-            git.Run("remote", "add", "origin", remote);
-            if (initialize)
-            {
-                Preview.Require(git.Run("ls-remote", "--refs", "origin", "refs/heads/data").Length == 0,
-                    "Data branch already exists; use normal publication.");
-                git.Run("symbolic-ref", "HEAD", "refs/heads/data");
-            }
-            else
-            {
-                git.Run("fetch", "--quiet", "--no-tags", "--depth", "1", "origin", "refs/heads/data");
-                var parent = git.Run("rev-parse", "FETCH_HEAD").Trim();
-                var paths = ValidateTree(git, parent);
-                git.Run("checkout", "--quiet", "--detach", parent);
-                if (SameContent(directory, paths, snapshot.Files))
-                {
-                    var previous = Metadata.Read(Path.Combine(directory, "metadata.json"));
-                    var tag = Tag(previous.Steam.ManifestId, parent);
-                    var reference = git.Run("ls-remote", "--refs", "origin", "refs/tags/" + tag).Split('\t', '\n');
-                    Preview.Require(reference.Length >= 2 && reference[0] == parent && reference[1] == "refs/tags/" + tag, "Unchanged snapshot lacks its exact lightweight tag.");
-                    return new(false, parent, tag);
-                }
-                git.Run("rm", "--quiet", "-r", "--ignore-unmatch", "--", ".");
-            }
-            foreach (var (path, file) in snapshot.Files)
-            {
-                var target = Path.Combine(directory, path);
-                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-                File.Copy(file.Path, target);
-            }
-            File.WriteAllBytes(Path.Combine(directory, "metadata.json"), JsonSerializer.SerializeToUtf8Bytes(metadata, Preview.Json));
-            git.Run("add", "--all", "--", ".");
-            git.Run("-c", "user.name=alexbowe", "-c", "user.email=alex@alexbowe.com", "commit", "--quiet", "-m",
-                initialize ? "chore: initialize asset snapshot" : "chore: update asset snapshot");
-            var commit = git.Run("rev-parse", "HEAD").Trim();
-            var newTag = Tag(manifestId, commit);
-            if (initialize)
-                // Empty expected values reject conflicting ref creation. Git may
-                // safely complete the tag if a racer created this exact commit.
-                git.Run("push", "--atomic", "--force-with-lease=refs/heads/data:", $"--force-with-lease=refs/tags/{newTag}:",
-                    "origin", $"{commit}:refs/heads/data", $"{commit}:refs/tags/{newTag}");
-            else
-                git.Run("push", "--atomic", "origin", $"{commit}:refs/heads/data", $"{commit}:refs/tags/{newTag}");
-            return new(true, commit, newTag);
+            WriteSnapshot(staging, snapshot, metadata);
+            Directory.Move(staging, output);
         }
-        finally
-        {
-            Directory.Delete(directory, recursive: true);
-        }
+        finally { if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true); }
+        return metadata;
     }
 
-    private static string[] ValidateTree(Git git, string commit)
+    private static Publication PublishSnapshot(string directory, string remote, DataSnapshot snapshot, Metadata metadata)
     {
-        var entries = git.Run("ls-tree", "-r", "-z", commit).Split('\0', StringSplitOptions.RemoveEmptyEntries);
-        var paths = new List<string>();
-        foreach (var entry in entries)
+        var git = new Git(directory);
+        git.Run("init", "--quiet");
+        git.Run("remote", "add", "origin", remote);
+        git.Run("fetch", "--quiet", "--no-tags", "--depth", "1", "origin", "refs/heads/main");
+        var parent = git.Run("rev-parse", "FETCH_HEAD").Trim();
+        var entries = GeneratedTree(git, parent);
+        git.Run("checkout", "--quiet", "--detach", parent);
+        var tag = Tag(metadata.Steam.ManifestId, metadata.ContentSha256);
+        var existing = git.Run("ls-remote", "--refs", "origin", "refs/tags/" + tag);
+        if (existing.Length > 0)
+        {
+            git.Run("fetch", "--quiet", "--no-tags", "--depth", "1", "origin", "refs/tags/" + tag);
+            var commit = git.Run("rev-parse", "FETCH_HEAD").Trim();
+            Preview.Require(git.Run("cat-file", "-t", commit).Trim() == "commit", "Release tag must point directly to a commit.");
+            var previous = Metadata.Parse(git.Run("show", commit + ":metadata.json"));
+            Preview.Require(previous.ContentSha256 == metadata.ContentSha256 && previous.Steam == metadata.Steam &&
+                ContentDigest.Tree(GeneratedTree(git, commit)) == metadata.ContentSha256,
+                "Existing release tag conflicts with the validated snapshot.");
+            Preview.Require(ContentDigest.Tree(entries) == metadata.ContentSha256 &&
+                Metadata.Parse(git.Run("show", parent + ":metadata.json")) == previous,
+                "Main no longer contains this release; refusing to restore an older snapshot.");
+            return new(false, commit, tag);
+        }
+        foreach (var entry in entries) File.Delete(Path.Combine(directory, entry.Path));
+        WriteSnapshot(directory, snapshot, metadata);
+        var roots = entries.Select(entry => entry.Path).Concat(snapshot.Files.Keys).Append("metadata.json")
+            .Select(path => path.Split('/')[0]).Distinct(StringComparer.Ordinal).ToArray();
+        git.Run(["add", "--force", "--all", "--", .. roots]);
+        var staged = git.Run("write-tree").Trim();
+        Preview.Require(ContentDigest.Tree(GeneratedTree(git, staged)) == metadata.ContentSha256,
+            "Git transformed generated content; publication was not attempted.");
+        if (git.Run("diff", "--cached", "--name-only").Length > 0)
+            git.Run("-c", "user.name=alexbowe", "-c", "user.email=alex@alexbowe.com", "commit", "--quiet", "-m", "chore: update asset snapshot");
+        var published = git.Run("rev-parse", "HEAD").Trim();
+        git.Run("push", "--atomic", "origin", $"{published}:refs/heads/main", $"{published}:refs/tags/{tag}");
+        return new(true, published, tag);
+    }
+
+    private static void WriteSnapshot(string directory, DataSnapshot snapshot, Metadata metadata)
+    {
+        foreach (var (path, file) in snapshot.Files)
+        {
+            var target = Path.Combine(directory, path);
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(file.Path, target);
+        }
+        File.WriteAllBytes(Path.Combine(directory, "metadata.json"), JsonSerializer.SerializeToUtf8Bytes(metadata, Preview.Json));
+    }
+
+    private static ContentDigest.Entry[] GeneratedTree(Git git, string commit)
+    {
+        var result = new List<ContentDigest.Entry>();
+        foreach (var entry in git.Run("ls-tree", "-r", "-z", commit).Split('\0', StringSplitOptions.RemoveEmptyEntries))
         {
             var parts = entry.Split('\t', 2);
-            Preview.Require(parts.Length == 2 && parts[0].StartsWith("100644 blob ", StringComparison.Ordinal), "Data branch must contain ordinary generated files only.");
+            Preview.Require(parts.Length == 2, "Invalid Git tree entry.");
             var path = parts[1];
-            Preview.Require(path == "metadata.json" || DataSnapshot.Allowed(path), "Data branch contains a file outside the published snapshot.");
-            paths.Add(path);
+            if (!Reserved(path)) continue;
+            var header = parts[0].Split(' ');
+            Preview.Require(header.Length == 3 && header[0] == "100644" && header[1] == "blob" &&
+                (DataSnapshot.Allowed(path) || LegacyGenerated(path)), "Generated paths must contain ordinary allowlisted files only.");
+            result.Add(new(header[0], header[2], path));
         }
-        Preview.Require(DataSnapshot.Required.Append("metadata.json").All(paths.Contains), "Existing data branch is not an initialized snapshot.");
-        return paths.ToArray();
+        return result.ToArray();
     }
 
-    private static bool SameContent(string directory, IEnumerable<string> existing, IReadOnlyDictionary<string, SnapshotFile> incoming)
-    {
-        var paths = existing.Where(DataSnapshot.Payload).ToHashSet(StringComparer.Ordinal);
-        return paths.SetEquals(incoming.Keys.Where(DataSnapshot.Payload)) && paths.All(path => incoming[path].Matches(Path.Combine(directory, path)));
-    }
+    private static bool Reserved(string path) => DataSnapshot.Required.Contains(path) || path is "metadata.json" or "schema.json" or "images" or "localization" ||
+        path.StartsWith("images/", StringComparison.Ordinal) || path.StartsWith("localization/", StringComparison.Ordinal);
 
-    internal static string Tag(string manifest, string commit) => $"arc-{manifest}-{commit[..12]}";
+    private static bool LegacyGenerated(string path) => path is "metadata.json" or "schema.json" ||
+        Regex.IsMatch(path, @"\Aimages/[A-Za-z0-9_-]+\.png\z", RegexOptions.CultureInvariant);
+
+    internal static string Tag(string manifest, string contentSha256) => $"arc-{manifest}-{contentSha256[..12]}";
 }
 
 internal sealed class Git(string directory)

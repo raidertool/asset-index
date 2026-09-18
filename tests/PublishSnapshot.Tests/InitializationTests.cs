@@ -1,170 +1,102 @@
-using System.Text.Json;
-
 namespace PublishSnapshot.Tests;
 
 public sealed partial class PublisherTests
 {
     [Fact]
-    public void InitializationCreatesAnOrphanProjectedSnapshotAndNormalRetryIsUnchanged()
+    public void FirstPublicationReplacesLegacyGeneratedFilesAndPreservesSource()
     {
-        remoteGit.Run("update-ref", "-d", "refs/heads/data");
-        var unowned = AddUnownedImage("/Game/T_RegistryOnly.T_RegistryOnly", "Texture2D");
-        var input = HashFiles(preview);
-        var seedReferences = new Git(seed).Run("show-ref");
+        var git = new Git(seed);
+        git.Run("rm", "--quiet", "-r", ".");
+        File.WriteAllText(Path.Combine(seed, "README.md"), "Source documentation");
+        Directory.CreateDirectory(Path.Combine(seed, "src"));
+        File.WriteAllText(Path.Combine(seed, "src", "main.cs"), "// source");
+        Directory.CreateDirectory(Path.Combine(seed, "images"));
+        File.WriteAllText(Path.Combine(seed, "images", "Old_asset.png"), "old image");
+        File.WriteAllText(Path.Combine(seed, "asset_index.csv"), "old schema");
+        File.WriteAllText(Path.Combine(seed, "schema.json"), "old schema");
+        Commit(git);
+        git.Run("push", "--quiet", "origin", "HEAD:refs/heads/main");
+        var parent = RemoteRef("refs/heads/main");
 
-        Assert.Equal(0, Program.Main(["--init", preview, remote, NextExtractor, "456"]));
+        var result = Publisher.Publish(preview, remote, NextExtractor, "456");
 
-        var commit = RemoteRef("refs/heads/data");
-        var tag = Publisher.Tag("456", commit);
-        Assert.Equal(commit, RemoteRef("refs/tags/" + tag));
-        Assert.Equal("commit", remoteGit.Run("cat-file", "-t", "refs/tags/" + tag).Trim());
-        Assert.Equal(commit, remoteGit.Run("rev-list", "--parents", "-n", "1", commit).Trim());
-        Assert.Equal(initialCommit, RemoteRef("refs/heads/main"));
-        Assert.Equal(DataSnapshot.Required.Concat([Image, unowned, "metadata.json"]).Order(),
-            remoteGit.Run("ls-tree", "-r", "--name-only", commit).Split('\n', StringSplitOptions.RemoveEmptyEntries).Order());
-        Assert.Equal(File.ReadAllText(Path.Combine(preview, "assets.json")), remoteGit.Run("show", commit + ":assets.json"));
-        using var metadata = JsonDocument.Parse(remoteGit.Run("show", commit + ":metadata.json"));
-        Assert.Equal(NextExtractor, metadata.RootElement.GetProperty("extractorCommit").GetString());
-        Assert.Equal("456", metadata.RootElement.GetProperty("steam").GetProperty("manifestId").GetString());
-        Assert.Equal(input, HashFiles(preview));
-        Assert.Equal(seedReferences, new Git(seed).Run("show-ref"));
-
-        var references = remoteGit.Run("show-ref");
-        var retry = Publisher.Publish(preview, remote, InitialExtractor, "789");
-        Assert.False(retry.Changed);
-        Assert.Equal(commit, retry.Commit);
-        Assert.Equal(tag, retry.Tag);
-        Assert.Throws<InvalidDataException>(() => Publisher.Initialize(preview, remote, NextExtractor, "456"));
-        Assert.Equal(references, remoteGit.Run("show-ref"));
+        Assert.Equal(result.Commit + " " + parent, remoteGit.Run("rev-list", "--parents", "-n", "1", result.Commit).Trim());
+        Assert.Equal("Source documentation", remoteGit.Run("show", result.Commit + ":README.md"));
+        Assert.Equal("// source", remoteGit.Run("show", result.Commit + ":src/main.cs"));
+        var paths = remoteGit.Run("ls-tree", "-r", "--name-only", result.Commit);
+        Assert.DoesNotContain("Old_asset.png", paths);
+        Assert.DoesNotContain("schema.json", paths);
+        Assert.DoesNotContain("discovery/", paths);
     }
 
     [Fact]
-    public void InitializationRefusesAnObservedExistingDataBranch()
+    public void MissingMainCannotBeInitializedByPublication()
     {
-        var references = remoteGit.Run("show-ref");
-
-        var error = Assert.Throws<InvalidDataException>(() => Publisher.Initialize(preview, remote, NextExtractor, "456"));
-
-        Assert.Contains("already exists", error.Message);
-        Assert.Equal(references, remoteGit.Run("show-ref"));
-    }
-
-    [Fact]
-    public void InitializationValidatesTheFullPreviewBeforeAnyGitAccess()
-    {
-        Corrupt("incomplete");
-        var references = remoteGit.Run("show-ref");
-        var input = HashFiles(preview);
-
-        var error = Assert.Throws<InvalidDataException>(() => Publisher.Initialize(preview,
-            Path.Combine(root, "nonexistent-remote"), NextExtractor, "456"));
-
-        Assert.Equal("Preview is incomplete.", error.Message);
-        Assert.Equal(references, remoteGit.Run("show-ref"));
-        Assert.Equal(input, HashFiles(preview));
-    }
-
-    [Fact]
-    public void OrdinaryPublicationNeverInitializesAMissingDataBranch()
-    {
-        remoteGit.Run("update-ref", "-d", "refs/heads/data");
-        var references = remoteGit.Run("show-ref");
-
+        remoteGit.Run("update-ref", "-d", "refs/heads/main");
+        var before = remoteGit.Run("show-ref");
         Assert.Throws<IOException>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
-
-        Assert.Equal(references, remoteGit.Run("show-ref"));
-    }
-
-    [Theory]
-    [InlineData("refs/heads/data")]
-    [InlineData("refs/tags/*")]
-    public void InitializationRefRejectionIsAtomicAndSameInputCanBeRetried(string rejected)
-    {
-        remoteGit.Run("update-ref", "-d", "refs/heads/data");
-        var hook = InstallHook($"case \"$1\" in {rejected}) exit 1 ;; esac\nexit 0\n", "update");
-        var references = remoteGit.Run("show-ref");
-        var seedReferences = new Git(seed).Run("show-ref");
-
-        Assert.Throws<IOException>(() => Publisher.Initialize(preview, remote, NextExtractor, "456"));
-
-        Assert.Equal(references, remoteGit.Run("show-ref"));
-        Assert.Equal(seedReferences, new Git(seed).Run("show-ref"));
-        File.Delete(hook);
-        var retry = Publisher.Initialize(preview, remote, NextExtractor, "456");
-        Assert.Equal(retry.Commit, RemoteRef("refs/heads/data"));
-        Assert.Equal(retry.Commit, RemoteRef("refs/tags/" + retry.Tag));
+        Assert.Equal(before, remoteGit.Run("show-ref"));
     }
 
     [Fact]
-    public void InitializationRejectsADataCreationAfterPushAdvertisement()
+    public void ExportValidatesPrivateEvidenceAndWritesOnlySafeFiles()
     {
-        remoteGit.Run("update-ref", "-d", "refs/heads/data");
-        var tags = remoteGit.Run("show-ref", "--tags");
-        InstallHook($"unset GIT_QUARANTINE_PATH\ngit update-ref refs/heads/data {initialCommit} {new string('0', 40)} || exit 1\nexit 0\n");
-
-        Assert.Throws<IOException>(() => Publisher.Initialize(preview, remote, NextExtractor, "456"));
-
-        Assert.Equal(initialCommit, RemoteRef("refs/heads/data"));
-        Assert.Equal(initialCommit, RemoteRef("refs/heads/main"));
-        Assert.Equal(tags, remoteGit.Run("show-ref", "--tags"));
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void InitializationRejectsConflictingRefsCreatedAfterItsPrecheck(bool tag)
-    {
-        remoteGit.Run("update-ref", "-d", "refs/heads/data");
-        var reference = tag ? "refs/tags/arc-456-$(git rev-parse HEAD | cut -c1-12)" : "refs/heads/data";
-        WithInitializationRace($"git --git-dir=\"$remote\" update-ref {reference} {initialCommit}\n", () =>
-            Assert.Throws<IOException>(() => Publisher.Initialize(preview, remote, NextExtractor, "456")));
-
-        Assert.True(File.Exists(Path.Combine(remote, "race-commit")));
-        Assert.Equal(initialCommit, RemoteRef("refs/heads/main"));
-        if (tag)
+        ChangeJson("coverage.json", report =>
         {
-            var commit = File.ReadAllText(Path.Combine(remote, "race-commit")).Trim();
-            Assert.Equal(initialCommit, RemoteRef("refs/tags/" + Publisher.Tag("456", commit)));
-            Assert.Equal("", remoteGit.Run("for-each-ref", "--format=%(refname)", "refs/heads/data"));
-        }
-        else
-        {
-            Assert.Equal(initialCommit, RemoteRef("refs/heads/data"));
-            Assert.Equal(Publisher.Tag("123", initialCommit), remoteGit.Run("tag", "--list").Trim());
-        }
+            report["notices"]!.AsArray().Add(new System.Text.Json.Nodes.JsonObject
+            { ["stage"] = "private-stage", ["path"] = "private-path", ["message"] = "private-investigation" });
+            report["discovery"]!["nativeScope"] = "private-method";
+        });
+        var output = Path.Combine(root, "safe-export");
+        var before = HashFiles(preview);
+        var metadata = Publisher.Export(preview, output, NextExtractor, "456");
+        var files = Directory.GetFiles(output, "*", SearchOption.AllDirectories)
+            .ToDictionary(path => Path.GetRelativePath(output, path).Replace('\\', '/'), SnapshotFile.Read);
+
+        Assert.Equal(metadata.ContentSha256, ContentDigest.Files(files));
+        Assert.Equal(DataSnapshot.Required.Append(Image).Append("metadata.json").Order(), files.Keys.Order());
+        Assert.DoesNotContain("private-", File.ReadAllText(Path.Combine(output, "coverage.json")));
+        Assert.Equal(before, HashFiles(preview));
+        Assert.Throws<InvalidDataException>(() => Publisher.Export(preview, output, NextExtractor, "456"));
+        Assert.Equal(0, Program.Main(["--help"]));
+        Assert.Equal(2, Program.Main(["--init", preview, remote, NextExtractor, "456"]));
     }
 
     [Fact]
-    public void InitializationSafelyCompletesATagWhenARacerCreatesTheIdenticalCommit()
+    public void FailedExportLeavesNoOutputAndCanBeRetried()
     {
-        remoteGit.Run("update-ref", "-d", "refs/heads/data");
-        Publication? result = null;
-        WithInitializationRace("git push --quiet origin HEAD:refs/heads/data\n", () =>
-            result = Publisher.Initialize(preview, remote, NextExtractor, "456"));
-
-        Assert.NotNull(result);
-        Assert.Equal(result.Commit, File.ReadAllText(Path.Combine(remote, "race-commit")).Trim());
-        Assert.Equal(result.Commit, RemoteRef("refs/heads/data"));
-        Assert.Equal(result.Commit, RemoteRef("refs/tags/" + result.Tag));
-        Assert.Equal(initialCommit, RemoteRef("refs/heads/main"));
+        var output = Path.Combine(root, "safe-export");
+        Corrupt("incomplete");
+        Assert.Throws<InvalidDataException>(() => Publisher.Export(preview, output, NextExtractor, "456"));
+        Assert.False(Path.Exists(output));
+        ChangeJson("coverage.json", report => report["status"] = "succeeded");
+        Assert.Equal(0, Program.Main(["--export", preview, output, NextExtractor, "456"]));
+        Assert.True(File.Exists(Path.Combine(output, "metadata.json")));
     }
 
-    private void WithInitializationRace(string mutation, Action action)
+    [Fact]
+    public void ConflictingReleaseTagCannotMoveMain()
     {
-        var templates = Path.Combine(root, "init-template");
-        Directory.CreateDirectory(Path.Combine(templates, "hooks"));
-        var hook = Path.Combine(templates, "hooks", "post-commit");
-        File.WriteAllText(hook, "#!/bin/sh\nset -e\nremote=$(git remote get-url origin)\n" + mutation +
-            "git rev-parse HEAD > \"$remote/race-commit\"\n");
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(hook, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-        // All publisher cases share this xUnit class and run serially. Only the
-        // disposable publisher repository receives this temporary template.
-        var previous = Environment.GetEnvironmentVariable("GIT_TEMPLATE_DIR");
-        try
-        {
-            Environment.SetEnvironmentVariable("GIT_TEMPLATE_DIR", templates);
-            action();
-        }
-        finally { Environment.SetEnvironmentVariable("GIT_TEMPLATE_DIR", previous); }
+        using var captured = Preview.Read(preview);
+        using var snapshot = DataSnapshot.Create(captured);
+        var tag = Publisher.Tag("456", ContentDigest.Files(snapshot.Files));
+        remoteGit.Run("update-ref", "refs/tags/" + tag, initialCommit);
+        var before = remoteGit.Run("show-ref");
+
+        Assert.Throws<InvalidDataException>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
+
+        Assert.Equal(before, remoteGit.Run("show-ref"));
+    }
+
+    [Fact]
+    public void RetryCannotRestoreAnOlderReleaseOverNewerMainData()
+    {
+        Publisher.Publish(preview, remote, NextExtractor, "456");
+        WritePreview(preview, "Initial name");
+        var before = remoteGit.Run("show-ref");
+
+        Assert.Throws<InvalidDataException>(() => Publisher.Publish(preview, remote, InitialExtractor, "123"));
+
+        Assert.Equal(before, remoteGit.Run("show-ref"));
     }
 }

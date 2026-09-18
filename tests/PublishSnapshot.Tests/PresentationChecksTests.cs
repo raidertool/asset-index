@@ -249,6 +249,9 @@ public sealed partial class PublisherTests
             metadata["name"] = "OtherMetadata";
             metadata["path"] = other;
             rows[0]!["metadata"]!.AsArray().Add(metadata);
+            var image = rows[0]!["images"]![0]!.DeepClone();
+            image["source"] = other;
+            rows[0]!["images"]!.AsArray().Add(image);
             var presentation = rows[0]!["presentation"]!;
             var candidate = presentation["candidates"]![0]!.DeepClone();
             candidate["sourcePath"] = other;

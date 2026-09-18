@@ -9,6 +9,9 @@
   <ItemGroup>
     <ProjectReference Include="../../vendor/CUE4Parse/CUE4Parse/CUE4Parse.csproj" />
     <None Include="../../mappings/ArcRaiders.usmap" Link="mappings/ArcRaiders.usmap" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Include="../AssetIndex/CatalogRecords.cs" Link="CatalogRecords.cs" />
+    <Compile Include="../AssetIndex/CatalogCsv.cs" Link="CatalogCsv.cs" />
+    <Compile Include="../AssetIndex/ResourceFiles.cs" Link="ResourceFiles.cs" />
     <Compile Include="../AssetIndex/GameplayTagQueryPolicy.cs" Link="GameplayTagQueryPolicy.cs" />
     <Compile Include="../AssetIndex/ImageFields.cs" Link="ImageFields.cs" />
     <Compile Include="../AssetIndex/InventoryRootPolicy.cs" Link="InventoryRootPolicy.cs" />

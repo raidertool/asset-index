@@ -168,6 +168,111 @@ public sealed class PresentationRelationChecksTests
         Assert.Throws<InvalidDataException>(() => fixture.Validate("41", "containers", relation));
     }
 
+    [Fact]
+    public void CompleteCatalogContainsEveryFrameAndVisualRelationship()
+    {
+        using var fixture = new Relations();
+        fixture.ValidateComplete(fixture.CompleteCatalog());
+    }
+
+    [Theory]
+    [InlineData(0, "containers")]
+    [InlineData(1, "containers")]
+    [InlineData(2, "visualSlots")]
+    public void RemovingAnEntireRelationshipCannotHideItByAlsoOmittingTextCandidates(int index, string family)
+    {
+        using var fixture = new Relations();
+        var catalog = fixture.CompleteCatalog();
+        fixture.ValidateComplete(catalog);
+        catalog[index]!["presentation"]![family]!.AsArray().Clear();
+        catalog[index]!["presentation"]!["candidates"]!.AsArray().Clear();
+
+        Assert.Throws<InvalidDataException>(() => fixture.ValidateComplete(catalog));
+    }
+
+    [Theory]
+    [InlineData("containers")]
+    [InlineData("visualSlots")]
+    public void EveryMatchingLabelIsRequiredEvenWhenAnotherLabelRemains(string family)
+    {
+        using var fixture = new Relations();
+        var catalog = fixture.CompleteCatalog();
+        if (family == "containers")
+        {
+            var label = fixture.Fixture.Object("/Game/SecondCategory.SecondCategory", "UIInventoryContainerMetaDataItem");
+            Scalar(label, "ContainerType", "EnumProperty", "name", "ENewInventoryContainerType::Armor");
+            foreach (var row in catalog.Take(2))
+            {
+                var relations = row!["presentation"]![family]!.AsArray();
+                var additional = relations[0]!.DeepClone();
+                additional["metadataPath"] = label["path"]!.GetValue<string>();
+                relations.Add(additional);
+            }
+        }
+        else
+        {
+            var label = fixture.AddNavigation("/Game/SecondLabel.SecondLabel", Relations.UiType);
+            var additional = fixture.Visual();
+            additional["metadataPath"] = label["path"]!.GetValue<string>();
+            catalog[2]!["presentation"]![family]!.AsArray().Add(additional);
+        }
+        fixture.ValidateComplete(catalog);
+        catalog[family == "containers" ? 0 : 2]!["presentation"]![family]!.AsArray().RemoveAt(1);
+
+        Assert.Throws<InvalidDataException>(() => fixture.ValidateComplete(catalog));
+    }
+
+    [Theory]
+    [InlineData("no-frame-array")]
+    [InlineData("nonmatching-visual-query")]
+    [InlineData("no-navigation")]
+    [InlineData("nonmatching-navigation")]
+    public void NoRelationshipIsRequiredWhenDecodedDataHasNoMatch(string reason)
+    {
+        using var fixture = new Relations();
+        var catalog = fixture.CompleteCatalog();
+        if (reason == "no-frame-array")
+        {
+            fixture.FrameObject["properties"]!.AsArray().Clear();
+            fixture.FrameObject["values"]!.AsArray().Clear();
+            fixture.FrameObject["references"]!.AsArray().RemoveAt(2);
+            foreach (var row in catalog) row!["presentation"]!["containers"]!.AsArray().Clear();
+        }
+        else if (reason == "nonmatching-visual-query")
+        {
+            var visual = fixture.Fixture.Objects.Single(row => row["path"]!.GetValue<string>() == Relations.VisualSlot);
+            visual["values"]![0]!["value"] = "Item.Unrelated";
+            catalog[2]!["presentation"]!["visualSlots"]!.AsArray().Clear();
+        }
+        else
+        {
+            if (reason == "no-navigation") fixture.Fixture.Objects.Remove(fixture.Navigation);
+            else fixture.Navigation["values"]![0]!["value"] = "UI.Type.Other";
+            catalog[2]!["presentation"]!["visualSlots"]!.AsArray().Clear();
+        }
+
+        fixture.ValidateComplete(catalog);
+    }
+
+    [Fact]
+    public void InheritedFrameRelationshipsRemainDistinctForTheSameTargetIds()
+    {
+        using var fixture = new Relations();
+        var child = fixture.Fixture.Object("/Game/ChildFrame.ChildFrame", "LoadoutFrameItemDataAsset", Relations.Frame);
+        var catalog = fixture.CompleteCatalog();
+        foreach (var row in catalog.Take(2))
+        {
+            var relations = row!["presentation"]!["containers"]!.AsArray();
+            var inherited = relations[0]!.DeepClone();
+            inherited["framePath"] = child["path"]!.GetValue<string>();
+            relations.Add(inherited);
+        }
+        fixture.ValidateComplete(catalog);
+        catalog[0]!["presentation"]!["containers"]!.AsArray().RemoveAt(1);
+
+        Assert.Throws<InvalidDataException>(() => fixture.ValidateComplete(catalog));
+    }
+
     private sealed class Relations : IDisposable
     {
         public const string Frame = "/Game/Frame.Frame", Slot = "/Game/Slot.Slot", Item = "/Game/Item.Item";
@@ -184,11 +289,12 @@ public sealed class PresentationRelationChecksTests
             Fixture.AddClass("LoadoutFrameItemDataAsset", "ItemDataAssetBase", ("Containers", "ArrayProperty"));
             Fixture.AddClass("InventoryContainerSlotDataAsset", "ItemDataAssetBase", ("DefaultContainer", "ObjectProperty"));
             Fixture.AddClass("InventoryContainerItemDataAsset", "ItemDataAssetBase");
-            Fixture.AddClass("UIInventoryContainerMetaDataItem", "Object", ("ContainerType", "EnumProperty"));
+            Fixture.AddClass("UIInventoryContainerMetaDataItem", "Object", ("ContainerType", "EnumProperty"), ("ContainerName", "TextProperty"));
             Fixture.AddClass("CharacterVisualSlotOnlineItemDataAsset", "ItemDataAssetBase", ("ItemsQuery", "StructProperty"));
             Fixture.AddClass("CharacterVisualSkinOnlineItemDataAsset", "ItemDataAssetBase", ("Tags", "StructProperty"));
             Fixture.AddClass("UICharacterVisualSkinMetaDataItem", "UIMetaDataItem", ("TypeTag", "StructProperty"));
-            Fixture.AddClass("UICharacterCustomizationQuickNavTabMetaDataItem", "Object", ("CharacterCustomizationTypeTag", "StructProperty"));
+            Fixture.AddClass("UICharacterCustomizationQuickNavTabMetaDataItem", "Object", ("CharacterCustomizationTypeTag", "StructProperty"),
+                ("DisplayName", "TextProperty"));
             ItemObject(Item, "InventoryContainerItemDataAsset", "42");
             ItemObject(OtherItem, "InventoryContainerItemDataAsset", "43");
             var slot = ItemObject(Slot, "InventoryContainerSlotDataAsset", "41");
@@ -205,8 +311,25 @@ public sealed class PresentationRelationChecksTests
             var visual = ItemObject(VisualSlot, "CharacterVisualSlotOnlineItemDataAsset", "50");
             Query(visual);
             AddSkin("First", "70", UiType);
-            Navigation = Fixture.Object(Label, "UICharacterCustomizationQuickNavTabMetaDataItem");
-            Tag(Navigation, "CharacterCustomizationTypeTag", UiType);
+            Navigation = AddNavigation(Label, UiType);
+        }
+
+        public JsonObject AddNavigation(string path, string type)
+        {
+            var row = Fixture.Object(path, "UICharacterCustomizationQuickNavTabMetaDataItem");
+            Tag(row, "CharacterCustomizationTypeTag", type);
+            var text = Header(row, "DisplayName", "TextProperty");
+            row["texts"]!.AsArray().Add(new JsonObject
+            {
+                ["pointer"] = text,
+                ["flags"] = 0,
+                ["history"] = "Base",
+                ["namespace"] = "ui",
+                ["key"] = "skin",
+                ["source"] = "Skin",
+                ["tableId"] = null
+            });
+            return row;
         }
 
         public (JsonObject Skin, JsonObject Ui) AddSkin(string name, string id, string type)
@@ -245,7 +368,32 @@ public sealed class PresentationRelationChecksTests
             var presentation = new JsonObject { ["containers"] = new JsonArray(), ["visualSlots"] = new JsonArray(), ["inventoryRoots"] = new JsonArray() };
             presentation[family]!.AsArray().Add(relation.DeepClone());
             using var json = JsonDocument.Parse(new JsonArray(new JsonObject { ["id"] = id, ["presentation"] = presentation }).ToJsonString());
+            new PresentationRelationChecks(evidence, context).ValidateDeclared(json.RootElement);
+        }
+
+        public JsonArray CompleteCatalog() => new(
+            CompleteRow("41", "containers", Container("container-slot")),
+            CompleteRow("42", "containers", Container("default-container")),
+            CompleteRow("50", "visualSlots", Visual()));
+
+        public void ValidateComplete(JsonArray catalog)
+        {
+            var (evidence, _, context) = Fixture.Read(PresentationRelationChecks.RootFields);
+            using var json = JsonDocument.Parse(catalog.ToJsonString());
             new PresentationRelationChecks(evidence, context).Validate(json.RootElement);
+        }
+
+        private static JsonObject CompleteRow(string id, string family, JsonObject relation)
+        {
+            var presentation = new JsonObject
+            {
+                ["containers"] = new JsonArray(),
+                ["visualSlots"] = new JsonArray(),
+                ["inventoryRoots"] = new JsonArray(),
+                ["candidates"] = new JsonArray()
+            };
+            presentation[family]!.AsArray().Add(relation);
+            return new JsonObject { ["id"] = id, ["presentation"] = presentation };
         }
 
         private JsonObject ItemObject(string path, string type, string id)

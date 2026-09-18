@@ -7,10 +7,6 @@ on:
         description: Publish a successful snapshot (reviewed main only).
         type: boolean
         default: false
-      initialize:
-        description: Create the first data branch and tag (requires publish).
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -34,13 +30,8 @@ jobs:
       - name: Validate publication request
         env:
           PUBLISH: ${{ inputs.publish }}
-          INITIALIZE: ${{ inputs.initialize }}
         run: |
           set -euo pipefail
-          if [[ "$INITIALIZE" == true && "$PUBLISH" != true ]]; then
-            echo "Initialization requires publish=true." >&2
-            exit 1
-          fi
           if [[ "$PUBLISH" == true && ( "$GITHUB_REPOSITORY" != raidertool/asset-index || "$GITHUB_REF" != refs/heads/main ) ]]; then
             echo "Publication requires raidertool/asset-index main." >&2
             exit 1
@@ -212,6 +203,8 @@ jobs:
           if-no-files-found: warn
           path: |
             ${{ runner.temp }}/asset-index-preview/assets.json
+            ${{ runner.temp }}/asset-index-preview/asset_index.csv
+            ${{ runner.temp }}/asset-index-preview/asset_localizations.csv
             ${{ runner.temp }}/asset-index-preview/coverage.json
             ${{ runner.temp }}/asset-index-preview/resources.json
             ${{ runner.temp }}/asset-index-preview/discovery/
@@ -265,8 +258,6 @@ jobs:
 
       - name: Validate and publish snapshot
         timeout-minutes: 20
-        env:
-          INITIALIZE: ${{ inputs.initialize }}
         run: |
           set -euo pipefail
           gh auth setup-git --hostname github.com
@@ -274,7 +265,4 @@ jobs:
             "$RUNNER_TEMP/asset-index-preview" https://github.com/raidertool/asset-index.git
             "$EXTRACTOR_COMMIT" "$MANIFEST_ID"
           )
-          if [[ "$INITIALIZE" == true ]]; then
-            arguments=(--init "${arguments[@]}")
-          fi
           dotnet run --project src/PublishSnapshot -c Release -- "${arguments[@]}"

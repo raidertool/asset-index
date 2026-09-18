@@ -182,6 +182,100 @@ public sealed class InventoryRootChecksTests
         Assert.Throws<InvalidDataException>(() => InventoryRootChecks.Read(json.RootElement, sources, discovered));
     }
 
+    [Fact]
+    public void CompleteRootCatalogContainsSlotDefaultAndAllowedContainers()
+    {
+        using var fixture = new RootFixture();
+        fixture.ValidateComplete(fixture.CompleteCatalog());
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void RemovingAnEntireRootRelationshipCannotHideItsDecodedSource(int index)
+    {
+        using var fixture = new RootFixture();
+        var catalog = fixture.CompleteCatalog();
+        fixture.ValidateComplete(catalog);
+        catalog[index]!["presentation"]!["inventoryRoots"]!.AsArray().Clear();
+        catalog[index]!["presentation"]!["candidates"]!.AsArray().Clear();
+
+        Assert.Throws<InvalidDataException>(() => fixture.ValidateComplete(catalog));
+    }
+
+    [Fact]
+    public void EveryMetadataLabelForTheRootCategoryMustBeRetained()
+    {
+        using var fixture = new RootFixture();
+        var label = fixture.Fixture.Object("/Game/SecondLabel.SecondLabel", "UIInventoryContainerMetaDataItem");
+        Scalar(label, "ContainerType", "EnumProperty", "name", "ENewInventoryContainerType::Stash");
+        var catalog = fixture.CompleteCatalog();
+        foreach (var row in catalog)
+        {
+            var roots = row!["presentation"]!["inventoryRoots"]!.AsArray();
+            var additional = roots[0]!.DeepClone();
+            additional["metadataPath"] = label["path"]!.GetValue<string>();
+            roots.Add(additional);
+        }
+        fixture.ValidateComplete(catalog);
+        catalog[1]!["presentation"]!["inventoryRoots"]!.AsArray().RemoveAt(1);
+
+        Assert.Throws<InvalidDataException>(() => fixture.ValidateComplete(catalog));
+    }
+
+    [Fact]
+    public void ExplicitNullRootReferencesHaveNoRequiredRelationships()
+    {
+        using var fixture = new RootFixture();
+        fixture.Root["references"]!.AsArray().Last()!["targetPath"] = null;
+        fixture.Root["references"]!.AsArray().Last()!["isNull"] = true;
+        var catalog = fixture.CompleteCatalog();
+        foreach (var row in catalog) row!["presentation"]!["inventoryRoots"]!.AsArray().Clear();
+
+        fixture.ValidateComplete(catalog);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RootInheritanceRequiresTheActualLinksAndRespectsExplicitNull(bool explicitNull)
+    {
+        using var fixture = new RootFixture();
+        var child = fixture.Fixture.Object("/Game/Child.Child", "InventoryTreeRootAsset", RootFixture.RootPath);
+        var catalog = fixture.CompleteCatalog();
+        if (explicitNull) Reference(child, "StashSlot", null);
+        else
+        {
+            foreach (var row in catalog)
+            {
+                var roots = row!["presentation"]!["inventoryRoots"]!.AsArray();
+                var inherited = roots[0]!.DeepClone();
+                inherited["rootPath"] = child["path"]!.GetValue<string>();
+                roots.Add(inherited);
+            }
+        }
+        fixture.ValidateComplete(catalog);
+        if (explicitNull) return;
+        catalog[0]!["presentation"]!["inventoryRoots"]!.AsArray().RemoveAt(1);
+        Assert.Throws<InvalidDataException>(() => fixture.ValidateComplete(catalog));
+    }
+
+    [Fact]
+    public void DistinctContainerPathsSharingAnEffectiveIdRemainSeparateRelationships()
+    {
+        using var fixture = new RootFixture();
+        Boolean(fixture.AllowedItem, "bOverrideItemAssetId", true);
+        Number(fixture.AllowedItem, "OverrideItemAssetId", "42");
+        var catalog = fixture.CompleteCatalog();
+        catalog[1]!["presentation"]!["inventoryRoots"]!.AsArray().Add(fixture.Relation("allowed-container"));
+        catalog.RemoveAt(2);
+        fixture.ValidateComplete(catalog);
+        catalog[1]!["presentation"]!["inventoryRoots"]!.AsArray().RemoveAt(1);
+
+        Assert.Throws<InvalidDataException>(() => fixture.ValidateComplete(catalog));
+    }
+
     private sealed class RootFixture : IDisposable
     {
         public const string RootPath = "/Game/Root.Root", SlotPath = "/Game/Slot.Slot", LabelPath = "/Game/Label.Label";
@@ -198,13 +292,14 @@ public sealed class InventoryRootChecksTests
         public RootFixture(string field = "StashSlot")
         {
             this.field = field;
-            Fixture.AddClass("InventoryTreeRootAsset", "DataAsset", (field, "ObjectProperty"));
+            Fixture.AddClass("InventoryTreeRootAsset", "DataAsset", new[] { field }.Concat(InventoryRootPolicy.Categories.Keys
+                .Where(name => !name.Equals(field, StringComparison.OrdinalIgnoreCase))).Select(name => (name, "ObjectProperty")).ToArray());
             Fixture.AddClass("InventoryContainerSlotDataAsset", "ItemDataAssetBase", ("DefaultContainer", "ObjectProperty"),
                 ("AllowedContainersQuery", "StructProperty"));
             Fixture.Mappings.Types["InventoryContainerSlotDataAsset"].Properties[1].MappingType.StructType = "GameplayTagQuery";
             Fixture.AddClass("InventoryContainerItemDataAsset", "ItemDataAssetBase", ("Tags", "StructProperty"));
             Fixture.Mappings.Types["InventoryContainerItemDataAsset"].Properties[0].MappingType.StructType = "GameplayTagContainer";
-            Fixture.AddClass("UIInventoryContainerMetaDataItem", "Object", ("ContainerType", "EnumProperty"));
+            Fixture.AddClass("UIInventoryContainerMetaDataItem", "Object", ("ContainerType", "EnumProperty"), ("ContainerName", "TextProperty"));
             Root = Fixture.Object(RootPath, "InventoryTreeRootAsset");
             Reference(Root, field, SlotPath);
             Slot = Item(SlotPath, "InventoryContainerSlotDataAsset", "41");
@@ -248,8 +343,31 @@ public sealed class InventoryRootChecksTests
                     ["inventoryRoots"] = new JsonArray(relation.DeepClone())
                 }
             }).ToJsonString());
+            new PresentationRelationChecks(evidence, context).ValidateDeclared(document.RootElement);
+        }
+
+        public JsonArray CompleteCatalog() => new(
+            CompleteRow("41", Relation("container-slot")), CompleteRow("42", Relation("default-container")),
+            CompleteRow("43", Relation("allowed-container")));
+
+        public void ValidateComplete(JsonArray catalog)
+        {
+            var (evidence, _, context) = Fixture.Read(PresentationRelationChecks.RootFields);
+            using var document = JsonDocument.Parse(catalog.ToJsonString());
             new PresentationRelationChecks(evidence, context).Validate(document.RootElement);
         }
+
+        private static JsonObject CompleteRow(string id, JsonObject relation) => new()
+        {
+            ["id"] = id,
+            ["presentation"] = new JsonObject
+            {
+                ["containers"] = new JsonArray(),
+                ["visualSlots"] = new JsonArray(),
+                ["inventoryRoots"] = new JsonArray(relation),
+                ["candidates"] = new JsonArray()
+            }
+        };
 
         private JsonObject Item(string path, string type, string id)
         {

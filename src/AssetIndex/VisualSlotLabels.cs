@@ -91,7 +91,6 @@ internal sealed class VisualSlotLabelCollector(TypeMappings mappings, ICollectio
         var types = members.Select(member => member.TypeTag).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         if (types.Length != 1) throw new InvalidDataException("Matching skin items have different UI type tags.");
         var navigation = labels.Where(label => label.Type.Equals(types[0], StringComparison.OrdinalIgnoreCase)).ToArray();
-        if (navigation.Length == 0) throw new InvalidDataException("Visual-slot UI type has no navigation label.");
         return navigation.Select(label => new VisualSlotName(slot.Id, slot.Path, types[0], label.Reference,
             members.ToArray(), slot.Query, label.DefinedAt)
         { Text = label.Text, TextIssues = label.Issues }).ToArray();

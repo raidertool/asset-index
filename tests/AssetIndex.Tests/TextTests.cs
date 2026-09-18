@@ -144,13 +144,13 @@ public sealed class TextTests
     }
 
     [Fact]
-    public void MissingTranslationUsesSourceOnlyForEnglish()
+    public void MissingTranslationIsBlankIncludingEnglishAndPreservesAuthoredSource()
     {
         var reference = new TextReference("items", "name", "Source name");
         var translations = new Dictionary<string, IReadOnlyDictionary<string, string>>();
 
-        Assert.Equal("Source name", Text.Resolve(reference, translations, "en"));
-        Assert.Equal(string.Empty, Text.Resolve(reference, translations, "fr"));
+        Assert.Equal(string.Empty, CatalogText.Resolve(reference, translations));
+        Assert.Equal("Source name", reference.Source);
     }
 
     [Fact]
@@ -162,7 +162,7 @@ public sealed class TextTests
             ["items"] = new Dictionary<string, string> { ["name"] = "XP" }
         };
 
-        Assert.Equal("XP", Text.Resolve(reference, translations, "fr"));
+        Assert.Equal("XP", CatalogText.Resolve(reference, translations));
     }
 
     [Fact]
@@ -174,8 +174,8 @@ public sealed class TextTests
             ["items"] = new Dictionary<string, string> { ["blank"] = string.Empty }
         };
 
-        Assert.Equal(string.Empty, Text.Resolve(new("items", "name", "Source"), translations, "de"));
-        Assert.Equal(string.Empty, Text.Resolve(new("items", "blank", "Source"), translations, "en"));
+        Assert.Equal(string.Empty, CatalogText.Resolve(new("items", "name", "Source"), translations));
+        Assert.Equal(string.Empty, CatalogText.Resolve(new("items", "blank", "Source"), translations));
     }
 
     [Fact]
@@ -497,7 +497,7 @@ public sealed class TextTests
         var reference = Text.Read(Asset(metadata, issues), issues).Name;
 
         Assert.Equal(new TextReference("", "", "XP", CultureInvariant: true), reference);
-        Assert.Equal("XP", Text.Resolve(reference, new Dictionary<string, IReadOnlyDictionary<string, string>>(), "fr"));
+        Assert.Equal("XP", CatalogText.Resolve(reference, new Dictionary<string, IReadOnlyDictionary<string, string>>()));
         Assert.Empty(issues);
     }
 
@@ -514,7 +514,7 @@ public sealed class TextTests
         var reference = Text.Read(Asset(metadata), []).Name;
 
         Assert.Equal(new TextReference("items", "name", "XP", CultureInvariant: true), reference);
-        Assert.Equal("XP", Text.Resolve(reference, translations, "fr"));
+        Assert.Equal("XP", CatalogText.Resolve(reference, translations));
     }
 
     [Theory]
@@ -529,8 +529,7 @@ public sealed class TextTests
         var reference = Text.Read(Asset(metadata), []).Name;
 
         Assert.Equal(new TextReference("", "", "Source name"), reference);
-        Assert.Equal("Source name", Text.Resolve(reference, translations, "en"));
-        Assert.Equal(string.Empty, Text.Resolve(reference, translations, "fr"));
+        Assert.Equal(string.Empty, CatalogText.Resolve(reference, translations));
     }
 
     private static CatalogAsset Asset(UObject metadata, ICollection<ExtractionIssue>? issues = null) =>

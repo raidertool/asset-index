@@ -22,6 +22,74 @@ public sealed class ImageOriginChecksTests
         Assert.Throws<InvalidDataException>(() => Validate(fixture, "Icon", "/Game/Other.Other"));
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void ADecodedImageAssociationCannotBeOmittedEvenWhenNullOrInherited(bool isNull, bool inherited)
+    {
+        using var fixture = new IdentityFixture();
+        var source = fixture.Object(Source, "PersistenceDataAsset", inherited ? Template : null);
+        var owner = inherited ? fixture.Object(Template, "PersistenceDataAsset") : source;
+        Reference(owner, "Icon", isNull ? null : Texture, soft: true);
+        Validate(fixture, "Icon", isNull ? null : Texture);
+
+        var error = Assert.Throws<InvalidDataException>(() => ValidateImages(fixture, new JsonArray(), Source));
+
+        Assert.Contains("omits decoded image association", error.Message);
+    }
+
+    [Theory]
+    [InlineData("Icon")]
+    [InlineData("BigIcon")]
+    public void FieldsSharingTheSameTextureRemainSeparateAssociations(string omitted)
+    {
+        using var fixture = new IdentityFixture();
+        var source = fixture.Object(Source, "PersistenceDataAsset");
+        Reference(source, "Icon", Texture, soft: true);
+        Reference(source, "BigIcon", Texture, soft: true);
+        var images = new JsonArray(Image(Source, "Icon", Texture), Image(Source, "BigIcon", Texture));
+        ValidateImages(fixture, images, Source);
+        images.Remove(images.Single(image => image!["field"]!.GetValue<string>() == omitted));
+
+        Assert.Throws<InvalidDataException>(() => ValidateImages(fixture, images, Source));
+    }
+
+    [Fact]
+    public void MetadataImageCannotBeOmittedBehindAnotherSourcesImage()
+    {
+        using var fixture = new IdentityFixture();
+        Reference(fixture.Object(Source, "PersistenceDataAsset"), "Icon", Texture, soft: true);
+        Reference(fixture.Object(Template, "UIMetaDataItem"), "Icon", Texture, soft: true);
+        var images = new JsonArray(Image(Source, "Icon", Texture), Image(Template, "Icon", Texture));
+        ValidateImages(fixture, images, Source, Template);
+        images.RemoveAt(1);
+
+        Assert.Throws<InvalidDataException>(() => ValidateImages(fixture, images, Source, Template));
+    }
+
+    [Theory]
+    [InlineData("PersistenceDataAsset", "Icon")]
+    [InlineData("UIEnvironmentalDamageSourceMetaDataItem", "CoverImage")]
+    public void MissingSerializedImageFieldsRequireNoAssociation(string type, string field)
+    {
+        using var fixture = new IdentityFixture();
+        if (type != "PersistenceDataAsset") fixture.AddClass(type, "UIMetaDataItem", (field, "SoftObjectProperty"));
+        fixture.Object(Source, type);
+
+        ValidateImages(fixture, new JsonArray(), Source);
+    }
+
+    [Fact]
+    public void SameNamedFieldOnUnrelatedOwnerDoesNotCreateATypedImageAssociation()
+    {
+        using var fixture = new IdentityFixture();
+        Reference(fixture.Object(Source, "PersistenceDataAsset"), "CoverImage", Texture, soft: true);
+
+        ValidateImages(fixture, new JsonArray(), Source);
+    }
+
     [Fact]
     public void ExplicitNullImageMasksTemplateTexture()
     {
@@ -106,12 +174,56 @@ public sealed class ImageOriginChecksTests
         var pointer = Header(source, leaf, "SoftObjectProperty", parent + index + "/Properties");
         source["references"]!.AsArray().Add(Link(pointer, Texture, "property", "soft"));
         Validate(fixture, field, Texture);
+        Assert.Throws<InvalidDataException>(() => ValidateImages(fixture, new JsonArray(), Source));
         Assert.Throws<InvalidDataException>(() => Validate(fixture, field, "/Game/Other.Other"));
         if (index.Length > 0)
         {
             Assert.Throws<InvalidDataException>(() => Validate(fixture, "MapAreas[1].HeaderImage", Texture));
             Assert.Throws<InvalidDataException>(() => Validate(fixture, "MapAreas[00].HeaderImage", Texture));
         }
+    }
+
+    [Theory]
+    [InlineData("missing-root")]
+    [InlineData("empty-array")]
+    [InlineData("missing-leaf")]
+    public void NestedImageContainerWithoutAnImageLeafRequiresNoAssociation(string shape)
+    {
+        using var fixture = new IdentityFixture();
+        fixture.AddClass("UIMapAreaInfoMetaDataItem", "UIMetaDataItem", ("MapAreas", "ArrayProperty"));
+        fixture.AddClass("MapAreaInfo", null, ("HeaderImage", "SoftObjectProperty"));
+        fixture.Mappings.Types["UIMapAreaInfoMetaDataItem"].Properties[0].MappingType =
+            new("ArrayProperty", innerType: new("StructProperty", "MapAreaInfo"));
+        var source = fixture.Object(Source, "UIMapAreaInfoMetaDataItem");
+        if (shape != "missing-root")
+        {
+            var root = Header(source, "MapAreas", "ArrayProperty");
+            if (shape == "empty-array") Value(source, root, "ArrayProperty", "empty-array", null);
+            else Value(source, root + "/0", "StructProperty", "empty-struct", null);
+        }
+
+        ValidateImages(fixture, new JsonArray(), Source);
+    }
+
+    [Fact]
+    public void EveryNestedArrayLeafRetainsItsOwnOrdinalAndExplicitNull()
+    {
+        using var fixture = new IdentityFixture();
+        fixture.AddClass("UIMapAreaInfoMetaDataItem", "UIMetaDataItem", ("MapAreas", "ArrayProperty"));
+        fixture.AddClass("MapAreaInfo", null, ("HeaderImage", "SoftObjectProperty"));
+        fixture.Mappings.Types["UIMapAreaInfoMetaDataItem"].Properties[0].MappingType =
+            new("ArrayProperty", innerType: new("StructProperty", "MapAreaInfo"));
+        var source = fixture.Object(Source, "UIMapAreaInfoMetaDataItem");
+        var root = Header(source, "MapAreas", "ArrayProperty");
+        var first = Header(source, "HeaderImage", "SoftObjectProperty", root + "/0/Properties");
+        var second = Header(source, "HeaderImage", "SoftObjectProperty", root + "/1/Properties");
+        source["references"]!.AsArray().Add(Link(first, Texture, "property", "soft"));
+        source["references"]!.AsArray().Add(Link(second, null, "property", "soft"));
+        var images = new JsonArray(Image(Source, "MapAreas[0].HeaderImage", Texture), Image(Source, "MapAreas[1].HeaderImage", null));
+        ValidateImages(fixture, images, Source);
+        images.RemoveAt(1);
+
+        Assert.Throws<InvalidDataException>(() => ValidateImages(fixture, images, Source));
     }
 
     [Fact]
@@ -159,15 +271,26 @@ public sealed class ImageOriginChecksTests
     }
 
     private static void Validate(IdentityFixture fixture, string field, string? resource)
+        => ValidateImages(fixture, new JsonArray(Image(Source, field, resource)), Source);
+
+    private static JsonObject Image(string source, string field, string? resource) => new()
+    {
+        ["source"] = source,
+        ["field"] = field,
+        ["resource"] = resource,
+        ["status"] = resource is null ? "absent" : "exported"
+    };
+
+    private static void ValidateImages(IdentityFixture fixture, JsonArray images, params string[] sources)
     {
         var (_, _, identities) = fixture.Read(ImageOriginChecks.RootFields.ToArray());
+        JsonArray Sources(bool metadata) => new(sources.Where(path => identities.Schema(path).IsA("UIMetaDataItem") == metadata)
+            .Select(path => (JsonNode)new JsonObject { ["path"] = path }).ToArray());
         using var rows = JsonDocument.Parse(new JsonArray(new JsonObject
         {
-            ["images"] = new JsonArray(new JsonObject
-            {
-                ["source"] = Source, ["field"] = field, ["resource"] = resource,
-                ["status"] = resource is null ? "absent" : "exported"
-            })
+            ["definitions"] = Sources(false),
+            ["metadata"] = Sources(true),
+            ["images"] = images.DeepClone()
         }).ToJsonString());
         ImageOriginChecks.Validate(rows.RootElement, identities);
     }

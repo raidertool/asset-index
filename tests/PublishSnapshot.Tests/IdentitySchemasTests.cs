@@ -107,8 +107,9 @@ public sealed class IdentitySchemasTests
         const string template = "/Game/Base.Base";
         fixture.AddClass("DerivedPersistence", "PersistenceDataAsset");
         var source = fixture.Object(Instance, "DerivedPersistence", template);
-        Number(fixture.Object(template, "PersistenceDataAsset"), "AssetId", "42");
-        Validate(fixture.Read().Context, Catalog("42", [source]));
+        var parent = fixture.Object(template, "PersistenceDataAsset");
+        Number(parent, "AssetId", "42");
+        Validate(fixture.Read().Context, Catalog("42", [source, parent]));
     }
 
     [Fact]

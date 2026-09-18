@@ -6,9 +6,6 @@ using CUE4Parse.UE4.Objects.Core.i18N;
 
 namespace AssetIndex;
 
-internal sealed record TextReference(string Namespace, string Key, string Source, bool CultureInvariant = false);
-internal sealed record TextCandidate(string Role, string SourceKind, string SourcePath, string SourceClass,
-    string Field, string DefinedAt, TextReference Reference);
 internal sealed record AssetText(long AssetId, TextReference? Name, TextReference? Description)
 {
     public IReadOnlyList<TextCandidate> Candidates { get; init; } = [];
@@ -111,24 +108,12 @@ internal static class Text
             observe?.Invoke(locale, translations);
             foreach (var asset in assets)
             {
-                var name = Resolve(asset.Name, translations, locale);
-                var description = Resolve(asset.Description, translations, locale);
-                if (name.Length > 0 || description.Length > 0)
-                    rows.Add(new LocalizedText(asset.AssetId, locale, name, description));
+                var name = CatalogText.Resolve(asset.Name, translations);
+                var description = CatalogText.Resolve(asset.Description, translations);
+                rows.Add(new LocalizedText(asset.AssetId, locale, name, description));
             }
         }
         return rows;
-    }
-
-    internal static string Resolve(TextReference? text,
-        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> translations, string locale)
-    {
-        if (text is null) return string.Empty;
-        if (text.CultureInvariant) return text.Source;
-        if (text.Key.Length > 0 && translations.TryGetValue(text.Namespace, out var entries)
-            && entries.TryGetValue(text.Key, out var value))
-            return value;
-        return locale == "en" ? text.Source : string.Empty;
     }
 
     private static void ReadCandidate(UObject source, TextField field, string kind,

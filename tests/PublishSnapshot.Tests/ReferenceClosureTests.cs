@@ -13,7 +13,7 @@ public sealed partial class PublisherTests
     {
         AddReferenceFixture(target);
         var references = remoteGit.Run("show-ref");
-        var publishedFiles = remoteGit.Run("ls-tree", "-r", "refs/heads/data");
+        var publishedFiles = remoteGit.Run("ls-tree", "-r", "refs/heads/main");
         var inputFiles = HashFiles(preview);
 
         var error = Assert.Throws<InvalidDataException>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
@@ -21,7 +21,7 @@ public sealed partial class PublisherTests
         Assert.Contains("Named reference target is absent", error.Message);
         Assert.Contains(target, error.Message);
         Assert.Equal(references, remoteGit.Run("show-ref"));
-        Assert.Equal(publishedFiles, remoteGit.Run("ls-tree", "-r", "refs/heads/data"));
+        Assert.Equal(publishedFiles, remoteGit.Run("ls-tree", "-r", "refs/heads/main"));
         Assert.Equal(inputFiles, HashFiles(preview));
     }
 
@@ -38,7 +38,7 @@ public sealed partial class PublisherTests
         var result = Publisher.Publish(preview, remote, NextExtractor, "456");
 
         Assert.True(result.Changed);
-        Assert.Equal(result.Commit, RemoteRef("refs/heads/data"));
+        Assert.Equal(result.Commit, RemoteRef("refs/heads/main"));
         Assert.Equal(result.Commit, RemoteRef("refs/tags/" + result.Tag));
     }
 
@@ -52,7 +52,7 @@ public sealed partial class PublisherTests
         var error = Assert.Throws<InvalidDataException>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
 
         Assert.Contains("Referenced package was not inspected", error.Message);
-        Assert.Equal(initialCommit, RemoteRef("refs/heads/data"));
+        Assert.Equal(initialCommit, RemoteRef("refs/heads/main"));
     }
 
     [Fact]
@@ -69,7 +69,7 @@ public sealed partial class PublisherTests
         var error = Assert.Throws<InvalidDataException>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
 
         Assert.Contains("differ only by case", error.Message);
-        Assert.Equal(initialCommit, RemoteRef("refs/heads/data"));
+        Assert.Equal(initialCommit, RemoteRef("refs/heads/main"));
     }
 
     private void AddReferenceFixture(string target)
@@ -80,6 +80,11 @@ public sealed partial class PublisherTests
             {
                 var child = rows[0]!.DeepClone();
                 child["path"] = path;
+                child["class"] = "Object";
+                child["properties"] = new JsonArray();
+                child["values"] = new JsonArray();
+                child["texts"] = new JsonArray();
+                child["references"] = System.Text.Json.JsonSerializer.SerializeToNode(ObjectLinks("Object"));
                 rows.Add(child);
             }
             rows[0]!["properties"]!.AsArray().Add(PropertyHeader("/Properties/4", "RelatedAsset", "SoftObjectProperty"));
@@ -105,8 +110,8 @@ public sealed partial class PublisherTests
         });
         ChangeLines("discovery/exports.jsonl.gz", rows =>
         {
-            rows.Add(ExportHeader("PioneerGame/Content/DA_Test.uasset", 1, "/Game/DA_Test.DA_Test:Parent", "UIGameplayItemMetaDataItem", "UIMetaDataItem", "Object"));
-            rows.Add(ExportHeader("PioneerGame/Content/DA_Test.uasset", 2, "/Game/DA_Test.DA_Test:Parent.Leaf", "UIGameplayItemMetaDataItem", "UIMetaDataItem", "Object"));
+            rows.Add(ExportHeader("PioneerGame/Content/DA_Test.uasset", 1, "/Game/DA_Test.DA_Test:Parent", "Object"));
+            rows.Add(ExportHeader("PioneerGame/Content/DA_Test.uasset", 2, "/Game/DA_Test.DA_Test:Parent.Leaf", "Object"));
         });
     }
 

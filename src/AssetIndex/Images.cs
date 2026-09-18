@@ -7,9 +7,6 @@ using CUE4Parse_Conversion.Textures;
 
 namespace AssetIndex;
 
-internal sealed record AssetImage(string Field, string Source, string? Resource, string Status,
-    string? File = null, int? Width = null, int? Height = null);
-
 internal sealed record ImageRequest(string Field, string Source, string? Resource, string Status,
     ObjectLocation? Location = null);
 

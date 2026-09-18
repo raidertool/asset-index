@@ -25,10 +25,8 @@ internal static class LocalizedTextChecks
         {
             var name = Resolve(presentation.GetProperty("name"), dictionary);
             var description = Resolve(presentation.GetProperty("description"), dictionary);
-            var expected = name.Length > 0 || description.Length > 0;
             var present = translations.Remove(dictionary.Locale, out var actual);
-            Require(present == expected, $"Unexpected or missing translation row for {dictionary.Locale}.");
-            if (!present) continue;
+            Require(present, $"Unexpected or missing translation row for {dictionary.Locale}.");
             Require(actual == (name, description), $"Rendered text differs from selected evidence for {dictionary.Locale}.");
             if (dictionary.Locale == "en") english = (name.Length > 0, description.Length > 0);
         }
@@ -44,6 +42,6 @@ internal static class LocalizedTextChecks
         var key = String(reference, "key", allowEmpty: true);
         if (key.Length > 0 && dictionary.Entries.TryGetValue(
             (String(reference, "namespace", allowEmpty: true), key), out var translated)) return translated;
-        return dictionary.Locale == "en" ? source : "";
+        return "";
     }
 }

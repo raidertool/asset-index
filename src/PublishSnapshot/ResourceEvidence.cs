@@ -1,6 +1,5 @@
+using AssetIndex;
 using System.Buffers.Text;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using SkiaSharp;
@@ -164,7 +163,7 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, IReadOnlyLi
     {
         using var document = ReadJson(files, "resources.json");
         var resources = new Dictionary<string, ResourceImage>(StringComparer.Ordinal);
-        var images = new HashSet<string>(StringComparer.Ordinal);
+        var images = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var row in document.RootElement.EnumerateArray())
         {
             Fields(row, "path", "status", "file", "width", "height");
@@ -172,14 +171,13 @@ internal sealed record ResourceEvidence(HashSet<string> ObjectPaths, IReadOnlyLi
             Require(objects.Contains(path), "Image resource lacks object evidence.");
             Require(String(row, "status") == "exported", "Image resource failed to export.");
             var file = String(row, "file");
-            var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(path)));
-            Require(file == $"images/{hash}.png" && images.Add(file), "Invalid or duplicate resource file.");
+            Require(file == ResourceFiles.ImagePath(path) && images.Add(file), "Invalid or duplicate resource file.");
             var image = new ResourceImage(file, row.GetProperty("width").GetInt32(), row.GetProperty("height").GetInt32());
             Require(image.Width > 0 && image.Height > 0 && resources.TryAdd(path, image), "Invalid or duplicate image resource.");
             Require(files.TryGetValue(file, out var source), "Missing resource PNG.");
             ValidatePng(source!, image);
         }
-        Require(images.SetEquals(files.Keys.Where(path => SnapshotFiles.ImagePath.IsMatch(path))), "PNG files and resource records do not match.");
+        Require(images.SetEquals(files.Keys.Where(path => ResourceFiles.IsImagePath(path))), "PNG files and resource records do not match.");
         return resources;
     }
 

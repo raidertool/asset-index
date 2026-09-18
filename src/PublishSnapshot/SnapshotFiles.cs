@@ -1,3 +1,4 @@
+using AssetIndex;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 
@@ -24,11 +25,10 @@ internal sealed class SnapshotFiles : IDisposable
 {
     private readonly string directory = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "asset-index-preview-" + Guid.NewGuid().ToString("N"));
     public Dictionary<string, SnapshotFile> Files { get; } = new(StringComparer.Ordinal);
-    internal static readonly Regex ImagePath = new("\\Aimages/[0-9a-f]{64}\\.png\\z", RegexOptions.CultureInvariant);
     internal static readonly Regex LocalePath = new("\\Alocalization/[a-z]{2,3}(?:_[a-z0-9]{2,8})*\\.jsonl\\.gz\\z", RegexOptions.CultureInvariant);
-    internal static readonly string[] Required = ["assets.json", "coverage.json", "resources.json", "discovery/objects.jsonl.gz", "discovery/exports.jsonl.gz", "discovery/files.jsonl.gz", "discovery/registry.jsonl.gz", "discovery/packages.jsonl.gz", "localization/en.jsonl.gz"];
+    internal static readonly string[] Required = ["asset_index.csv", "asset_localizations.csv", "assets.json", "coverage.json", "resources.json", "discovery/objects.jsonl.gz", "discovery/exports.jsonl.gz", "discovery/files.jsonl.gz", "discovery/registry.jsonl.gz", "discovery/packages.jsonl.gz", "localization/en.jsonl.gz"];
 
-    public static bool Allowed(string path) => Required.Contains(path) || ImagePath.IsMatch(path) || LocalePath.IsMatch(path);
+    public static bool Allowed(string path) => Required.Contains(path) || ResourceFiles.IsImagePath(path) || LocalePath.IsMatch(path);
     public static SnapshotFiles Capture(string source)
     {
         var snapshot = new SnapshotFiles();
@@ -52,7 +52,8 @@ internal sealed class SnapshotFiles : IDisposable
             var relative = prefix + System.IO.Path.GetFileName(entry);
             if ((attributes & FileAttributes.Directory) != 0)
             {
-                Preview.Require(relative is "images" or "discovery" or "localization", $"Unexpected preview directory: {relative}");
+                Preview.Require(relative is "images" or "discovery" or "localization" ||
+                    relative.StartsWith("images/", StringComparison.Ordinal) && ResourceFiles.IsImagePath(relative + "/probe.png"), $"Unexpected preview directory: {relative}");
                 CopyDirectory(entry, relative + "/");
                 continue;
             }

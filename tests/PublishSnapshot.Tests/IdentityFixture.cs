@@ -40,8 +40,13 @@ internal sealed class IdentityFixture : IDisposable
         classPath ??= "/Script/Test." + type;
         var row = new JsonObject
         {
-            ["path"] = path, ["class"] = type, ["properties"] = new JsonArray(), ["values"] = new JsonArray(),
-            ["texts"] = new JsonArray(), ["issues"] = new JsonArray(), ["tableEntries"] = new JsonArray(),
+            ["path"] = path,
+            ["class"] = type,
+            ["properties"] = new JsonArray(),
+            ["values"] = new JsonArray(),
+            ["texts"] = new JsonArray(),
+            ["issues"] = new JsonArray(),
+            ["tableEntries"] = new JsonArray(),
             ["references"] = new JsonArray(Link("/Class", classPath, "class", "resolved"), Link("/Template", template, "template", "resolved"))
         };
         Objects.Add(row);
@@ -82,8 +87,9 @@ internal sealed class IdentityFixture : IDisposable
 
     public static JsonNode Source(JsonObject row) => new JsonObject
     {
-        ["name"] = row["path"]!.GetValue<string>().Split('.').Last(),
-        ["class"] = row["class"]!.GetValue<string>(), ["path"] = row["path"]!.GetValue<string>()
+        ["name"] = row["path"]!.GetValue<string>().Split('.', ':').Last(),
+        ["class"] = row["class"]!.GetValue<string>(),
+        ["path"] = row["path"]!.GetValue<string>()
     };
 
     public static string Header(JsonObject row, string name, string type, string container = "/Properties")
@@ -97,8 +103,12 @@ internal sealed class IdentityFixture : IDisposable
         var pointer = container + "/" + count;
         row["properties"]!.AsArray().Add(new JsonObject
         {
-            ["pointer"] = pointer, ["name"] = name, ["type"] = type, ["arrayIndex"] = null,
-            ["arraySize"] = 1, ["serializeType"] = "Property"
+            ["pointer"] = pointer,
+            ["name"] = name,
+            ["type"] = type,
+            ["arrayIndex"] = null,
+            ["arraySize"] = 1,
+            ["serializeType"] = "Property"
         });
         return pointer;
     }
@@ -113,8 +123,12 @@ internal sealed class IdentityFixture : IDisposable
         row["references"]!.AsArray().Add(Link(Header(row, name, soft ? "SoftObjectProperty" : "ObjectProperty"), target, "property", soft ? "soft" : "hard"));
     public static JsonObject Link(string pointer, string? target, string role, string kind) => new()
     {
-        ["pointer"] = pointer, ["kind"] = kind, ["role"] = role, ["targetPath"] = target,
-        ["isNull"] = target is null, ["error"] = null
+        ["pointer"] = pointer,
+        ["kind"] = kind,
+        ["role"] = role,
+        ["targetPath"] = target,
+        ["isNull"] = target is null,
+        ["error"] = null
     };
 
     public void Dispose()

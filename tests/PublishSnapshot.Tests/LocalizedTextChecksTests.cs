@@ -21,27 +21,25 @@ public sealed class LocalizedTextChecksTests
     }
 
     [Fact]
-    public void SourceFallbackIsEnglishOnlyAndEmptyTranslationIsAuthoritative()
+    public void MissingAndEmptyTranslationsStayEmptyInEveryLocale()
     {
         var name = Reference("Source", false);
         var dictionaries = new[] { Dictionary("en"), Dictionary("ko_kr") };
-        Validate(name, null, dictionaries, Row("en", "Source"));
-        Assert.Throws<InvalidDataException>(() => Validate(name, null, dictionaries, Row("en", "Source"), Row("ko_kr", "Source")));
-
+        Validate(name, null, dictionaries, Row("en", ""), Row("ko_kr", ""));
+        Assert.Throws<InvalidDataException>(() => Validate(name, null, dictionaries, Row("en", "Source"), Row("ko_kr", "")));
         dictionaries[0] = Dictionary("en", "");
-        Validate(name, null, dictionaries);
-        Assert.Throws<InvalidDataException>(() => Validate(name, null, dictionaries, Row("en", "Source")));
+        Validate(name, null, dictionaries, Row("en", ""), Row("ko_kr", ""));
     }
 
     [Fact]
-    public void DescriptionOnlyRowsAreValidatedAndEmptyRowsAreOmitted()
+    public void DescriptionOnlyAndEmptyRowsAreRequired()
     {
         var description = Reference("Description", true);
         var dictionaries = new[] { Dictionary("en") };
         Assert.Equal((false, true), Validate(null, description, dictionaries, Row("en", "", "Description")));
         Assert.Throws<InvalidDataException>(() => Validate(null, description, dictionaries, Row("en", "", "Wrong")));
-        Validate(null, null, dictionaries);
-        Assert.Throws<InvalidDataException>(() => Validate(null, null, dictionaries, Row("en", "")));
+        Validate(null, null, dictionaries, Row("en", ""));
+        Assert.Throws<InvalidDataException>(() => Validate(null, null, dictionaries));
     }
 
     [Fact]

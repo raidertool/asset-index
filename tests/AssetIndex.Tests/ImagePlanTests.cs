@@ -40,6 +40,7 @@ public sealed partial class ImagePlanTests : IDisposable
         var result = Assert.Single(Images.Export(new(42, [source], []), resources, provider.Load, issues));
 
         Assert.Equal("exported", result.Status);
+        Assert.Equal("images/Game/Icon.png", result.File);
         Assert.Equal(2, provider.ReadFiles.Count);
         Assert.All(provider.ReadFiles, file => Assert.Same(original, file));
         using var bitmap = SKBitmap.Decode(Path.Combine(output, result.File!));
@@ -263,6 +264,28 @@ public sealed partial class ImagePlanTests : IDisposable
         Assert.Equal(location.Path, first.Path);
         Assert.Equal(1, loads);
         Assert.Equal(location.Path, Assert.Single(issues).Path);
+    }
+
+    [Theory]
+    [InlineData("/Game/Other.Icon")]
+    [InlineData("/Game/Other.icon")]
+    public void DifferentPackagesCannotOverwriteTheSameOriginalTextureFilename(string secondPath)
+    {
+        TextureDecoder.UseAssetRipperTextureDecoder = true;
+        using var provider = new ImageProvider();
+        var firstLocation = new ObjectLocation(new ImageFixtureFile("/Game/Icons.uasset"), 0, "/Game/Icons.Icon");
+        var secondLocation = new ObjectLocation(new ImageFixtureFile("/Game/Other.uasset", 0x001f), 0, secondPath);
+        var resources = new ImageResources(output, issues);
+        var first = resources.Export(firstLocation, provider.Load);
+        var bytes = File.ReadAllBytes(Path.Combine(output, first.File!));
+
+        var second = resources.Export(secondLocation, provider.Load);
+
+        Assert.Equal("failed", second.Status);
+        Assert.Null(second.File);
+        Assert.Equal(bytes, File.ReadAllBytes(Path.Combine(output, first.File!)));
+        Assert.Contains("filename conflicts", Assert.Single(issues).Message);
+        Assert.Single(Directory.GetFiles(output, "*.png", SearchOption.AllDirectories));
     }
 
     [Fact]

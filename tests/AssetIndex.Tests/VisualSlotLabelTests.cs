@@ -119,6 +119,34 @@ public sealed class VisualSlotLabelTests
         Assert.Empty(issues);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ValidSkinTypeWithoutMatchingNavigationHasNoLabelRelation(bool unrelatedNavigation)
+    {
+        var objects = Fixture();
+        var navigation = objects.Single(source => source.Name == "OpaqueNavigation");
+        if (unrelatedNavigation) Set(navigation, "CharacterCustomizationTypeTag", Tag("Other.Category"));
+        else objects.Remove(navigation);
+        var issues = new List<ExtractionIssue>();
+
+        Assert.Empty(VisualSlotLabels.Read(objects, Mappings.Value, issues));
+
+        Assert.Empty(issues);
+    }
+
+    [Fact]
+    public void MalformedNavigationCannotBecomeAnOrdinaryMissingLabel()
+    {
+        var objects = Fixture();
+        Set(objects.Single(source => source.Name == "OpaqueNavigation"), "CharacterCustomizationTypeTag", new Int64Property(1));
+        var issues = new List<ExtractionIssue>();
+
+        Assert.Empty(VisualSlotLabels.Read(objects, Mappings.Value, issues));
+
+        Assert.Contains(issues, issue => issue.Stage == "visual-slot" && issue.Path == "OpaqueNavigation");
+    }
+
     [Fact]
     public void UnreadableSkinTagsCannotSilentlyNarrowTheMatchingPopulation()
     {

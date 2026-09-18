@@ -1,6 +1,5 @@
+using AssetIndex;
 using System.IO.Compression;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json.Nodes;
 
 namespace PublishSnapshot.Tests;
@@ -99,11 +98,11 @@ public sealed partial class PublisherTests
                 }); break;
             case "registry": ChangeLines("discovery/registry.jsonl.gz", rows => rows[0]!["tags"]!["NewTag"] = "New evidence"); break;
         }
-        var result = Publisher.Publish(preview, remote, NextExtractor, "456");
+        var result = Publisher.Publish(preview, remote, NextExtractor, "123");
         Assert.Equal(changed, result.Changed);
         Assert.Equal(changed, initialCommit != result.Commit);
         Assert.Equal(original, File.ReadAllBytes(Path.Combine(preview, "assets.json")));
-        Assert.False(Publisher.Publish(preview, remote, NextExtractor, "456").Changed);
+        Assert.False(Publisher.Publish(preview, remote, NextExtractor, "123").Changed);
     }
 
     [Theory]
@@ -130,7 +129,8 @@ public sealed partial class PublisherTests
 
     private string AddUnownedImage(string resource, string resourceClass)
     {
-        var file = "images/" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(resource))) + ".png";
+        var file = ResourceFiles.ImagePath(resource);
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(preview, file))!);
         File.Copy(Path.Combine(preview, Image), Path.Combine(preview, file));
         ChangeJson("resources.json", rows => rows.AsArray().Add(new JsonObject
         {

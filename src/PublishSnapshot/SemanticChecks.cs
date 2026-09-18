@@ -17,8 +17,8 @@ internal static class SemanticChecks
         var evidence = DecodedEvidence.Read(files["discovery/objects.jsonl.gz"], fields, schemas.ObserveObject);
         var identities = new IdentityContext(evidence, schemas);
         identities.Validate(assets);
-        TextRoleChecks.Validate(assets, identities);
         new PresentationRelationChecks(evidence, identities).Validate(assets);
+        TextRoleChecks.Validate(assets, identities);
         ImageOriginChecks.Validate(assets, identities);
         using var resources = Preview.ReadJson(files, "resources.json");
         ImageOriginChecks.ValidateResources(resources.RootElement, identities);

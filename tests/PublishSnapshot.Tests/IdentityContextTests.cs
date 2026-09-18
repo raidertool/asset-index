@@ -171,7 +171,7 @@ public sealed class IdentityContextTests
         var source = fixture.Object(Persistence, "PersistenceDataAsset", Template);
         var template = fixture.Object(Template, "PersistenceDataAsset");
         Number(template, "AssetId", "42");
-        Validate(fixture.Read().Context, Catalog("42", [source]));
+        Validate(fixture.Read().Context, Catalog("42", [source, template]));
         fixture.AddClass("Unrelated", "DataAsset", ("AssetId", "Int64Property"));
         template["class"] = "Unrelated";
         template["references"]![0]!["targetPath"] = "/Script/Test.Unrelated";

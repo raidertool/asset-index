@@ -9,12 +9,12 @@ namespace PublishSnapshot;
 
 // Structural checks establish ownership of declared sources. These checks prove
 // the intervening game references, category fields, and complete query membership.
-internal sealed class PresentationRelationChecks(DecodedEvidence evidence, IdentityContext identities)
+internal sealed partial class PresentationRelationChecks(DecodedEvidence evidence, IdentityContext identities)
 {
     public static readonly string[] RootFields =
     [
         "Containers", "ContainerType", "DefaultContainer", "Tags", "ItemsQuery", "PersistenceDataAsset",
-        "TypeTag", "CharacterCustomizationTypeTag", "AllowedContainersQuery", .. InventoryRootPolicy.Categories.Keys
+        "TypeTag", "CharacterCustomizationTypeTag", "AllowedContainersQuery", "ContainerName", "DisplayName", .. InventoryRootPolicy.Categories.Keys
     ];
 
     private sealed record Skin(string Path, string Persistence, long Id, string[] Tags);
@@ -23,6 +23,12 @@ internal sealed class PresentationRelationChecks(DecodedEvidence evidence, Ident
     private IReadOnlyList<SkinUi>? skinUi;
 
     public void Validate(JsonElement assets)
+    {
+        ValidateDeclared(assets);
+        ValidateCompleteness(assets);
+    }
+
+    internal void ValidateDeclared(JsonElement assets)
     {
         foreach (var asset in assets.EnumerateArray())
         {
@@ -80,19 +86,9 @@ internal sealed class PresentationRelationChecks(DecodedEvidence evidence, Ident
     {
         var frame = ObjectPath(relation, "framePath");
         Instance(frame, "LoadoutFrameItemDataAsset");
-        var entries = Field(frame, "Containers", "ArrayProperty");
-        var index = relation.GetProperty("containerIndex").GetInt32();
-        Require(Elements(entries).Contains(index), "Container presentation index is not a decoded frame entry.");
-        var prefix = entries.Header.Pointer + "/" + index + "/Properties";
-        var typeField = entries.Owner.Field("Type", prefix)
-            ?? throw new InvalidDataException("Loadout-frame entry has no Type.");
-        var type = Enum(typeField);
+        var (type, slot) = FrameEntry(frame, relation.GetProperty("containerIndex").GetInt32());
         Require(type == String(relation, "containerType"), "Container presentation differs from its frame category.");
-        var slotField = entries.Owner.Field("ContainerSlotDataAsset", prefix)
-            ?? throw new InvalidDataException("Loadout-frame entry has no slot reference.");
-        Type(slotField, "ObjectProperty");
-        var slot = ObjectPath(relation, "slotPath");
-        Same(slotField.Reference(), slot, "Loadout-frame slot reference differs from presentation.");
+        Same(slot, ObjectPath(relation, "slotPath"), "Loadout-frame slot reference differs from presentation.");
         Instance(slot, "InventoryContainerSlotDataAsset");
         Category(ObjectPath(relation, "metadataPath"), type);
         if (String(relation, "role") == "container-slot") Identity(id, slot);
@@ -103,6 +99,19 @@ internal sealed class PresentationRelationChecks(DecodedEvidence evidence, Ident
             Instance(container, "InventoryContainerItemDataAsset");
             Identity(id, container);
         }
+    }
+
+    private (string Type, string Slot) FrameEntry(string frame, int index)
+    {
+        var entries = Field(frame, "Containers", "ArrayProperty");
+        Require(Elements(entries).Contains(index), "Container presentation index is not a decoded frame entry.");
+        var prefix = entries.Header.Pointer + "/" + index + "/Properties";
+        var type = entries.Owner.Field("Type", prefix)
+            ?? throw new InvalidDataException("Loadout-frame entry has no Type.");
+        var slot = entries.Owner.Field("ContainerSlotDataAsset", prefix)
+            ?? throw new InvalidDataException("Loadout-frame entry has no slot reference.");
+        Type(slot, "ObjectProperty");
+        return (Enum(type), slot.Reference() ?? throw new InvalidDataException("Loadout-frame slot reference is null."));
     }
 
     private void VisualSlot(long id, JsonElement relation)

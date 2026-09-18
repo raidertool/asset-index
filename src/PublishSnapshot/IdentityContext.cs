@@ -29,6 +29,7 @@ internal sealed class IdentityContext(DecodedEvidence evidence, IdentitySchemas 
 
     public void Validate(JsonElement assets)
     {
+        var declared = new Dictionary<string, (long Id, bool Metadata)>(StringComparer.OrdinalIgnoreCase);
         foreach (var asset in assets.EnumerateArray())
         {
             var expected = Id(String(asset, "id"));
@@ -43,12 +44,31 @@ internal sealed class IdentityContext(DecodedEvidence evidence, IdentitySchemas 
                 var path = ResourceEvidence.ObjectPath(source, "path");
                 Require(!IsClassDefault(path), "A class default object is not a catalog definition or metadata item.");
                 var schema = Schema(path);
+                var decodedPath = evidence.Object(path).Path;
+                var nameStart = Math.Max(decodedPath.LastIndexOf('.'), decodedPath.LastIndexOf(':')) + 1;
+                Require(String(source, "name") == decodedPath[nameStart..], "Catalog source name differs from its decoded object name.");
                 Require(String(source, "class").Equals(schema.SourceClass, StringComparison.OrdinalIgnoreCase),
                     "Catalog source class differs from decoded identity evidence.");
                 Require(schema.IsA("UIMetaDataItem") == metadata, "Catalog source has the wrong identity role.");
                 var actual = metadata ? MetadataId(path, definitions) : DefinitionId(path, definitions);
                 Require(actual == expected, $"Catalog ID differs from typed identity evidence at {path}.");
+                Require(declared.TryAdd(path, (expected, metadata)), $"Catalog repeats source identity: {path}.");
             }
+        }
+        ValidateCompleteness(declared);
+    }
+
+    private void ValidateCompleteness(IReadOnlyDictionary<string, (long Id, bool Metadata)> declared)
+    {
+        foreach (var source in evidence.Objects)
+        {
+            if (IsClassDefault(source.Path)) continue;
+            var schema = Schema(source.Path);
+            var metadata = schema.IsA("UIMetaDataItem");
+            var id = metadata ? MetadataId(source.Path) : DefinitionId(source.Path);
+            if (id is null) continue;
+            Require(declared.TryGetValue(source.Path, out var actual) && actual == (id.Value, metadata),
+                $"Catalog omits decoded {(metadata ? "metadata" : "definition")} identity {id}: {source.Path}.");
         }
     }
 
@@ -74,16 +94,20 @@ internal sealed class IdentityContext(DecodedEvidence evidence, IdentitySchemas 
     {
         var schema = Schema(path);
         Require(schema.IsA("UIMetaDataItem"), "Metadata identity requires a native metadata class.");
-        if (Override(path, "bOverrideAssetId", "OverrideAssetId") is { } overridden) return overridden;
         var links = MetadataLinks.Where(link => schema.IsA(link.Class)).ToArray();
         Require(links.Length <= 1, "Metadata has conflicting native identity contracts.");
         var field = links.Length == 1 ? links[0].Field : "PersistenceDataAsset";
-        if (schema.Property(field, "ObjectProperty", "SoftObjectProperty") is null) return null;
-        var target = Reference(path, field);
-        if (target is null) return null;
-        Require(definitions is null || definitions.Contains(target), "Metadata identity target is absent from catalog definitions.");
-        Require(!Schema(target).IsA("UIMetaDataItem"), "Metadata identity target cannot be metadata.");
-        return DefinitionId(target, definitions);
+        var hasReference = schema.Property(field, "ObjectProperty", "SoftObjectProperty") is not null;
+        var hasOverride = schema.Property("OverrideAssetId", "Int64Property") is not null;
+        if (!hasReference && !hasOverride) return null;
+        if (Override(path, "bOverrideAssetId", "OverrideAssetId") is { } overridden) return overridden;
+        var target = hasReference ? Reference(path, field) : null;
+        Require(target is not null, $"Metadata has no resolvable typed identity: {path}.");
+        Require(definitions is null || definitions.Contains(target!), "Metadata identity target is absent from catalog definitions.");
+        Require(!Schema(target!).IsA("UIMetaDataItem"), "Metadata identity target cannot be metadata.");
+        var id = DefinitionId(target!, definitions);
+        Require(id is not null, $"Metadata has no resolvable typed identity: {path}.");
+        return id;
     }
 
     private long? Override(string path, string enabled, string value)

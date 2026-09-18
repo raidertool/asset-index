@@ -33,7 +33,12 @@ public sealed partial class PublisherTests
         Assert.Equal(File.ReadAllText(Path.Combine(preview, "assets.json")), remoteGit.Run("show", result.Commit + ":assets.json"));
         Assert.True(File.Exists(Path.Combine(preview, unowned)));
         Assert.True(File.Exists(Path.Combine(preview, "discovery/objects.jsonl.gz")));
-        Assert.Equal(File.ReadAllText(Path.Combine(preview, "coverage.json")), remoteGit.Run("show", result.Commit + ":coverage.json"));
+        using var coverage = JsonDocument.Parse(remoteGit.Run("show", result.Commit + ":coverage.json"));
+        Assert.Equal(2, coverage.RootElement.GetProperty("formatVersion").GetInt32());
+        Assert.Equal(0, coverage.RootElement.GetProperty("issueCounts").GetProperty("total").GetInt32());
+        Assert.False(coverage.RootElement.TryGetProperty("issues", out _));
+        Assert.False(coverage.RootElement.TryGetProperty("notices", out _));
+        Assert.False(coverage.RootElement.GetProperty("discovery").TryGetProperty("nativeScope", out _));
     }
 
     [Fact]
@@ -49,7 +54,7 @@ public sealed partial class PublisherTests
             foreach (var row in reversed) rows.AsArray().Add(row);
         });
 
-        var retry = Publisher.Publish(preview, remote, InitialExtractor, "789");
+        var retry = Publisher.Publish(preview, remote, InitialExtractor, "456");
 
         Assert.False(retry.Changed);
         Assert.Equal(first.Commit, retry.Commit);
@@ -75,6 +80,13 @@ public sealed partial class PublisherTests
     [Fact]
     public void APreviewWithNoCatalogImagesStillPublishesItsResources()
     {
+        ChangeLines("discovery/objects.jsonl.gz", rows =>
+        {
+            var source = rows[0]!;
+            source["properties"]!.AsArray().RemoveAt(3);
+            var references = source["references"]!.AsArray();
+            references.Remove(references.Single(reference => reference!["pointer"]!.GetValue<string>() == "/Properties/3"));
+        });
         ChangeJson("assets.json", rows => rows[0]!["images"] = new JsonArray());
         ChangeJson("coverage.json", report => report["images"] = 0);
         using var captured = Preview.Read(preview);
@@ -86,9 +98,21 @@ public sealed partial class PublisherTests
         Assert.True(File.Exists(captured.Files[Image].Path));
     }
 
+    [Fact]
+    public void KeepingThePngDoesNotPermitDroppingItsDecodedCatalogAssociation()
+    {
+        ChangeJson("assets.json", rows => rows[0]!["images"] = new JsonArray());
+        ChangeJson("coverage.json", report => report["images"] = 0);
+
+        var error = Assert.Throws<InvalidDataException>(() => Preview.Read(preview));
+
+        Assert.Contains("omits decoded image association", error.Message);
+        Assert.True(File.Exists(Path.Combine(preview, Image)));
+    }
+
     [Theory]
     [InlineData("assets.json")]
-    [InlineData("coverage.json")]
+    [InlineData("asset_index.csv")]
     [InlineData("localization/en.jsonl.gz")]
     [InlineData("image")]
     public void EveryPublishedBlobHasTheSameSizeLimit(string selected)

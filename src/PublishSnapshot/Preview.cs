@@ -1,15 +1,12 @@
+using AssetIndex;
 using System.Globalization;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace PublishSnapshot;
 
 internal sealed record Preview(SnapshotFiles Snapshot) : IDisposable
 {
     internal static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true };
-    private static readonly Regex ImagePath = SnapshotFiles.ImagePath;
     public IReadOnlyDictionary<string, SnapshotFile> Files => Snapshot.Files;
     public void Dispose() => Snapshot.Dispose();
 
@@ -27,6 +24,7 @@ internal sealed record Preview(SnapshotFiles Snapshot) : IDisposable
             ValidateRecords(assets.RootElement, coverage.RootElement, evidence);
             TextOriginChecks.Validate(assets.RootElement, snapshot.Files["discovery/objects.jsonl.gz"]);
             SemanticChecks.Validate(assets.RootElement, snapshot.Files, coverage.RootElement);
+            CsvChecks.Validate(assets.RootElement, snapshot.Files);
             return new(snapshot);
         }
         catch { snapshot.Dispose(); throw; }
@@ -100,9 +98,7 @@ internal sealed record Preview(SnapshotFiles Snapshot) : IDisposable
             Require(status == "exported", "Preview contains a failed or unsupported image.");
             var resourcePath = String(image, "resource");
             var path = String(image, "file");
-            Require(ImagePath.IsMatch(path), "Image path must be images/<64 lowercase hex>.png.");
-            var resourceHash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(resourcePath)));
-            Require(path == $"images/{resourceHash}.png", "Image filename does not match its declared resource path.");
+            Require(path == ResourceFiles.ImagePath(resourcePath), "Image filename does not match its declared resource path.");
             var size = (Width: image.GetProperty("width").GetInt32(), Height: image.GetProperty("height").GetInt32());
             Require(size.Width > 0 && size.Height > 0, "Image dimensions must be positive.");
             Require(resources.TryGetValue(resourcePath, out var resource) && resource.File == path
@@ -117,7 +113,7 @@ internal sealed record Preview(SnapshotFiles Snapshot) : IDisposable
         Require(value.ValueKind == JsonValueKind.Object, "Expected a JSON object.");
         var found = new HashSet<string>(StringComparer.Ordinal);
         foreach (var property in value.EnumerateObject()) Require(found.Add(property.Name), $"Duplicate JSON field: {property.Name}");
-        Require(found.SetEquals(fields), "JSON fields do not match format version 1.");
+        Require(found.SetEquals(fields), "JSON fields do not match the expected snapshot schema.");
     }
 
     internal static string String(JsonElement value, string name, bool allowEmpty = false)

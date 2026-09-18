@@ -1,7 +1,7 @@
+using AssetIndex;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Security.Cryptography;
-using System.Text;
 using System.IO.Compression;
 using SkiaSharp;
 
@@ -12,13 +12,14 @@ public sealed partial class PublisherTests : IDisposable
     private const string InitialExtractor = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private const string NextExtractor = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     private const string Texture = "/Game/T_Test.T_Test";
-    private static readonly string Image = "images/" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Texture))) + ".png";
+    private static readonly string Image = ResourceFiles.ImagePath(Texture);
     private readonly string root = Path.Combine(Path.GetTempPath(), "snapshot-publisher-test-" + Guid.NewGuid().ToString("N"));
     private readonly string remote;
     private readonly string preview;
     private readonly string seed;
     private readonly Git remoteGit;
     private readonly string initialCommit;
+    private readonly string initialDigest;
 
     public PublisherTests()
     {
@@ -29,13 +30,15 @@ public sealed partial class PublisherTests : IDisposable
         new Git(root).Run("init", "--bare", "--quiet", remote);
         remoteGit = new Git(remote);
         WriteSeed(seed, "Initial name");
-        File.WriteAllBytes(Path.Combine(seed, "metadata.json"), JsonSerializer.SerializeToUtf8Bytes(Metadata.Create(InitialExtractor, "123"), Preview.Json));
+        initialDigest = ContentDigest.Files(Directory.GetFiles(seed, "*", SearchOption.AllDirectories)
+            .ToDictionary(path => Path.GetRelativePath(seed, path).Replace('\\', '/'), SnapshotFile.Read));
+        File.WriteAllBytes(Path.Combine(seed, "metadata.json"), JsonSerializer.SerializeToUtf8Bytes(Metadata.Create(InitialExtractor, "123", initialDigest), Preview.Json));
         var git = new Git(seed);
         git.Run("init", "--quiet");
         Commit(git);
         initialCommit = git.Run("rev-parse", "HEAD").Trim();
         git.Run("remote", "add", "origin", remote);
-        git.Run("push", "--quiet", "--atomic", "origin", "HEAD:refs/heads/data", "HEAD:refs/heads/main", $"HEAD:refs/tags/{Publisher.Tag("123", initialCommit)}");
+        git.Run("push", "--quiet", "--atomic", "origin", "HEAD:refs/heads/main", $"HEAD:refs/tags/{Publisher.Tag("123", initialDigest)}");
         WritePreview(preview, "New name");
     }
 
@@ -45,35 +48,51 @@ public sealed partial class PublisherTests : IDisposable
         var result = Publisher.Publish(preview, remote, NextExtractor, "456");
 
         Assert.True(result.Changed);
-        Assert.Equal(result.Commit, RemoteRef("refs/heads/data"));
-        Assert.Equal(initialCommit, RemoteRef("refs/heads/main"));
-        Assert.Equal("arc-456-" + result.Commit[..12], result.Tag);
+        Assert.Equal(result.Commit, RemoteRef("refs/heads/main"));
+        Assert.Equal("arc-456-" + ReadMetadata(result.Commit).ContentSha256[..12], result.Tag);
         Assert.Equal(result.Commit, RemoteRef("refs/tags/" + result.Tag));
         Assert.Equal("commit", remoteGit.Run("cat-file", "-t", "refs/tags/" + result.Tag).Trim());
         Assert.Equal("alex@alexbowe.com\nalex@alexbowe.com", remoteGit.Run("show", "-s", "--format=%ae%n%ce", result.Commit).Trim());
         Assert.Equal(DataSnapshot.Required.Append(Image).Append("metadata.json").Order(),
             remoteGit.Run("ls-tree", "-r", "--name-only", result.Commit).Split('\n', StringSplitOptions.RemoveEmptyEntries).Order());
         using var metadata = JsonDocument.Parse(remoteGit.Run("show", result.Commit + ":metadata.json"));
-        Assert.Equal(1, metadata.RootElement.GetProperty("formatVersion").GetInt32());
+        Assert.Equal(2, metadata.RootElement.GetProperty("formatVersion").GetInt32());
         Assert.Equal(NextExtractor, metadata.RootElement.GetProperty("extractorCommit").GetString());
         Assert.Equal("456", metadata.RootElement.GetProperty("steam").GetProperty("manifestId").GetString());
     }
 
     [Fact]
-    public void IdenticalPayloadKeepsOldCommitTagAndMetadataDespiteNewProvenance()
+    public void IdenticalPayloadWithANewSteamReleaseGetsANewTagButTheSameContentIdentity()
     {
         WritePreview(preview, "Initial name");
-        ChangeJson("coverage.json", node => node["discovery"]!["nativeScope"] = "Updated scan description");
-        var references = remoteGit.Run("show-ref");
+        ChangeJson("coverage.json", node => node["discovery"]!["nativeScope"] = "Private scan description");
 
         var result = Publisher.Publish(preview, remote, NextExtractor, "18446744073709551615");
 
+        Assert.True(result.Changed);
+        Assert.NotEqual(initialCommit, result.Commit);
+        Assert.Equal(initialDigest, ReadMetadata(result.Commit).ContentSha256);
+        Assert.Equal(Publisher.Tag("18446744073709551615", initialDigest), result.Tag);
+        Assert.Equal(NextExtractor, ReadMetadata(result.Commit).ExtractorCommit);
+        Assert.DoesNotContain("Private scan description", remoteGit.Run("show", result.Commit + ":coverage.json"));
+    }
+
+    [Fact]
+    public void SourceOnlyMainCommitRetainsReleaseCommitAndProvenanceOnRetry()
+    {
+        File.WriteAllText(Path.Combine(seed, "README.md"), "Updated source documentation");
+        var git = new Git(seed);
+        Commit(git);
+        git.Run("push", "--quiet", "origin", "HEAD:refs/heads/main");
+        var main = RemoteRef("refs/heads/main");
+        WritePreview(preview, "Initial name");
+
+        var result = Publisher.Publish(preview, remote, NextExtractor, "123");
+
         Assert.False(result.Changed);
         Assert.Equal(initialCommit, result.Commit);
-        Assert.Equal(Publisher.Tag("123", initialCommit), result.Tag);
-        Assert.Equal(references, remoteGit.Run("show-ref"));
-        Assert.Contains(InitialExtractor, remoteGit.Run("show", "refs/heads/data:metadata.json"));
-        Assert.DoesNotContain(NextExtractor, remoteGit.Run("show", "refs/heads/data:metadata.json"));
+        Assert.Equal(main, RemoteRef("refs/heads/main"));
+        Assert.Equal(InitialExtractor, ReadMetadata(main).ExtractorCommit);
     }
 
     [Fact]
@@ -82,7 +101,7 @@ public sealed partial class PublisherTests : IDisposable
         var first = Publisher.Publish(preview, remote, NextExtractor, "456");
         var references = remoteGit.Run("show-ref");
 
-        var retry = Publisher.Publish(preview, remote, InitialExtractor, "789");
+        var retry = Publisher.Publish(preview, remote, InitialExtractor, "456");
 
         Assert.False(retry.Changed);
         Assert.Equal(first.Commit, retry.Commit);
@@ -143,13 +162,13 @@ public sealed partial class PublisherTests : IDisposable
 
         var retry = Publisher.Publish(preview, remote, NextExtractor, "456");
         Assert.True(retry.Changed);
-        Assert.Equal(retry.Commit, RemoteRef("refs/heads/data"));
+        Assert.Equal(retry.Commit, RemoteRef("refs/heads/main"));
         Assert.Equal(retry.Commit, RemoteRef("refs/tags/" + retry.Tag));
         Assert.Equal(seedReferences, seedGit.Run("show-ref"));
     }
 
     [Fact]
-    public void ConcurrentDataWriterIsNeverOverwritten()
+    public void ConcurrentMainWriterIsNeverOverwritten()
     {
         WriteSeed(seed, "Concurrent writer");
         var seedGit = new Git(seed);
@@ -157,14 +176,15 @@ public sealed partial class PublisherTests : IDisposable
         var competing = seedGit.Run("rev-parse", "HEAD").Trim();
         seedGit.Run("push", "--quiet", "origin", "HEAD:refs/heads/race-source");
         var tags = remoteGit.Run("show-ref", "--tags");
-        InstallHook($"unset GIT_QUARANTINE_PATH\ngit update-ref refs/heads/data {competing} {initialCommit} || exit 1\nexit 0\n");
+        InstallHook($"unset GIT_QUARANTINE_PATH\ngit update-ref refs/heads/main {competing} {initialCommit} || exit 1\nexit 0\n");
 
         Assert.Throws<IOException>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
 
-        Assert.Equal(competing, RemoteRef("refs/heads/data"));
-        Assert.Equal(initialCommit, RemoteRef("refs/heads/main"));
+        Assert.Equal(competing, RemoteRef("refs/heads/main"));
         Assert.Equal(tags, remoteGit.Run("show-ref", "--tags"));
     }
+
+    private Metadata ReadMetadata(string commit) => Metadata.Parse(remoteGit.Run("show", commit + ":metadata.json"));
 
     private void Corrupt(string mutation)
     {
@@ -207,11 +227,12 @@ public sealed partial class PublisherTests : IDisposable
         var value = JsonNode.Parse(File.ReadAllText(path))!;
         change(value);
         File.WriteAllText(path, value.ToJsonString());
+        if (file == "assets.json") RefreshCsv(preview);
     }
 
     private static void WritePreview(string directory, string name)
     {
-        Directory.CreateDirectory(Path.Combine(directory, "images"));
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(directory, Image))!);
         using var bitmap = new SKBitmap(2, 1);
         bitmap.Erase(SKColors.Red);
         using var image = SKImage.FromBitmap(bitmap);
@@ -319,6 +340,28 @@ public sealed partial class PublisherTests : IDisposable
             ExportHeader("PioneerGame/Content/DA_Identity.uasset", 0, "/Game/DA_Identity.DA_Identity", "PersistenceDataAsset", "DataAsset", "Object")
         });
         WriteLines(directory, "localization/en.jsonl.gz", new[] { new { @namespace = "Shared", key = "UNCHANGED", value = "Unowned text" } });
+        RefreshCsv(directory);
+    }
+
+    private static void RefreshCsv(string directory)
+    {
+        // Invalid-catalog tests deliberately violate JSON/selection contracts;
+        // those must fail the catalog validator before CSV verification.
+        AssetRecord[] records;
+        try { records = JsonSerializer.Deserialize<AssetRecord[]>(File.ReadAllBytes(Path.Combine(directory, "assets.json")), Preview.Json)!; }
+        catch (JsonException) { return; }
+        try
+        {
+            using var main = new MemoryStream();
+            using var locales = new MemoryStream();
+            CatalogCsv.Write(main, CatalogCsv.MainRows(records));
+            CatalogCsv.Write(locales, CatalogCsv.LocalizationRows(records));
+            File.WriteAllBytes(Path.Combine(directory, CatalogCsv.MainFile), main.ToArray());
+            File.WriteAllBytes(Path.Combine(directory, CatalogCsv.LocalizationFile), locales.ToArray());
+        }
+        catch (InvalidDataException) { }
+        catch (InvalidOperationException) { }
+        catch (ArgumentException) { }
     }
 
     private static void WriteSeed(string directory, string name)
