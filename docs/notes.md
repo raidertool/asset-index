@@ -31,6 +31,12 @@ substituted for an unsupported finished material icon.
 
 ## Evidence and validation
 
+Archive read priority determines package selection. Equal-priority copies must
+agree on content hashes, owned payloads and package-store context before sharing
+a stable representative. Unknown or conflicting copies stop extraction. Path and
+package-ID lookup use the same winner; older-priority versions remain available
+for upstream import resolution.
+
 Every effective mounted package gets an export-header inventory. Typed candidates,
 registry UI textures and relevant references require decoded bodies; known
 unrelated exports can remain header-only. Exact object/outer paths and superclass

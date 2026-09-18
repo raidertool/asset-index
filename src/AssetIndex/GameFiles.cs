@@ -23,6 +23,7 @@ internal static class GameFiles
             provider.Initialize();
             provider.SubmitKey(new FGuid(), new FAesKey(Environment.GetEnvironmentVariable("ARC_AES_KEY") ?? DefaultKey));
             provider.Mount();
+            provider.NormalizeFiles();
             provider.PostMount();
             var missing = provider.UnloadedVfs.Where(reader => reader.HasDirectoryIndex).ToArray();
             if (missing.Length > 0)

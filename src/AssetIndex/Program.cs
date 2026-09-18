@@ -58,7 +58,7 @@ internal static class Program
             Console.WriteLine("Mounting game containers...");
             using var provider = GameFiles.Open(options);
             inputContainers = Discovery.PackageInputIndex.Census(provider);
-            Console.WriteLine($"Mounted {provider.Files.Count:N0} files. Reading typed object fields and references...");
+            Console.WriteLine($"Mounted {provider.Files.Keys.Distinct(provider.PathComparer).Count():N0} file paths. Reading typed object fields and references...");
             var storage = PackageStorage.Read(provider.Files.Values);
             Console.WriteLine($"Mounted IoStore packages including shadowed versions: {storage.Packages:N0} distinct entries, {storage.Bytes:N0} raw bytes.");
             Console.WriteLine($"Package spool volume: {provider.PackageSpoolAvailableBytes:N0} bytes currently available.");
