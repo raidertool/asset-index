@@ -7,12 +7,12 @@ Game-backed workflow jobs require a private repository. Public CI runs offline;
 the safe handoff from private validation to public publication is not implemented.
 
 - `assets.json`: catalog rows and presentation provenance.
-- `resources.json` and `images/`: every image referenced by the catalog.
+- `resources.json` and `images/`: every exported image, including UI resources without an asset ID.
 - `localization/<locale>.jsonl.gz`: merged localization dictionaries, including English.
 - `coverage.json`: extraction counts, errors, notices, mapping hash, and discovery scope.
 
-The complete preview is validated first. Discovery streams and extra UI images
-remain private; they are excluded from Git. Coverage retains
+The complete preview is validated first. Discovery streams remain private;
+they are excluded from Git. Coverage retains
 the full extraction counts. Every published file must be at most 100 MiB.
 
 ```sh
@@ -73,7 +73,7 @@ The data Git commit identifies the snapshot. Its lightweight tag is
 Changed snapshots push `data` and the tag atomically, without force. A rejected
 push applies neither update; a concurrent writer is never overwritten.
 
-Identical catalog, filtered resources, localization, and catalog PNG bytes keep
+Identical catalog, resources, localization, and PNG bytes keep
 the existing commit, metadata and tag. Coverage, source-only edits and excluded
 evidence cannot create a snapshot on their own. All localization changes remain
 versioned. New run provenance stays in its logs/artifacts; identical retries

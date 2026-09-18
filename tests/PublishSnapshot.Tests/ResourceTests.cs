@@ -110,17 +110,20 @@ public sealed partial class PublisherTests
     [InlineData("/Game/T_Unowned.T_Unowned", "Texture2D")]
     [InlineData("/Game/MI_Unowned.MI_Unowned", "MaterialInstanceConstant")]
     [InlineData("/Game/M_Unowned.M_Unowned", "Material")]
-    public void AnUnownedImageIsExcludedFromGitButStillValidated(string resource, string resourceClass)
+    public void AnUnownedImageIsPublishedAndStillValidated(string resource, string resourceClass)
     {
         WritePreview(preview, "Initial name");
         var file = AddUnownedImage(resource, resourceClass);
 
         var result = Publisher.Publish(preview, remote, NextExtractor, "456");
 
-        Assert.False(result.Changed);
-        Assert.Equal(initialCommit, result.Commit);
-        Assert.DoesNotContain(file, remoteGit.Run("ls-tree", "-r", "--name-only", result.Commit));
-        Assert.DoesNotContain(resource, remoteGit.Run("show", result.Commit + ":resources.json"));
+        Assert.True(result.Changed);
+        Assert.NotEqual(initialCommit, result.Commit);
+        Assert.Contains(file, remoteGit.Run("ls-tree", "-r", "--name-only", result.Commit));
+        Assert.Contains(resource, remoteGit.Run("show", result.Commit + ":resources.json"));
+        var retry = Publisher.Publish(preview, remote, NextExtractor, "456");
+        Assert.False(retry.Changed);
+        Assert.Equal(result.Commit, retry.Commit);
         File.WriteAllText(Path.Combine(preview, file), "broken unowned image");
         AssertRejected();
     }

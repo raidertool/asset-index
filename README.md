@@ -49,9 +49,9 @@ conditions. Unsupported materials remain marked; missing text is not filled
 from an older snapshot.
 See [discovery rules](docs/discovery.md) before adding new associations.
 
-Planned `data` publication retains the catalog, all its images, localization,
-coverage and metadata. Full discovery evidence and extra UI images stay in the
-private preview; the complete preview must pass validation before publication.
+Planned `data` publication retains the catalog, every exported image, localization,
+coverage and metadata. Full discovery evidence stays in the private preview;
+the complete preview must pass validation before publication.
 
 Exit codes: `0` succeeded, `1` incomplete, `2` invalid input. Inspect coverage
 and affected images even after success: success does not prove completeness.

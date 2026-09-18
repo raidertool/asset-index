@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace PublishSnapshot;
 
-// Projection borrows validated files; only the filtered resource list is owned here.
+// Projection borrows validated files; only the sorted resource list is owned here.
 // Keep the Preview alive until this snapshot has been published and disposed.
 internal sealed class DataSnapshot : IDisposable
 {
@@ -22,16 +22,9 @@ internal sealed class DataSnapshot : IDisposable
         Directory.CreateDirectory(snapshot.directory);
         try
         {
-            using var assets = Preview.ReadJson(preview.Files, "assets.json");
-            var resources = assets.RootElement.EnumerateArray()
-                .SelectMany(asset => asset.GetProperty("images").EnumerateArray())
-                .Where(image => image.GetProperty("status").GetString() == "exported")
-                .Select(image => Preview.String(image, "resource")).ToHashSet(StringComparer.Ordinal);
             using var inventory = Preview.ReadJson(preview.Files, "resources.json");
             var selected = inventory.RootElement.EnumerateArray()
-                .Where(resource => resources.Contains(Preview.String(resource, "path")))
                 .OrderBy(resource => Preview.String(resource, "path"), StringComparer.Ordinal).ToArray();
-            Preview.Require(selected.Length == resources.Count, "Catalog image lacks a validated resource.");
             var files = preview.Files.Where(pair => pair.Key is "assets.json" or "coverage.json" || SnapshotFiles.LocalePath.IsMatch(pair.Key))
                 .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
             foreach (var resource in selected)
@@ -39,9 +32,9 @@ internal sealed class DataSnapshot : IDisposable
                 var path = Preview.String(resource, "file");
                 files.Add(path, preview.Files[path]);
             }
-            var filtered = Path.Combine(snapshot.directory, "resources.json");
-            File.WriteAllBytes(filtered, JsonSerializer.SerializeToUtf8Bytes(selected, Preview.Json));
-            files.Add("resources.json", SnapshotFile.Read(filtered));
+            var sorted = Path.Combine(snapshot.directory, "resources.json");
+            File.WriteAllBytes(sorted, JsonSerializer.SerializeToUtf8Bytes(selected, Preview.Json));
+            files.Add("resources.json", SnapshotFile.Read(sorted));
             foreach (var (path, file) in files)
                 Preview.Require(file.Length <= MaximumBlobBytes, $"Published file exceeds 100 MiB: {path}");
             snapshot.Files = files;

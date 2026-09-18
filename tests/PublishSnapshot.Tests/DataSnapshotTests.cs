@@ -6,7 +6,7 @@ namespace PublishSnapshot.Tests;
 public sealed partial class PublisherTests
 {
     [Fact]
-    public void PublicationRetainsEveryCatalogImageAndLocaleWithoutChangingTheFullPreview()
+    public void PublicationRetainsEveryImageAndLocaleWithoutChangingTheFullPreview()
     {
         var second = AddUnownedImage("/Game/T_Second.T_Second", "Texture2D");
         AddCatalogImage("BigIcon", "/Game/T_Second.T_Second", second);
@@ -24,10 +24,10 @@ public sealed partial class PublisherTests
         var result = Publisher.Publish(preview, remote, NextExtractor, "456");
 
         Assert.True(result.Changed);
-        Assert.Equal(DataSnapshot.Required.Concat([Image, second, "localization/ko.jsonl.gz", "metadata.json"]).Order(),
+        Assert.Equal(DataSnapshot.Required.Concat([Image, second, unowned, "localization/ko.jsonl.gz", "metadata.json"]).Order(),
             remoteGit.Run("ls-tree", "-r", "--name-only", result.Commit).Split('\n', StringSplitOptions.RemoveEmptyEntries).Order());
         using var resources = JsonDocument.Parse(remoteGit.Run("show", result.Commit + ":resources.json"));
-        Assert.Equal(new[] { "/Game/T_Second.T_Second", Texture },
+        Assert.Equal(new[] { "/Game/T_Second.T_Second", Texture, "/Game/T_Unowned.T_Unowned" },
             resources.RootElement.EnumerateArray().Select(resource => resource.GetProperty("path").GetString()));
         Assert.Equal(input, HashFiles(preview));
         Assert.Equal(File.ReadAllText(Path.Combine(preview, "assets.json")), remoteGit.Run("show", result.Commit + ":assets.json"));
@@ -73,16 +73,16 @@ public sealed partial class PublisherTests
     }
 
     [Fact]
-    public void APreviewWithNoCatalogImagesPublishesAnEmptyResourceList()
+    public void APreviewWithNoCatalogImagesStillPublishesItsResources()
     {
         ChangeJson("assets.json", rows => rows[0]!["images"] = new JsonArray());
         ChangeJson("coverage.json", report => report["images"] = 0);
         using var captured = Preview.Read(preview);
         using var snapshot = DataSnapshot.Create(captured);
 
-        Assert.DoesNotContain(Image, snapshot.Files.Keys);
+        Assert.Contains(Image, snapshot.Files.Keys);
         using var resources = Preview.ReadJson(snapshot.Files, "resources.json");
-        Assert.Empty(resources.RootElement.EnumerateArray());
+        Assert.Equal(Texture, Assert.Single(resources.RootElement.EnumerateArray()).GetProperty("path").GetString());
         Assert.True(File.Exists(captured.Files[Image].Path));
     }
 
