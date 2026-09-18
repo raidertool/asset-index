@@ -1,7 +1,8 @@
 # Contributing
 
-Keep patches small and use Conventional Commits. Source and generated data share
-`main`; publish generated files through the validated publisher.
+Keep patches small and use Conventional Commits. Open code, mapping and workflow
+PRs against `main`. Generated files live on `data`; publish them through the
+validated publisher.
 
 ## Test
 

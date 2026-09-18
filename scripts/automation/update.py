@@ -64,10 +64,10 @@ def public_steam_manifest():
 
 def publication():
     # Read one immutable tree so metadata and its blob identity cannot disagree.
-    main = github("git/ref/heads/main")["object"]["sha"]
-    if not SHA.fullmatch(main):
-        raise ValueError("Cannot resolve main.")
-    tree = github("git/trees/" + main)
+    commit = github("git/ref/heads/data")["object"]["sha"]
+    if not SHA.fullmatch(commit):
+        raise ValueError("Cannot resolve the data branch.")
+    tree = github("git/trees/" + commit)
     entries = [entry for entry in tree["tree"] if entry["path"] == "metadata.json"]
     if not entries:
         return None, "missing"
@@ -155,7 +155,7 @@ def plan(force, enabled, event):
 def verify_current(manifest):
     if public_steam_manifest() != manifest_id(manifest):
         raise ValueError("Steam updated during extraction; the next check will extract the newer release.")
-    # The publisher checks the previous metadata blob after fetching main. It also
+    # The publisher checks the previous metadata blob after fetching data. It also
     # recognizes a completed identical push whose acknowledgement was lost.
 
 

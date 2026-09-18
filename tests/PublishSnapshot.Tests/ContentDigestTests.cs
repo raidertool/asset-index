@@ -52,7 +52,7 @@ public sealed partial class PublisherTests
     }
 
     [Fact]
-    public void GeneratedSymlinkCannotOverwriteSource()
+    public void GeneratedSymlinkCannotOverwriteUnmanagedData()
     {
         var git = new Git(seed);
         git.Run("rm", "--quiet", "-r", "images");
@@ -60,28 +60,27 @@ public sealed partial class PublisherTests
         File.WriteAllText(Path.Combine(seed, "source-images", "keep.txt"), "keep");
         Directory.CreateSymbolicLink(Path.Combine(seed, "images"), "source-images");
         Commit(git);
-        git.Run("push", "--quiet", "origin", "HEAD:refs/heads/main");
+        git.Run("push", "--quiet", "origin", "HEAD:refs/heads/data");
         var before = remoteGit.Run("show-ref");
         Assert.Throws<InvalidDataException>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
         Assert.Equal(before, remoteGit.Run("show-ref"));
     }
 
     [Fact]
-    public void ConcurrentSourceCommitIsPreservedOnRetry()
+    public void ConcurrentSourceCommitDoesNotBlockDataPublication()
     {
-        File.WriteAllText(Path.Combine(seed, "README.md"), "Concurrent documentation");
-        var git = new Git(seed);
+        File.WriteAllText(Path.Combine(source, "README.md"), "Concurrent documentation");
+        var git = new Git(source);
         Commit(git);
         var competing = git.Run("rev-parse", "HEAD").Trim();
         git.Run("push", "--quiet", "origin", "HEAD:refs/heads/race-source");
-        var hook = InstallHook($"unset GIT_QUARANTINE_PATH\ngit update-ref refs/heads/main {competing} {initialCommit} || exit 1\nexit 0\n");
-
-        Assert.Throws<IOException>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
-        Assert.Equal(competing, RemoteRef("refs/heads/main"));
-        File.Delete(hook);
+        InstallHook($"unset GIT_QUARANTINE_PATH\ngit update-ref refs/heads/main {competing} {initialSourceCommit} || exit 1\nexit 0\n");
         var result = Publisher.Publish(preview, remote, NextExtractor, "456");
 
-        Assert.Equal("Concurrent documentation", remoteGit.Run("show", result.Commit + ":README.md"));
-        Assert.EndsWith(" " + competing, remoteGit.Run("rev-list", "--parents", "-n", "1", result.Commit).Trim());
+        Assert.True(result.Changed);
+        Assert.Equal(competing, RemoteRef("refs/heads/main"));
+        Assert.Equal(result.Commit, RemoteRef("refs/heads/data"));
+        Assert.Equal("Concurrent documentation", remoteGit.Run("show", competing + ":README.md"));
+        Assert.EndsWith(" " + initialCommit, remoteGit.Run("rev-list", "--parents", "-n", "1", result.Commit).Trim());
     }
 }

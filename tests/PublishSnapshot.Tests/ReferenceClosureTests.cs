@@ -13,7 +13,7 @@ public sealed partial class PublisherTests
     {
         AddReferenceFixture(target);
         var references = remoteGit.Run("show-ref");
-        var publishedFiles = remoteGit.Run("ls-tree", "-r", "refs/heads/main");
+        var publishedFiles = remoteGit.Run("ls-tree", "-r", "refs/heads/data");
         var inputFiles = HashFiles(preview);
 
         var error = Assert.Throws<InvalidDataException>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
@@ -21,7 +21,7 @@ public sealed partial class PublisherTests
         Assert.Contains("Named reference target is absent", error.Message);
         Assert.Contains(target, error.Message);
         Assert.Equal(references, remoteGit.Run("show-ref"));
-        Assert.Equal(publishedFiles, remoteGit.Run("ls-tree", "-r", "refs/heads/main"));
+        Assert.Equal(publishedFiles, remoteGit.Run("ls-tree", "-r", "refs/heads/data"));
         Assert.Equal(inputFiles, HashFiles(preview));
     }
 
@@ -38,7 +38,7 @@ public sealed partial class PublisherTests
         var result = Publisher.Publish(preview, remote, NextExtractor, "456");
 
         Assert.True(result.Changed);
-        Assert.Equal(result.Commit, RemoteRef("refs/heads/main"));
+        Assert.Equal(result.Commit, RemoteRef("refs/heads/data"));
         Assert.Equal(result.Commit, RemoteRef("refs/tags/" + result.Tag));
     }
 
@@ -52,7 +52,7 @@ public sealed partial class PublisherTests
         var error = Assert.Throws<InvalidDataException>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
 
         Assert.Contains("Referenced package was not inspected", error.Message);
-        Assert.Equal(initialCommit, RemoteRef("refs/heads/main"));
+        Assert.Equal(initialCommit, RemoteRef("refs/heads/data"));
     }
 
     [Fact]
@@ -69,7 +69,7 @@ public sealed partial class PublisherTests
         var error = Assert.Throws<InvalidDataException>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
 
         Assert.Contains("differ only by case", error.Message);
-        Assert.Equal(initialCommit, RemoteRef("refs/heads/main"));
+        Assert.Equal(initialCommit, RemoteRef("refs/heads/data"));
     }
 
     private void AddReferenceFixture(string target)

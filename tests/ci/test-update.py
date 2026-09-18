@@ -119,7 +119,7 @@ class UpdateTests(unittest.TestCase):
     def test_state_is_read_from_one_immutable_tree(self):
         paths = []
         responses = {
-            'git/ref/heads/main': {'object': {'sha': SHA}},
+            'git/ref/heads/data': {'object': {'sha': SHA}},
             'git/trees/' + SHA: {'tree': [{'path': 'metadata.json', 'type': 'blob', 'mode': '100644', 'sha': BLOB}]},
             'git/blobs/' + BLOB: {'encoding': 'base64', 'content': base64.b64encode(json.dumps(metadata()).encode()).decode()},
         }
@@ -135,6 +135,12 @@ class UpdateTests(unittest.TestCase):
         responses['git/trees/' + SHA]['tree'] = []
         with patch.object(update, 'github', side_effect=api):
             self.assertEqual(update.publication(), (None, 'missing'))
+
+    def test_missing_data_branch_never_falls_back_to_source_main(self):
+        with patch.object(update, 'github', side_effect=RuntimeError('Missing data branch')) as api:
+            with self.assertRaises(RuntimeError):
+                update.publication()
+            api.assert_called_once_with('git/ref/heads/data')
 
     def test_publication_rejects_new_steam_version_and_defers_git_state_to_publisher(self):
         with patch.object(update, 'public_steam_manifest', return_value='124'), self.assertRaises(ValueError):

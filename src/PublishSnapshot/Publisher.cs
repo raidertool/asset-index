@@ -93,7 +93,7 @@ internal static class Publisher
         var git = new Git(directory);
         git.Run("init", "--quiet");
         git.Run("remote", "add", "origin", remote);
-        git.Run("fetch", "--quiet", "--no-tags", "--depth", "1", "origin", "refs/heads/main");
+        git.Run("fetch", "--quiet", "--no-tags", "--depth", "1", "origin", "refs/heads/data");
         var parent = git.Run("rev-parse", "FETCH_HEAD").Trim();
         var entries = GeneratedTree(git, parent);
         git.Run("checkout", "--quiet", "--detach", parent);
@@ -110,7 +110,7 @@ internal static class Publisher
                 "Existing release tag conflicts with the validated snapshot.");
             Preview.Require(ContentDigest.Tree(entries) == metadata.ContentSha256 &&
                 Metadata.Parse(git.Run("show", parent + ":metadata.json")) == previous,
-                "Main no longer contains this release; refusing to restore an older snapshot.");
+                "Data branch no longer contains this release; refusing to restore an older snapshot.");
             return new(false, commit, tag);
         }
         if (expectedMetadataBlob is not null)
@@ -133,7 +133,7 @@ internal static class Publisher
         if (git.Run("diff", "--cached", "--name-only").Length > 0)
             git.Run("-c", "user.name=alexbowe", "-c", "user.email=alex@alexbowe.com", "commit", "--quiet", "-m", "chore: update asset snapshot");
         var published = git.Run("rev-parse", "HEAD").Trim();
-        git.Run("push", "--atomic", "origin", $"{published}:refs/heads/main", $"{published}:refs/tags/{tag}");
+        git.Run("push", "--atomic", "origin", $"{published}:refs/heads/data", $"{published}:refs/tags/{tag}");
         return new(true, published, tag);
     }
 

@@ -3,9 +3,14 @@
 Game asset IDs, localized text and images, extracted with
 [upstream CUE4Parse](https://github.com/FabianFG/CUE4Parse).
 
-**Preview:** the files below describe the new export. The root CSVs remain in
+**[Browse and download the data →](https://github.com/raidertool/asset-index/tree/data)**
+
+`main` contains the extractor, mappings, tests and workflows. Generated files live
+on [`data`](https://github.com/raidertool/asset-index/tree/data).
+
+**Preview:** the files below describe the new export. The data branch retains
 the [legacy format](https://github.com/raidertool/asset-index/tree/6a68cb6608e9d2eaf802ad239172038c6596b21f)
-until the validated replacement is published. Source and generated data share `main`.
+until its validated replacement is published.
 
 ## Use the data
 
@@ -17,6 +22,9 @@ until the validated replacement is published. Source and generated data share `m
 | `resources.json`, `images/` | All exported images, including UI textures without an asset ID |
 | `localization/` | Compressed translation dictionaries |
 | `metadata.json`, `coverage.json` | Snapshot identity and extraction diagnostics |
+
+Use the `data` branch in raw download URLs, or pin a snapshot tag/commit for
+repeatable downloads. Old `/main/…` data URLs must change to `/data/…`.
 
 IDs are decimal strings in JSON; read CSV IDs as strings too. One ID can have
 multiple definitions and image roles. The core CSV is a convenient projection;
@@ -83,7 +91,7 @@ release-tooling-only commits do not bump software. The first new tag continues
 from legacy version `0.13.2`; existing `arc-...-exfil-v...` tags remain unchanged.
 
 The publisher validates a complete preview before updating generated files on
-`main`, preserving source and docs:
+`data`. It never updates `main`:
 
 ```sh
 dotnet run --project src/PublishSnapshot -c Release -- \
@@ -93,7 +101,7 @@ dotnet run --project src/PublishSnapshot -c Release -- \
 The data digest covers the sorted generated Git blob inventory; it excludes
 metadata, coverage and source. The same manifest and content create no new
 snapshot even after source-only commits. A new Steam manifest creates a snapshot
-identity even when its content is unchanged. Main and the data tag are pushed
+identity even when its content is unchanged. The data branch and its tag are pushed
 atomically without overwriting a concurrent writer.
 
 `--export <preview> <new-directory> <extractor-commit> <Steam-manifest-id>`
@@ -117,7 +125,8 @@ caches, full discovery records or authentication logs are uploaded or cached.
 Maintainers: restrict the `steam-extraction` and `asset-publication` environments
 to `main`. Put only `STEAM_USERNAME` and `STEAM_PASSWORD` in `steam-extraction`;
 the publisher uses the repository's `GITHUB_TOKEN`. Confirm branch/tag rules allow
-its atomic update, test a manual export, then explicitly select `publish` for the
+its atomic `data`/tag update while protecting `main` through PRs. The `data` branch
+must exist before publication. Test a manual export, then explicitly select `publish` for the
 first publication. Set `ASSET_UPDATES_ENABLED=true` to enable scheduled updates.
 Until then, the schedule skips extraction; manual runs remain available.
 

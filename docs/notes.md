@@ -96,9 +96,9 @@ run or execute files from the transferred artifact.
 
 Data tags are `arc-<manifestId>-<contentSha25612>`. The full hash covers the sorted
 published-content Git blob inventory, excluding coverage and metadata. Source and
-docs are preserved on `main`. Atomic main/tag updates reject concurrent writers;
+docs live on `main`. Atomic data/tag updates reject concurrent data writers;
 existing tags are checked and never replaced. Matching manifest/content is a
-no-op even when the current main commit includes newer source changes. The tag's
+no-op; changes on `main` do not move the data branch. The tag's
 snapshot metadata retains the extractor commit that produced that content.
 
 Software tags occupy the separate `exfil-vX.Y.Z` namespace. The fixed legacy

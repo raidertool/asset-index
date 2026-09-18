@@ -5,13 +5,14 @@ namespace PublishSnapshot.Tests;
 public sealed partial class PublisherTests
 {
     [Fact]
-    public void PublicExportPublishesWithoutDiscoveryAndPreservesSource()
+    public void PublicExportPublishesToDataAfterAnIndependentSourceChange()
     {
-        File.WriteAllText(Path.Combine(seed, "README.md"), "Source stays on main");
-        var git = new Git(seed);
+        var previous = MetadataBlob();
+        File.WriteAllText(Path.Combine(source, "README.md"), "Source stays on main");
+        var git = new Git(source);
         Commit(git);
         git.Run("push", "--quiet", "origin", "HEAD:refs/heads/main");
-        var previous = MetadataBlob();
+        var main = RemoteRef("refs/heads/main");
         var (directory, metadata) = Handoff();
         var input = HashFiles(directory);
         Assert.False(Directory.Exists(Path.Combine(directory, "discovery")));
@@ -20,7 +21,9 @@ public sealed partial class PublisherTests
 
         Assert.True(result.Changed);
         Assert.Equal(metadata, ReadMetadata(result.Commit));
-        Assert.Equal("Source stays on main", remoteGit.Run("show", result.Commit + ":README.md"));
+        Assert.Equal(main, RemoteRef("refs/heads/main"));
+        Assert.Equal("Source stays on main", remoteGit.Run("show", main + ":README.md"));
+        Assert.DoesNotContain("src/", remoteGit.Run("ls-tree", "-r", "--name-only", result.Commit));
         Assert.Equal(input, HashFiles(directory));
     }
 
@@ -44,10 +47,8 @@ public sealed partial class PublisherTests
         var previous = MetadataBlob();
         var (directory, metadata) = Handoff();
         var first = Publisher.PublishExport(directory, remote, NextExtractor, "456", HandoffDigest(directory), previous);
-        var git = new Git(seed);
-        git.Run("fetch", "--quiet", "origin", "refs/heads/main");
-        git.Run("checkout", "--quiet", "--detach", "FETCH_HEAD");
-        File.WriteAllText(Path.Combine(seed, "README.md"), "Later source update");
+        var git = new Git(source);
+        File.WriteAllText(Path.Combine(source, "README.md"), "Later source update");
         Commit(git);
         git.Run("push", "--quiet", "origin", "HEAD:refs/heads/main");
         var references = remoteGit.Run("show-ref");
@@ -80,7 +81,7 @@ public sealed partial class PublisherTests
         File.Delete(Path.Combine(seed, "metadata.json"));
         var git = new Git(seed);
         Commit(git);
-        git.Run("push", "--quiet", "origin", "HEAD:refs/heads/main");
+        git.Run("push", "--quiet", "origin", "HEAD:refs/heads/data");
         var (directory, metadata) = Handoff();
 
         var result = Publisher.PublishExport(directory, remote, NextExtractor, "456", HandoffDigest(directory), "missing");
@@ -194,7 +195,7 @@ public sealed partial class PublisherTests
         var exit = Program.Main(["--publish-export", directory, remote, NextExtractor, "456", HandoffDigest(directory), previous]);
 
         Assert.Equal(0, exit);
-        Assert.Equal(metadata, ReadMetadata(RemoteRef("refs/heads/main")));
+        Assert.Equal(metadata, ReadMetadata(RemoteRef("refs/heads/data")));
     }
 
     [Theory]
@@ -243,7 +244,7 @@ public sealed partial class PublisherTests
         File.WriteAllText(Path.Combine(seed, ".gitattributes"), "coverage.json text eol=lf\n");
         var git = new Git(seed);
         Commit(git);
-        git.Run("push", "--quiet", "origin", "HEAD:refs/heads/main");
+        git.Run("push", "--quiet", "origin", "HEAD:refs/heads/data");
         var (directory, _) = Handoff();
         var coverage = Path.Combine(directory, "coverage.json");
         File.WriteAllText(coverage, File.ReadAllText(coverage).Replace("\n", "\r\n"));
@@ -283,7 +284,7 @@ public sealed partial class PublisherTests
         return ContentDigest.ExportFiles(captured.Files);
     }
 
-    private string MetadataBlob() => remoteGit.Run("rev-parse", "refs/heads/main:metadata.json").Trim();
+    private string MetadataBlob() => remoteGit.Run("rev-parse", "refs/heads/data:metadata.json").Trim();
 
     private static void ChangeExportJson(string directory, string file, Action<JsonNode> change)
     {

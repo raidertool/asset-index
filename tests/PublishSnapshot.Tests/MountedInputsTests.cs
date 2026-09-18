@@ -30,13 +30,13 @@ public sealed partial class PublisherTests
             default: throw new ArgumentOutOfRangeException(nameof(mutation));
         }
         var references = remoteGit.Run("show-ref");
-        var tree = remoteGit.Run("ls-tree", "-r", "refs/heads/main");
+        var tree = remoteGit.Run("ls-tree", "-r", "refs/heads/data");
         var inputs = HashFiles(preview);
 
         Assert.Throws<InvalidDataException>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
 
         Assert.Equal(references, remoteGit.Run("show-ref"));
-        Assert.Equal(tree, remoteGit.Run("ls-tree", "-r", "refs/heads/main"));
+        Assert.Equal(tree, remoteGit.Run("ls-tree", "-r", "refs/heads/data"));
         Assert.Equal(inputs, HashFiles(preview));
     }
 

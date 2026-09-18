@@ -17,9 +17,11 @@ public sealed partial class PublisherTests : IDisposable
     private readonly string remote;
     private readonly string preview;
     private readonly string seed;
+    private readonly string source;
     private readonly Git remoteGit;
     private readonly string initialCommit;
     private readonly string initialDigest;
+    private readonly string initialSourceCommit;
 
     public PublisherTests()
     {
@@ -27,6 +29,7 @@ public sealed partial class PublisherTests : IDisposable
         remote = Path.Combine(root, "remote.git");
         preview = Path.Combine(root, "preview");
         seed = Path.Combine(root, "seed");
+        source = Path.Combine(root, "source");
         new Git(root).Run("init", "--bare", "--quiet", remote);
         remoteGit = new Git(remote);
         WriteSeed(seed, "Initial name");
@@ -38,7 +41,16 @@ public sealed partial class PublisherTests : IDisposable
         Commit(git);
         initialCommit = git.Run("rev-parse", "HEAD").Trim();
         git.Run("remote", "add", "origin", remote);
-        git.Run("push", "--quiet", "--atomic", "origin", "HEAD:refs/heads/main", $"HEAD:refs/tags/{Publisher.Tag("123", initialDigest)}");
+        git.Run("push", "--quiet", "--atomic", "origin", "HEAD:refs/heads/data", $"HEAD:refs/tags/{Publisher.Tag("123", initialDigest)}");
+        Directory.CreateDirectory(Path.Combine(source, "src"));
+        File.WriteAllText(Path.Combine(source, "README.md"), "Source documentation");
+        File.WriteAllText(Path.Combine(source, "src", "Extractor.cs"), "// Extractor source");
+        var sourceGit = new Git(source);
+        sourceGit.Run("init", "--quiet");
+        Commit(sourceGit);
+        initialSourceCommit = sourceGit.Run("rev-parse", "HEAD").Trim();
+        sourceGit.Run("remote", "add", "origin", remote);
+        sourceGit.Run("push", "--quiet", "origin", "HEAD:refs/heads/main");
         WritePreview(preview, "New name");
     }
 
@@ -48,7 +60,8 @@ public sealed partial class PublisherTests : IDisposable
         var result = Publisher.Publish(preview, remote, NextExtractor, "456");
 
         Assert.True(result.Changed);
-        Assert.Equal(result.Commit, RemoteRef("refs/heads/main"));
+        Assert.Equal(result.Commit, RemoteRef("refs/heads/data"));
+        Assert.Equal(initialSourceCommit, RemoteRef("refs/heads/main"));
         Assert.Equal("arc-456-" + ReadMetadata(result.Commit).ContentSha256[..12], result.Tag);
         Assert.Equal(result.Commit, RemoteRef("refs/tags/" + result.Tag));
         Assert.Equal("commit", remoteGit.Run("cat-file", "-t", "refs/tags/" + result.Tag).Trim());
@@ -80,8 +93,8 @@ public sealed partial class PublisherTests : IDisposable
     [Fact]
     public void SourceOnlyMainCommitRetainsReleaseCommitAndProvenanceOnRetry()
     {
-        File.WriteAllText(Path.Combine(seed, "README.md"), "Updated source documentation");
-        var git = new Git(seed);
+        File.WriteAllText(Path.Combine(source, "README.md"), "Updated source documentation");
+        var git = new Git(source);
         Commit(git);
         git.Run("push", "--quiet", "origin", "HEAD:refs/heads/main");
         var main = RemoteRef("refs/heads/main");
@@ -92,7 +105,8 @@ public sealed partial class PublisherTests : IDisposable
         Assert.False(result.Changed);
         Assert.Equal(initialCommit, result.Commit);
         Assert.Equal(main, RemoteRef("refs/heads/main"));
-        Assert.Equal(InitialExtractor, ReadMetadata(main).ExtractorCommit);
+        Assert.Equal(initialCommit, RemoteRef("refs/heads/data"));
+        Assert.Equal(InitialExtractor, ReadMetadata(result.Commit).ExtractorCommit);
     }
 
     [Fact]
@@ -162,13 +176,13 @@ public sealed partial class PublisherTests : IDisposable
 
         var retry = Publisher.Publish(preview, remote, NextExtractor, "456");
         Assert.True(retry.Changed);
-        Assert.Equal(retry.Commit, RemoteRef("refs/heads/main"));
+        Assert.Equal(retry.Commit, RemoteRef("refs/heads/data"));
         Assert.Equal(retry.Commit, RemoteRef("refs/tags/" + retry.Tag));
         Assert.Equal(seedReferences, seedGit.Run("show-ref"));
     }
 
     [Fact]
-    public void ConcurrentMainWriterIsNeverOverwritten()
+    public void ConcurrentDataWriterIsNeverOverwritten()
     {
         WriteSeed(seed, "Concurrent writer");
         var seedGit = new Git(seed);
@@ -176,11 +190,11 @@ public sealed partial class PublisherTests : IDisposable
         var competing = seedGit.Run("rev-parse", "HEAD").Trim();
         seedGit.Run("push", "--quiet", "origin", "HEAD:refs/heads/race-source");
         var tags = remoteGit.Run("show-ref", "--tags");
-        InstallHook($"unset GIT_QUARANTINE_PATH\ngit update-ref refs/heads/main {competing} {initialCommit} || exit 1\nexit 0\n");
+        InstallHook($"unset GIT_QUARANTINE_PATH\ngit update-ref refs/heads/data {competing} {initialCommit} || exit 1\nexit 0\n");
 
         Assert.Throws<IOException>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
 
-        Assert.Equal(competing, RemoteRef("refs/heads/main"));
+        Assert.Equal(competing, RemoteRef("refs/heads/data"));
         Assert.Equal(tags, remoteGit.Run("show-ref", "--tags"));
     }
 

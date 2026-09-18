@@ -41,12 +41,12 @@ public sealed partial class PublisherTests
             case "duplicate-selection": ChangeLines("discovery/packages.jsonl.gz", rows => rows[0]!["selected"] = new JsonArray(0, 0)); break;
             default: throw new ArgumentOutOfRangeException(nameof(mutation));
         }
-        var tree = remoteGit.Run("ls-tree", "-r", "refs/heads/main");
+        var tree = remoteGit.Run("ls-tree", "-r", "refs/heads/data");
         var inputs = HashFiles(preview);
 
         AssertRejected();
 
-        Assert.Equal(tree, remoteGit.Run("ls-tree", "-r", "refs/heads/main"));
+        Assert.Equal(tree, remoteGit.Run("ls-tree", "-r", "refs/heads/data"));
         Assert.Equal(inputs, HashFiles(preview));
     }
 
@@ -102,7 +102,7 @@ public sealed partial class PublisherTests
         var error = Assert.Throws<InvalidDataException>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
 
         Assert.Contains(expected, error.Message);
-        Assert.Equal(initialCommit, RemoteRef("refs/heads/main"));
+        Assert.Equal(initialCommit, RemoteRef("refs/heads/data"));
     }
 
     [Fact]

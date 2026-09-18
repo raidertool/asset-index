@@ -36,7 +36,7 @@ public sealed partial class PublisherTests
     {
         ChangeLines("discovery/objects.jsonl.gz", rows => MutateProperties(rows[0]!.AsObject(), mutation));
         var references = remoteGit.Run("show-ref");
-        var publishedFiles = remoteGit.Run("ls-tree", "-r", "refs/heads/main");
+        var publishedFiles = remoteGit.Run("ls-tree", "-r", "refs/heads/data");
         var input = HashFiles(preview);
 
         // A missing Git remote would raise IOException if validation reached Git.
@@ -44,7 +44,7 @@ public sealed partial class PublisherTests
             Path.Combine(root, "nonexistent-remote.git"), NextExtractor, "456"));
 
         Assert.Equal(references, remoteGit.Run("show-ref"));
-        Assert.Equal(publishedFiles, remoteGit.Run("ls-tree", "-r", "refs/heads/main"));
+        Assert.Equal(publishedFiles, remoteGit.Run("ls-tree", "-r", "refs/heads/data"));
         Assert.Equal(input, HashFiles(preview));
     }
 

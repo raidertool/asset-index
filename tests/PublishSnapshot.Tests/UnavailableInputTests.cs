@@ -24,10 +24,10 @@ public sealed partial class PublisherTests
 
         Assert.True(result.Changed);
         Assert.Equal(original, HashFiles(preview));
-        using var coverage = JsonDocument.Parse(remoteGit.Run("show", "refs/heads/main:coverage.json"));
+        using var coverage = JsonDocument.Parse(remoteGit.Run("show", "refs/heads/data:coverage.json"));
         Assert.Equal(3, coverage.RootElement.GetProperty("formatVersion").GetInt32());
         Assert.Equal(1, coverage.RootElement.GetProperty("exploration").GetProperty(hard ? "unavailableHardReferences" : "unavailableSoftReferences").GetInt32());
-        Assert.DoesNotContain("discovery/", remoteGit.Run("ls-tree", "-r", "refs/heads/main"));
+        Assert.DoesNotContain("discovery/", remoteGit.Run("ls-tree", "-r", "refs/heads/data"));
         Assert.DoesNotContain(AbsentTarget, coverage.RootElement.GetRawText());
     }
 
@@ -233,7 +233,7 @@ public sealed partial class PublisherTests
         var result = Publisher.Publish(preview, remote, NextExtractor, "456");
 
         Assert.True(result.Changed);
-        using var coverage = JsonDocument.Parse(remoteGit.Run("show", "refs/heads/main:coverage.json"));
+        using var coverage = JsonDocument.Parse(remoteGit.Run("show", "refs/heads/data:coverage.json"));
         Assert.Equal(1, coverage.RootElement.GetProperty("exploration").GetProperty("unavailableSoftReferences").GetInt32());
     }
 
@@ -302,11 +302,11 @@ public sealed partial class PublisherTests
     private void RejectUnavailable(string? message = null)
     {
         var refs = remoteGit.Run("show-ref");
-        var files = remoteGit.Run("ls-tree", "-r", "refs/heads/main");
+        var files = remoteGit.Run("ls-tree", "-r", "refs/heads/data");
         var error = Assert.ThrowsAny<Exception>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
         if (message is not null) Assert.Contains(message, error.Message);
         Assert.Equal(refs, remoteGit.Run("show-ref"));
-        Assert.Equal(files, remoteGit.Run("ls-tree", "-r", "refs/heads/main"));
+        Assert.Equal(files, remoteGit.Run("ls-tree", "-r", "refs/heads/data"));
     }
 
     private void AddUnavailableFixture(bool hard)

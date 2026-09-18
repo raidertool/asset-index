@@ -3,38 +3,48 @@ namespace PublishSnapshot.Tests;
 public sealed partial class PublisherTests
 {
     [Fact]
-    public void FirstPublicationReplacesLegacyGeneratedFilesAndPreservesSource()
+    public void FirstPublicationReplacesLegacyGeneratedFilesAndPreservesDataDocumentation()
     {
         var git = new Git(seed);
         git.Run("rm", "--quiet", "-r", ".");
-        File.WriteAllText(Path.Combine(seed, "README.md"), "Source documentation");
-        Directory.CreateDirectory(Path.Combine(seed, "src"));
-        File.WriteAllText(Path.Combine(seed, "src", "main.cs"), "// source");
+        File.WriteAllText(Path.Combine(seed, "README.md"), "Dataset documentation");
+        File.WriteAllText(Path.Combine(seed, "LICENSE"), "Dataset license");
         Directory.CreateDirectory(Path.Combine(seed, "images"));
         File.WriteAllText(Path.Combine(seed, "images", "Old_asset.png"), "old image");
         File.WriteAllText(Path.Combine(seed, "asset_index.csv"), "old schema");
         File.WriteAllText(Path.Combine(seed, "schema.json"), "old schema");
         Commit(git);
-        git.Run("push", "--quiet", "origin", "HEAD:refs/heads/main");
-        var parent = RemoteRef("refs/heads/main");
+        git.Run("push", "--quiet", "origin", "HEAD:refs/heads/data");
+        var parent = RemoteRef("refs/heads/data");
 
         var result = Publisher.Publish(preview, remote, NextExtractor, "456");
 
         Assert.Equal(result.Commit + " " + parent, remoteGit.Run("rev-list", "--parents", "-n", "1", result.Commit).Trim());
-        Assert.Equal("Source documentation", remoteGit.Run("show", result.Commit + ":README.md"));
-        Assert.Equal("// source", remoteGit.Run("show", result.Commit + ":src/main.cs"));
+        Assert.Equal("Dataset documentation", remoteGit.Run("show", result.Commit + ":README.md"));
+        Assert.Equal("Dataset license", remoteGit.Run("show", result.Commit + ":LICENSE"));
+        Assert.Equal(initialSourceCommit, RemoteRef("refs/heads/main"));
         var paths = remoteGit.Run("ls-tree", "-r", "--name-only", result.Commit);
         Assert.DoesNotContain("Old_asset.png", paths);
         Assert.DoesNotContain("schema.json", paths);
         Assert.DoesNotContain("discovery/", paths);
+        Assert.DoesNotContain("src/", paths);
     }
 
-    [Fact]
-    public void MissingMainCannotBeInitializedByPublication()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MissingDataBranchCannotBeInitializedByPublication(bool fromExport)
     {
-        remoteGit.Run("update-ref", "-d", "refs/heads/main");
+        remoteGit.Run("update-ref", "-d", "refs/heads/data");
         var before = remoteGit.Run("show-ref");
-        Assert.Throws<IOException>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
+        if (fromExport)
+        {
+            var (directory, _) = Handoff();
+            Assert.Throws<IOException>(() => Publisher.PublishExport(directory, remote, NextExtractor,
+                "456", HandoffDigest(directory), "missing"));
+        }
+        else
+            Assert.Throws<IOException>(() => Publisher.Publish(preview, remote, NextExtractor, "456"));
         Assert.Equal(before, remoteGit.Run("show-ref"));
     }
 
@@ -75,7 +85,7 @@ public sealed partial class PublisherTests
     }
 
     [Fact]
-    public void ConflictingReleaseTagCannotMoveMain()
+    public void ConflictingReleaseTagCannotMoveData()
     {
         using var captured = Preview.Read(preview);
         using var snapshot = DataSnapshot.Create(captured);
@@ -89,7 +99,7 @@ public sealed partial class PublisherTests
     }
 
     [Fact]
-    public void RetryCannotRestoreAnOlderReleaseOverNewerMainData()
+    public void RetryCannotRestoreAnOlderReleaseOverNewerData()
     {
         Publisher.Publish(preview, remote, NextExtractor, "456");
         WritePreview(preview, "Initial name");
