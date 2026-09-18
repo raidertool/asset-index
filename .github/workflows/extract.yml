@@ -109,28 +109,12 @@ jobs:
             printf '%s failed (exit %s): %s\n' "$phase" "$result" "$reason" >&2
           }
 
-          # GitHub masks these secrets. Keep raw Steam logs off the job log and out of artifacts.
-          if timeout --kill-after=15s 16m dotnet "$depotfs" smoke "${depot_args[@]}" --timeout 900 \
-            > "$RUNNER_TEMP/steam-smoke.log" 2>&1; then
-            manifest_id="$(sed -nE 's/.*manifest=([0-9]+).*/\1/p' "$RUNNER_TEMP/steam-smoke.log" | tail -1)"
-          else
-            result=$?
-            report_steam_failure "Steam depot access" "$result" "$RUNNER_TEMP/steam-smoke.log"
-            exit "$result"
-          fi
-          if [[ ! "$manifest_id" =~ ^[0-9]+$ ]]; then
-            echo "SteamDepotFS did not resolve a manifest." >&2
-            exit 1
-          fi
-          {
-            echo "Extractor commit: $GITHUB_SHA"
-            echo "Steam app: 1808500; depot: 1808501; manifest: $manifest_id"
-          } >> "$GITHUB_STEP_SUMMARY"
-
           mount_dir="$RUNNER_TEMP/arc-depot"
           mkdir -p "$mount_dir"
+          # One client resolves and mounts the manifest. A separate login could invalidate its token.
+          # GitHub masks these secrets. Keep raw Steam logs off the job log and out of artifacts.
           timeout --kill-after=15s 100m dotnet "$depotfs" mount "${depot_args[@]}" \
-            --timeout 6000 --manifest "$manifest_id" --mount-point "$mount_dir" \
+            --timeout 6000 --mount-point "$mount_dir" \
             > "$RUNNER_TEMP/steam-mount.log" 2>&1 &
           mount_pid=$!
           cleanup() {
@@ -162,6 +146,19 @@ jobs:
             report_steam_failure "Steam mount" 124 "$RUNNER_TEMP/steam-mount.log"
             exit 1
           fi
+          manifest_id="$(sed -nE 's/^mounting app=1808500 depot=1808501 manifest=(.*) at .+$/\1/p' "$RUNNER_TEMP/steam-mount.log" | sort -u)"
+          # Compare equal-length decimal strings: Bash arithmetic cannot represent every uint64.
+          # shellcheck disable=SC2071
+          if [[ ! "$manifest_id" =~ ^[1-9][0-9]*$ ]] ||
+            [[ ${#manifest_id} -gt 20 ]] ||
+            [[ ${#manifest_id} -eq 20 && "$manifest_id" > 18446744073709551615 ]]; then
+            echo "SteamDepotFS did not announce one valid mounted manifest." >&2
+            exit 1
+          fi
+          {
+            echo "Extractor commit: $GITHUB_SHA"
+            echo "Steam app: 1808500; depot: 1808501; manifest: $manifest_id"
+          } >> "$GITHUB_STEP_SUMMARY"
           game_dir="$mount_dir/PioneerGame/Content/Paks"
           timeout --kill-after=5s 20s test -d "$game_dir"
           timeout --kill-after=15s 90m dotnet run --project src/AssetIndex -c Release --no-build -- \

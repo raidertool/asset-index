@@ -28,6 +28,8 @@ jobs:
           dotnet-version: 10.0.302
       - name: Test runner disk preparation
         run: bash tests/ci/test-prepare-runner-disk.sh
+      - name: Test preview Steam session offline
+        run: python3 tests/ci/test-extract-preview.py
       - name: Test source release policy offline
         run: python3 tests/ci/test-release.py
       - name: Run offline tests
