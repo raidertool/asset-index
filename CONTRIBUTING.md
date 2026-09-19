@@ -42,7 +42,7 @@ the relevant tests for mapping/dependency changes.
 
 ## Releases
 
-Use Conventional Commits: `feat` bumps minor, `fix` patch, and `!` or a
+Use Conventional Commits: `feat` bumps minor, `fix`/`perf` patch, and `!` or a
 `BREAKING CHANGE:` footer major. After successful main CI, relevant source,
 mapping and runtime changes create an immutable `exfil-vX.Y.Z` tag. Documentation,
 tests and generated output do not bump software. Preview with

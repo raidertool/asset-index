@@ -59,7 +59,8 @@ internal sealed class JsonLinesFile<T> : IDisposable
         path = Snapshot.OutputPath(output, name);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        stream = new GZipStream(new FileStream(temporary, FileMode.CreateNew, FileAccess.Write), CompressionLevel.SmallestSize);
+        // Discovery evidence is intermediate output; public locale files keep their existing encoding.
+        stream = new GZipStream(new FileStream(temporary, FileMode.CreateNew, FileAccess.Write), CompressionLevel.Fastest);
     }
 
     public void Write(T row)

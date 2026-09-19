@@ -51,6 +51,31 @@ public sealed class CatalogCsvTests
     }
 
     [Fact]
+    public void BothCsvFilesHaveStableNumericIdAndLocaleOrderRegardlessOfInputArrival()
+    {
+        var assets = new long[] { 10, -2, 2, -10 }.Select(id => Asset() with
+        {
+            Id = id,
+            Text = [new("ja", "日本語", ""), new("en", "English", "")]
+        }).ToArray();
+        var reversed = assets.Reverse()
+            .Select(asset => asset with { Text = asset.Text.Reverse().ToArray() }).ToArray();
+        var expectedMain = Encoding.UTF8.GetBytes(
+            "asset_id,asset_name,display_name,description,image,wide_image\n" +
+            "-10,Actual,English,,,\n-2,Actual,English,,,\n2,Actual,English,,,\n10,Actual,English,,,\n");
+        var expectedLocalizations = Encoding.UTF8.GetBytes(
+            "asset_id,locale,display_name,description\n" +
+            "-10,en,English,\n-10,ja,日本語,\n-2,en,English,\n-2,ja,日本語,\n" +
+            "2,en,English,\n2,ja,日本語,\n10,en,English,\n10,ja,日本語,\n");
+
+        foreach (var input in new[] { assets, reversed })
+        {
+            Assert.Equal(expectedMain, CsvBytes(CatalogCsv.MainRows(input)));
+            Assert.Equal(expectedLocalizations, CsvBytes(CatalogCsv.LocalizationRows(input)));
+        }
+    }
+
+    [Fact]
     public void DefaultUsesIconAndNpcSpecificOwnerWinsEqualFieldTies()
     {
         var generic = new ObjectReference("Generic", "UIItemMetaDataItem", "/Game/A.A");
@@ -117,4 +142,10 @@ public sealed class CatalogCsvTests
     private static AssetImage Image(string field, string source, string file, int width = 512, int height = 512) =>
         new(field, source, "/Game/Texture.Texture", "exported", file, width, height);
     private static string[] Row(AssetRecord asset) => CatalogCsv.MainRows([asset]).Skip(1).Single();
+    private static byte[] CsvBytes(IEnumerable<string[]> rows)
+    {
+        using var stream = new MemoryStream();
+        CatalogCsv.Write(stream, rows);
+        return stream.ToArray();
+    }
 }

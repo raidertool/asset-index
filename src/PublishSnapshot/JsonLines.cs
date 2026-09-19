@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.IO.Compression;
+using System.IO.Hashing;
 using System.Text;
 using System.Text.Json;
 
@@ -31,9 +32,8 @@ internal static class JsonLines
 
     private sealed class MeasuredStream(Stream source) : Stream
     {
-        private static readonly uint[] Table = CreateTable();
-        private uint crc = uint.MaxValue;
-        public uint Checksum => ~crc;
+        private readonly Crc32 crc = new();
+        public uint Checksum => crc.GetCurrentHashAsUInt32();
         public long BytesRead { get; private set; }
         public override bool CanRead => true;
         public override bool CanSeek => false;
@@ -44,7 +44,7 @@ internal static class JsonLines
         public override int Read(Span<byte> buffer)
         {
             var count = source.Read(buffer);
-            foreach (var value in buffer[..count]) crc = Table[(crc ^ value) & 255] ^ (crc >> 8);
+            crc.Append(buffer[..count]);
             BytesRead += count;
             return count;
         }
@@ -52,17 +52,5 @@ internal static class JsonLines
         public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
         public override void SetLength(long value) => throw new NotSupportedException();
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
-
-        private static uint[] CreateTable()
-        {
-            var table = new uint[256];
-            for (uint index = 0; index < table.Length; index++)
-            {
-                var value = index;
-                for (var bit = 0; bit < 8; bit++) value = (value & 1) == 0 ? value >> 1 : (value >> 1) ^ 0xedb88320;
-                table[index] = value;
-            }
-            return table;
-        }
     }
 }

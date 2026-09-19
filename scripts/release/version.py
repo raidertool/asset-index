@@ -46,7 +46,7 @@ def severity(message):
         return 0
     if match[2] or re.search(r"(?m)^BREAKING(?: CHANGE|-CHANGE):\s*\S", message):
         return 3
-    return {"feat": 2, "fix": 1}.get(match[1], 0)
+    return {"feat": 2, "fix": 1, "perf": 1}.get(match[1], 0)
 
 
 def baseline(repo):
@@ -88,7 +88,7 @@ def plan(repo, target="HEAD"):
         raise RuntimeError("Latest source release is outside the target ancestry.")
     level = release_level(repo, base, target)
     if not level:
-        return {"tag": None, "reason": "No unreleased source feat, fix or breaking change."}
+        return {"tag": None, "reason": "No unreleased source feat, fix, perf or breaking change."}
     major, minor, patch = version
     next_version = {1: (major, minor, patch + 1),
                     2: (major, minor + 1, 0),

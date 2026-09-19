@@ -60,6 +60,13 @@ class ReleaseTests(unittest.TestCase):
         self.commit("global.json", "chore: update SDK")
         self.assertIsNone(release.plan(self.repo)["tag"])
 
+    def test_performance_bumps_only_for_runtime_changes(self):
+        self.commit("docs/notes.md", "perf: document profiling")
+        self.commit("tests/Case.cs", "perf: speed up test fixtures")
+        self.assertIsNone(release.plan(self.repo)["tag"])
+        self.commit("src/AssetIndex/Test.cs", "perf(extractor): reduce compression work")
+        self.assertEqual(release.plan(self.repo)["tag"], "exfil-v0.13.3")
+
     def test_empty_message_does_not_block_later_source_releases(self):
         self.git("commit", "--allow-empty", "--allow-empty-message", "-qm", "")
         self.assertIsNone(release.plan(self.repo)["tag"])
