@@ -21,6 +21,9 @@ IDs are decimal strings in JSON; read CSV IDs as strings too. One ID can have
 multiple definitions and image roles. The core CSV is a convenient projection;
 `assets.json` retains the detail.
 
+Both CSVs are sorted by numeric `asset_id`; localization rows are then sorted by
+`locale`. Changes to names or translations do not move rows within these groups.
+
 Each asset’s `text` entries in `assets.json`, and the localization CSV fields,
 stay blank when the selected translation is absent.
 Authored source text is separate in `presentation.name.source`,
@@ -41,17 +44,25 @@ constructing legacy filenames.
 
 ## Snapshot versions
 
-Pin a snapshot tag or commit for repeatable downloads. Tags use
+Browse [snapshot tags](https://github.com/raidertool/asset-index/tags) and pin a
+tag or commit for repeatable downloads. Data tags use
 `arc-<SteamManifestId>-<contentSha25612>`; `metadata.json` records the source
 commit, Steam identifiers and full data hash. Older snapshots retain their
-original formats and tag names.
+original formats and tag names. `exfil-v*` tags version the extractor instead.
+These are Git tags; they do not require entries on GitHub's Releases page.
+
+Documentation-only commits can follow the latest snapshot tag on `data` without
+creating a new data version. Existing tags stay unchanged.
 
 `coverage.json` summarizes extraction counts and known limitations. It is not
 test coverage or a percentage of the whole game; most consumers can ignore it.
 
+## Updates
+
+[Update asset snapshot](https://github.com/raidertool/asset-index/actions/workflows/extract.yml)
+is scheduled to check Steam every five minutes. GitHub can delay or skip checks.
+An unpublished Steam version triggers extraction and validation before updating
+`data` and creating its snapshot tag. An already published version is a no-op.
+
 Contribute extractor changes on `main`; dataset documentation changes target
 `data`. See [CONTRIBUTING.md](https://github.com/raidertool/asset-index/blob/main/CONTRIBUTING.md).
-
-## Credits
-
-Thanks to xivy, whose skills made this possible.
