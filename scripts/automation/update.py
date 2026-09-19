@@ -130,10 +130,12 @@ def retry_blocked(runs, jobs, now):
     return None
 
 
-def plan(force, enabled, event):
+def plan(force, enabled, event, automated=False):
     if event not in {"schedule", "workflow_dispatch"}:
         raise ValueError("Unsupported update event.")
-    if not enabled and event == "schedule":
+    if automated and force:
+        raise ValueError("Automatic dispatch cannot force an extraction.")
+    if not enabled and (event == "schedule" or automated):
         return {"needed": False, "reason": "Automatic updates are not enabled."}
     latest = public_steam_manifest()
     current, blob = publication()
@@ -152,7 +154,9 @@ def plan(force, enabled, event):
             "reason": "Extract the selected Steam release."}
 
 
-def verify_current(manifest):
+def verify_current(manifest, *, enabled=True, event="workflow_dispatch", automated=False):
+    if not enabled and (event == "schedule" or automated):
+        raise ValueError("Automatic updates are paused; no publication was attempted.")
     if public_steam_manifest() != manifest_id(manifest):
         raise ValueError("Steam updated during extraction; the next check will extract the newer release.")
     # The publisher checks the previous metadata blob after fetching data. It also
@@ -165,11 +169,13 @@ def main():
     args = parser.parse_args()
     if os.environ.get("GITHUB_REPOSITORY") != REPOSITORY or os.environ.get("GITHUB_REF") != "refs/heads/main":
         raise ValueError("Live updates require this repository's main branch.")
+    enabled = os.environ.get("UPDATES_ENABLED") == "true"
+    automated = os.environ.get("AUTOMATED") == "true"
+    event = os.environ["GITHUB_EVENT_NAME"]
     if args.operation == "current":
-        verify_current(os.environ["MANIFEST_ID"])
+        verify_current(os.environ["MANIFEST_ID"], enabled=enabled, event=event, automated=automated)
         return
-    result = plan(os.environ.get("FORCE") == "true", os.environ.get("UPDATES_ENABLED") == "true",
-                  os.environ["GITHUB_EVENT_NAME"])
+    result = plan(os.environ.get("FORCE") == "true", enabled, event, automated)
     with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:
         for key, value in result.items():
             output.write(f"{key}={str(value).lower() if isinstance(value, bool) else value}\n")

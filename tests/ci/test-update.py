@@ -6,6 +6,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import sys
 import unittest
 from unittest.mock import patch
 
@@ -83,13 +84,32 @@ class UpdateTests(unittest.TestCase):
             steam.assert_not_called()
         self.assertTrue(self.plan('123', force=True, enabled=False)['needed'])
 
-    def plan(self, current, *, force=False, enabled=True, ancestry='ahead'):
+    def test_automated_dispatch_obeys_pause_without_reading_services(self):
+        with patch.object(update, 'public_steam_manifest') as steam, \
+             patch.object(update, 'publication') as publication, patch.object(update, 'github') as api:
+            self.assertFalse(update.plan(False, False, 'workflow_dispatch', automated=True)['needed'])
+            steam.assert_not_called()
+            publication.assert_not_called()
+            api.assert_not_called()
+
+    def test_automated_dispatch_cannot_force_even_while_paused(self):
+        with patch.object(update, 'public_steam_manifest') as steam:
+            for enabled in [False, True]:
+                with self.subTest(enabled=enabled), self.assertRaisesRegex(ValueError, 'cannot force'):
+                    update.plan(True, enabled, 'workflow_dispatch', automated=True)
+            steam.assert_not_called()
+
+    def test_automated_dispatch_only_extracts_unpublished_versions(self):
+        self.assertFalse(self.plan('123', automated=True)['needed'])
+        self.assertTrue(self.plan('122', automated=True)['needed'])
+
+    def plan(self, current, *, force=False, enabled=True, ancestry='ahead', automated=False):
         responses = {'git/matching-refs/tags/exfil-v': [release()], f'compare/{SHA}...main': {'status': ancestry}}
         with patch.object(update, 'public_steam_manifest', return_value='123'), \
              patch.object(update, 'publication', return_value=(current, BLOB)), \
              patch.object(update, 'recent_runs', return_value=[]), \
              patch.object(update, 'github', side_effect=responses.__getitem__):
-            return update.plan(force, enabled, 'workflow_dispatch')
+            return update.plan(force, enabled, 'workflow_dispatch', automated=automated)
 
     def test_unpublished_release_and_manual_force_pin_source_and_previous_metadata(self):
         result = self.plan('122')
@@ -149,6 +169,29 @@ class UpdateTests(unittest.TestCase):
              patch.object(update, 'publication') as publication:
             update.verify_current('123')
             publication.assert_not_called()
+
+    def test_paused_automation_cannot_publish_but_explicit_manual_runs_can(self):
+        with patch.object(update, 'public_steam_manifest', return_value='123') as steam:
+            for event, automated in [('schedule', False), ('workflow_dispatch', True)]:
+                with self.subTest(event=event), self.assertRaisesRegex(ValueError, 'paused'):
+                    update.verify_current('123', enabled=False, event=event, automated=automated)
+            steam.assert_not_called()
+            update.verify_current('123', enabled=False)
+            steam.assert_called_once_with()
+            for event, automated in [('schedule', False), ('workflow_dispatch', True)]:
+                with self.subTest(event=event, enabled=True):
+                    update.verify_current('123', enabled=True, event=event, automated=automated)
+            self.assertEqual(steam.call_count, 3)
+
+    def test_publication_cli_passes_automatic_pause_state_to_the_guard(self):
+        environment = {'GITHUB_REPOSITORY': update.REPOSITORY, 'GITHUB_REF': 'refs/heads/main',
+                       'GITHUB_EVENT_NAME': 'workflow_dispatch', 'AUTOMATED': 'true',
+                       'UPDATES_ENABLED': 'false', 'MANIFEST_ID': '123'}
+        with patch.dict(os.environ, environment), patch.object(sys, 'argv', ['update.py', 'current']), \
+             patch.object(update, 'public_steam_manifest') as steam:
+            with self.assertRaisesRegex(ValueError, 'paused'):
+                update.main()
+            steam.assert_not_called()
 
     def test_retry_history_does_not_count_the_current_run(self):
         data = [{'id': 7, 'status': 'in_progress', 'updated_at': NOW.isoformat(), 'created_at': NOW.isoformat()},
