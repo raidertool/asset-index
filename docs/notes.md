@@ -121,6 +121,26 @@ vertex tint and no widget effects are assumed. These conditions do not reproduce
 arbitrary engine rendering. Tests use synthetic images and independent arithmetic
 fixtures. Unsupported materials retain evidence rather than a guessed icon.
 
+## Disk usage
+
+SteamDepotFS reads requested data with an 8 GiB chunk-cache limit; extraction
+spools selected package pages rather than downloading the whole game. Temporary
+extraction data is removed before export.
+
+The [2026-09-18 public run](https://github.com/raidertool/asset-index/actions/runs/35401161382)
+of `exfil-v1.0.1` on `ubuntu-latest` measured:
+
+| Phase | Peak additional disk use |
+| --- | ---: |
+| Extraction | 13.55 GiB |
+| Export, after extraction cleanup | 2.35 GiB |
+
+These are five-second samples relative to each phase's starting disk use. The
+phases run sequentially, so their peaks should not be added. They are observations
+for one run, not guaranteed limits. CI monitors available space and stops the
+process if it falls below the 2 GiB safety reserve; that reserve is not the total
+storage requirement.
+
 ## Local publication
 
 Validate a complete preview and write only public files locally:
